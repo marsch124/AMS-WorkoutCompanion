@@ -5,7 +5,7 @@ name: TestFlight
 # the iPhone too). The model and UI tests must pass first; a red suite ships nothing.
 #
 # Signing is done by an App Store Connect API key held as three repository
-# secrets (the same key AMS Workout Sync uses). The build number comes from
+# secrets. The build number comes from
 # project.yml (CURRENT_PROJECT_VERSION) — App Store Connect refuses one it already
 # has, so it goes up by one for every upload.
 on:
@@ -66,7 +66,7 @@ jobs:
       - name: Archive
         run: |
           # Signed ad hoc ("-"): asking Apple for a real certificate here mints one
-          # per runner and fills the account (AMS Workout Sync, build 38). The
+          # per runner and fills the account. The
           # export below re-signs for distribution with the App Store Connect key.
           xcodebuild archive \
             -project AMSWorkoutCompanion.xcodeproj \

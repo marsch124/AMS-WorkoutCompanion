@@ -15,7 +15,7 @@ all in a browser, the iPhone is enough.
 
 ## 2. The three secrets in this repository
 
-The same App Store Connect API key as AMS Workout Sync. At
+Your App Store Connect API key (one key serves all your apps). At
 <https://github.com/marsch124/AMS-WorkoutCompanion/settings/secrets/actions> →
 **New repository secret**, three times:
 

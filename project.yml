@@ -1,5 +1,5 @@
 # XcodeGen spec — run `xcodegen generate`, then open AMSWorkoutCompanion.xcodeproj.
-# iPhone only, portrait, like AMS Workout Sync.
+# iPhone only, portrait.
 name: AMSWorkoutCompanion
 options:
   bundleIdPrefix: com.schabbauer
