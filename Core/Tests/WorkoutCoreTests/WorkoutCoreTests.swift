@@ -106,6 +106,10 @@ final class WorkoutTests: XCTestCase {
         XCTAssertEqual(Clock.text(3725), "1:02:05")
     }
 
+    func testEveryKindHasAHandDrawnIconFromTheHub() {
+        XCTAssertEqual(WorkoutKind.allCases.map(\.iconKey), ["kettlebell", "yoga", "stopwatch"])
+    }
+
     func testStarters() {
         XCTAssertEqual(Starters.all.map(\.name), ["Push-ups", "Intervals", "Doctor's exercises"])
         XCTAssertEqual(Starters.all.map(\.colour), ["orange", "green", "pink"])
@@ -127,30 +131,17 @@ final class WorkoutTests: XCTestCase {
     }
 }
 
-final class PaletteTests: XCTestCase {
-    func testSeventeenColoursTwoRowsNoTeal() {
-        XCTAssertEqual(Palette.all.count, 17)
-        XCTAssertEqual(Set(Palette.all.map(\.key)).count, 17)
-        for s in Palette.all {
-            let c = Palette.rgb(s.fill)
-            let mx = max(c.r, c.g, c.b), mn = min(c.r, c.g, c.b)
-            guard mx - mn > 0.08 else { continue } // grey: no hue
-            var h: Double
-            if mx == c.r { h = 60 * ((c.g - c.b) / (mx - mn)) }
-            else if mx == c.g { h = 60 * ((c.b - c.r) / (mx - mn) + 2) }
-            else { h = 60 * ((c.r - c.g) / (mx - mn) + 4) }
-            if h < 0 { h += 360 }
-            XCTAssertFalse((160...200).contains(h), "\(s.name) is teal (hue \(h))")
-        }
+final class AppTextTests: XCTestCase {
+    func testWhatsNewIsNewestFirstAndStartsWithThisVersion() {
+        XCTAssertEqual(AppText.releases.map(\.version), ["1.1", "1.0"])
+        XCTAssertTrue(AppText.releases.allSatisfy { !$0.items.isEmpty })
     }
 
-    func testWordsOnEveryColourAreReadable() {
-        for s in Palette.all {
-            XCTAssertGreaterThanOrEqual(Palette.contrast(s.fill, s.ink), 3.0, s.name)
+    func testHowItWorksCoversEveryPart() {
+        let titles = AppText.howItWorks.map(\.title)
+        for kind in WorkoutKind.allCases {
+            XCTAssertTrue(titles.contains(kind.title.replacingOccurrences(of: "Exercise list", with: "Exercise lists")
+                .replacingOccurrences(of: "Interval timer", with: "Interval timers")), kind.title)
         }
-    }
-
-    func testUnknownKeyFallsBackToOrange() {
-        XCTAssertEqual(Palette.swatch("teal").key, "orange")
     }
 }

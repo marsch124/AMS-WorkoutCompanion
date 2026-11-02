@@ -1,3 +1,4 @@
+import AMSIcons
 import PhotosUI
 import SwiftUI
 import WorkoutCore
@@ -73,7 +74,7 @@ struct EditorScreen: View {
                     Button {
                         withAnimation { draft.exercises.append(Exercise()) }
                     } label: {
-                        Label("Add exercise", systemImage: "plus.circle.fill")
+                        MarkLabel(title: "Add exercise", d: Marks.plusAdd, colour: Theme.accent)
                             .font(.body.weight(.semibold))
                     }
                     .accessibilityIdentifier("editor-add-exercise")
@@ -92,8 +93,9 @@ struct EditorScreen: View {
         .navigationTitle(isNew ? draft.kind.title : "Edit workout")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if !isNew {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onDone) }
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel", action: onDone)
+                    .accessibilityIdentifier("editor-cancel")
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
@@ -129,24 +131,22 @@ struct EditorScreen: View {
     }
 }
 
-/// The seventeen colours in two rows of nine.
+/// The AMS-Icons hub's fifteen colours, in two rows of eight.
 private struct SwatchGrid: View {
     @Binding var selected: String
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 9), spacing: 10) {
-            ForEach(Palette.all, id: \.key) { s in
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 8), spacing: 10) {
+            ForEach(IconColour.palette) { s in
                 Button {
                     selected = s.key
                 } label: {
                     Circle()
-                        .fill(Color(hex: s.fill))
+                        .fill(s.fillColor)
                         .aspectRatio(1, contentMode: .fit)
                         .overlay {
                             if selected == s.key {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 13, weight: .heavy))
-                                    .foregroundStyle(Color(hex: s.ink))
+                                Mark(Marks.check, size: 16, colour: s.inkColor)
                             }
                         }
                         .overlay(Circle().stroke(Theme.ink, lineWidth: selected == s.key ? 2.5 : 0).padding(-3))
@@ -196,11 +196,11 @@ private struct ExerciseHeader: View {
             Text("Exercise \(number)")
             Spacer()
             Menu {
-                Button(action: up) { Label("Move up", systemImage: "arrow.up") }.disabled(number == 1)
-                Button(action: down) { Label("Move down", systemImage: "arrow.down") }.disabled(number == count)
-                Button(role: .destructive, action: remove) { Label("Remove", systemImage: "trash") }
+                Button("Move up", action: up).disabled(number == 1)
+                Button("Move down", action: down).disabled(number == count)
+                Button("Remove", role: .destructive, action: remove)
             } label: {
-                Image(systemName: "ellipsis.circle").font(.body)
+                Mark(Marks.more, size: 22, colour: Theme.accent).frame(width: 32, height: 24)
             }
             .accessibilityLabel("Exercise \(number) options")
         }
@@ -239,18 +239,15 @@ private struct ExerciseFields: View {
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
             HStack {
                 PhotosPicker(selection: $pick, matching: .images) {
-                    Label("Replace photo", systemImage: "photo")
+                    MarkLabel(title: "Replace photo", d: Marks.photo, colour: Theme.accent)
                 }
                 Spacer()
-                Button(role: .destructive) { exercise.photo = nil } label: {
-                    Label("Remove", systemImage: "trash").labelStyle(.iconOnly)
-                }
-                .accessibilityLabel("Remove photo")
+                Button("Remove photo", role: .destructive) { exercise.photo = nil }
             }
             .buttonStyle(.borderless)
         } else {
             PhotosPicker(selection: $pick, matching: .images) {
-                Label("Add photo", systemImage: "photo.badge.plus")
+                MarkLabel(title: "Add photo", d: Marks.photo, colour: Theme.accent)
             }
         }
     }

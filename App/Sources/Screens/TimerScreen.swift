@@ -137,7 +137,7 @@ struct TimerScreen: View {
         switch session.current {
         case .set?:
             Button { next() } label: {
-                Label("Done", systemImage: "checkmark")
+                MarkLabel(title: "Done", d: Marks.check, size: 26, colour: workout.inkOnFill)
             }
             .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill, height: 96))
             .accessibilityIdentifier("run-done")
@@ -146,7 +146,7 @@ struct TimerScreen: View {
                 Button("+15 s") { session.addTime(15) }
                     .buttonStyle(SoftButtonStyle())
                     .accessibilityIdentifier("run-add")
-                Button { next() } label: { Label("Skip", systemImage: "forward.end.fill") }
+                Button { next() } label: { MarkLabel(title: "Skip", d: Marks.skip, colour: workout.inkOnFill) }
                     .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill))
                     .accessibilityIdentifier("run-skip")
             }
@@ -155,12 +155,12 @@ struct TimerScreen: View {
                 Button {
                     if session.isPaused { session.resume(at: Date()) } else { session.pause(at: Date()) }
                 } label: {
-                    Label(session.isPaused ? "Resume" : "Pause",
-                          systemImage: session.isPaused ? "play.fill" : "pause.fill")
+                    MarkLabel(title: session.isPaused ? "Resume" : "Pause",
+                              d: session.isPaused ? Marks.play : Marks.pause, colour: Theme.ink)
                 }
                 .buttonStyle(SoftButtonStyle())
                 .accessibilityIdentifier("run-pause")
-                Button { next() } label: { Label("Skip", systemImage: "forward.end.fill") }
+                Button { next() } label: { MarkLabel(title: "Skip", d: Marks.skip, colour: workout.inkOnFill) }
                     .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill))
                     .accessibilityIdentifier("run-skip")
             }

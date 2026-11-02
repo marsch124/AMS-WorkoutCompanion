@@ -85,4 +85,23 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["workout-Push-ups"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["workout-Push-ups"].label.contains("6 × 20"))
     }
+
+    func testSettingsShowsTheVersionAndWhatsNew() {
+        app.buttons["open-settings"].tap()
+        let version = app.staticTexts["settings-version"]
+        XCTAssertTrue(version.waitForExistence(timeout: 5))
+        XCTAssertTrue(version.label.hasPrefix("1.1 ("), version.label)
+        app.buttons["settings-new"].tap()
+        XCTAssertTrue(app.staticTexts["whatsnew-1.1"].waitForExistence(timeout: 5))
+    }
+
+    func testANewWorkoutCanBeCancelled() {
+        app.buttons["add-workout"].tap()
+        app.buttons["new-reps"].tap()
+        let cancel = app.buttons["editor-cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        cancel.tap()
+        XCTAssertTrue(app.buttons["workout-Push-ups"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["workout-"].exists)
+    }
 }

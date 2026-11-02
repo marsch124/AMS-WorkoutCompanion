@@ -17,7 +17,7 @@ struct ChecklistScreen: View {
             header
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(spacing: 14) {
+                    VStack(spacing: 10) {
                         if workout.exercises.isEmpty {
                             Text("This list has no exercises yet. Close, then tap the pencil to add them.")
                                 .font(.title3)
@@ -109,13 +109,11 @@ struct ChecklistScreen: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
-                        .frame(height: 200)
+                        .frame(height: 180)
                         .frame(maxWidth: .infinity)
                         .clipped()
                         .overlay(alignment: .bottomTrailing) {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.white)
+                            Mark(Marks.expand, size: 14, colour: .white)
                                 .padding(8)
                                 .background(.black.opacity(0.45), in: Circle())
                                 .padding(10)
@@ -132,17 +130,14 @@ struct ChecklistScreen: View {
                 Cues.shared.tap()
             } label: {
                 HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 34, weight: .semibold))
-                        .foregroundStyle(isDone ? workout.fill : Theme.muted)
-                        .contentTransition(.symbolEffect(.replace))
+                    Mark(isDone ? Marks.ticked : Marks.circle, size: 32, colour: isDone ? workout.fill : Theme.muted)
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .firstTextBaseline) {
                             Text("\(number)")
                                 .font(.system(.subheadline, design: .rounded, weight: .heavy))
                                 .foregroundStyle(Theme.muted)
                             Text(e.name.isEmpty ? "Exercise" : e.name)
-                                .font(.system(.title3, design: .rounded, weight: .semibold))
+                                .font(.headline)
                                 .foregroundStyle(Theme.ink)
                                 .multilineTextAlignment(.leading)
                         }
@@ -164,7 +159,7 @@ struct ChecklistScreen: View {
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(16)
+                .padding(12)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -172,8 +167,8 @@ struct ChecklistScreen: View {
             .accessibilityIdentifier("check-\(number)")
         }
         .background(Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
             .stroke(isDone ? workout.fill : Theme.line, lineWidth: isDone ? 2 : 1))
         .opacity(isDone ? 0.6 : 1)
     }

@@ -8,7 +8,9 @@ An iPhone companion for workouts that change from day to day. Three kinds:
 | **Exercise list** | the doctor's exercises | a card per exercise — photo, amount, note — ticked off one by one |
 | **Interval timer** | 8 × 40 s work / 20 s rest | a countdown ring, Pause, Skip |
 
-Every workout has its own colour (the seventeen AMS template colours, no teal).
+Every workout has its own colour and hand-drawn icon from the shared AMS icon hub
+([AMS-Icons](https://github.com/marsch124/AMS-Icons)). Settings has How it works, What's new
+and the version. Full description: [`docs/specification.md`](docs/specification.md).
 Sound, vibration and spoken cues ("Set 2 of 5. 20 reps.", "Rest", "Last round. Go!"),
 and the screen stays awake while a workout runs. No history: it helps during the
 workout and keeps nothing afterwards. It starts with three examples: Push-ups,

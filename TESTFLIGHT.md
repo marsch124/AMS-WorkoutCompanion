@@ -30,8 +30,6 @@ other repository — they come from where they were kept when the key was made.
 
 ## 3. Ship
 
-**Actions → TestFlight → Run workflow** (on `main`). It runs every test first; a red
-suite ships nothing. Then Apple takes a few minutes, and the TestFlight app offers it.
-
-Before each further upload, `CURRENT_PROJECT_VERSION` in `project.yml` goes up by one —
-App Store Connect refuses a build number it already has.
+**Actions → TestFlight → Run workflow** (on `main`). It ships only a version whose tests
+passed after its push, and numbers the build itself. Then Apple takes a few minutes, and
+the TestFlight app offers it.

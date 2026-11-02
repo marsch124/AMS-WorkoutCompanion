@@ -1,22 +1,20 @@
 name: TestFlight
 
 # Archive the app and send it to TestFlight from GitHub's Mac — no Mac of his needed.
-# Run by hand: Actions → TestFlight → Run workflow (works from the GitHub app on
-# the iPhone too). The model and UI tests must pass first; a red suite ships nothing.
+# Started on request only: Actions → TestFlight → Run workflow. It ships only a version
+# whose tests already passed after its push (they are not run a second time).
 #
 # Signing is done by an App Store Connect API key held as three repository
-# secrets. The build number comes from
-# project.yml (CURRENT_PROJECT_VERSION) — App Store Connect refuses one it already
-# has, so it goes up by one for every upload.
+# secrets. The build number is this workflow's run number, so it goes up by itself.
 on:
   workflow_dispatch:
 
-jobs:
-  tests:
-    uses: ./.github/workflows/tests.yml
+permissions:
+  contents: read
+  actions: read
 
+jobs:
   upload:
-    needs: tests
     # Apple refuses anything built with an SDK older than iOS 26; this image has Xcode 26.
     runs-on: macos-26
     timeout-minutes: 60
@@ -26,6 +24,17 @@ jobs:
       ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: This version passed its tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OK=$(gh api "repos/${{ github.repository }}/actions/workflows/tests.yml/runs?head_sha=${{ github.sha }}&status=success" --jq '.total_count')
+          if [ "$OK" = "0" ]; then
+            echo "::error::The tests have not passed for ${GITHUB_SHA:0:7} yet — wait for the Tests run after the push, then start this again."
+            exit 1
+          fi
+          echo "Tests passed for ${GITHUB_SHA:0:7}."
 
       - name: Check the three secrets are there
         run: |
@@ -52,7 +61,7 @@ jobs:
 
       - name: Which build this is
         run: |
-          BUILD=$(grep CURRENT_PROJECT_VERSION project.yml | head -1 | tr -dc '0-9')
+          BUILD=${{ github.run_number }}
           VERSION=$(grep MARKETING_VERSION project.yml | head -1 | cut -d'"' -f2)
           echo "Building $VERSION ($BUILD) from ${GITHUB_REF_NAME} @ ${GITHUB_SHA:0:7}"
           echo "BUILD=$BUILD" >> "$GITHUB_ENV"
@@ -74,6 +83,7 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath build/AMSWorkoutCompanion.xcarchive \
+            CURRENT_PROJECT_VERSION="$BUILD" \
             CODE_SIGNING_ALLOWED=YES \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="-" \

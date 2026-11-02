@@ -1,3 +1,4 @@
+import AMSIcons
 import SwiftUI
 import WorkoutCore
 
@@ -8,31 +9,38 @@ struct HomeScreen: View {
     @State private var editing: Workout?
     @State private var adding = false
     @State private var deleting: Workout?
+    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: 8) {
                     ForEach(library.workouts) { w in
                         WorkoutCard(workout: w, start: { running = w }, edit: { editing = w })
                             .contextMenu {
-                                Button { editing = w } label: { Label("Edit", systemImage: "pencil") }
-                                Button { library.duplicate(w) } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
-                                Button(role: .destructive) { deleting = w } label: { Label("Delete", systemImage: "trash") }
+                                Button("Edit") { editing = w }
+                                Button("Duplicate") { library.duplicate(w) }
+                                Button("Delete", role: .destructive) { deleting = w }
                             }
                     }
                     if library.workouts.isEmpty {
                         EmptyHome { adding = true }
                     }
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
             .background(Theme.bg.ignoresSafeArea())
             .navigationTitle("Workouts")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showSettings = true } label: { Mark(Marks.gear, size: 24, colour: Theme.accent) }
+                        .accessibilityLabel("Settings")
+                        .accessibilityIdentifier("open-settings")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { adding = true } label: {
-                        Image(systemName: "plus.circle.fill").font(.title2)
+                        Mark(Marks.plusAdd, size: 26, colour: Theme.accent)
                     }
                     .accessibilityLabel("New workout")
                     .accessibilityIdentifier("add-workout")
@@ -50,6 +58,9 @@ struct HomeScreen: View {
                 KindPicker { adding = false }
             }
             .environment(library)
+        }
+        .sheet(isPresented: $showSettings) {
+            NavigationStack { SettingsScreen { showSettings = false } }
         }
         .fullScreenCover(item: $running) { w in
             Group {
@@ -80,11 +91,11 @@ private struct WorkoutCard: View {
     var body: some View {
         HStack(spacing: 0) {
             Button(action: start) {
-                HStack(spacing: 14) {
+                HStack(spacing: 12) {
                     WorkoutTile(workout: workout)
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(workout.name.isEmpty ? "Untitled" : workout.name)
-                            .font(.system(.title3, design: .rounded, weight: .semibold))
+                            .font(.headline)
                             .foregroundStyle(Theme.ink)
                             .lineLimit(2)
                         Text(workout.summary)
@@ -93,14 +104,12 @@ private struct WorkoutCard: View {
                             .lineLimit(1)
                     }
                     Spacer(minLength: 8)
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(workout.inkOnFill)
-                        .frame(width: 44, height: 44)
+                    Mark(Marks.play, size: 18, colour: workout.inkOnFill)
+                        .frame(width: 38, height: 38)
                         .background(workout.fill, in: Circle())
                 }
-                .padding(.vertical, 14)
-                .padding(.leading, 14)
+                .padding(.vertical, 8)
+                .padding(.leading, 10)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -108,18 +117,16 @@ private struct WorkoutCard: View {
             .accessibilityIdentifier("workout-\(workout.name)")
 
             Button(action: edit) {
-                Image(systemName: "pencil")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Theme.muted)
-                    .frame(width: 48, height: 72)
+                Mark(Marks.pencil, size: 20, colour: Theme.muted)
+                    .frame(width: 44, height: 54)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Edit \(workout.name)")
             .accessibilityIdentifier("edit-\(workout.name)")
         }
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Theme.line, lineWidth: 1))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.line, lineWidth: 1))
     }
 }
 
@@ -128,9 +135,7 @@ private struct EmptyHome: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "figure.mixed.cardio")
-                .font(.system(size: 56))
-                .foregroundStyle(Theme.muted)
+            IconMark(.hand("run"), size: 48, colour: Theme.muted)
             Text("No workouts yet")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(Theme.ink)
@@ -148,14 +153,14 @@ struct KindPicker: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            VStack(spacing: 8) {
                 ForEach(WorkoutKind.allCases, id: \.self) { kind in
                     NavigationLink(value: kind) {
-                        HStack(spacing: 14) {
+                        HStack(spacing: 12) {
                             WorkoutTile(workout: Workout(kind: kind))
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text(kind.title)
-                                    .font(.system(.title3, design: .rounded, weight: .semibold))
+                                    .font(.headline)
                                     .foregroundStyle(Theme.ink)
                                 Text(kind.blurb)
                                     .font(.subheadline)
@@ -163,17 +168,18 @@ struct KindPicker: View {
                                     .multilineTextAlignment(.leading)
                             }
                             Spacer(minLength: 0)
-                            Image(systemName: "chevron.right").foregroundStyle(Theme.muted)
+                            Mark(Marks.chevron, size: 16, colour: Theme.muted)
                         }
-                        .padding(14)
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Theme.line, lineWidth: 1))
+                        .padding(10)
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.line, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("new-\(kind.rawValue)")
                 }
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("New workout")

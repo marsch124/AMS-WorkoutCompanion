@@ -1,11 +1,14 @@
 import SwiftUI
 import UIKit
+import AMSIcons
 import WorkoutCore
 
 extension UIColor {
     convenience init(hex: String) {
-        let c = Palette.rgb(hex)
-        self.init(red: c.r, green: c.g, blue: c.b, alpha: 1)
+        let s = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+        let v = UInt32(s, radix: 16) ?? 0
+        self.init(red: CGFloat((v >> 16) & 0xff) / 255, green: CGFloat((v >> 8) & 0xff) / 255,
+                  blue: CGFloat(v & 0xff) / 255, alpha: 1)
     }
 }
 
@@ -33,24 +36,20 @@ enum Theme {
 }
 
 extension Workout {
-    var fill: Color { Color(hex: Palette.swatch(colour).fill) }
-    var inkOnFill: Color { Color(hex: Palette.swatch(colour).ink) }
+    /// The workout's colour from the AMS-Icons hub; an unknown key is orange.
+    var swatch: IconColour { IconColour.of(key: colour) ?? IconColour.of(key: "orange")! }
+    var fill: Color { swatch.fillColor }
+    var inkOnFill: Color { swatch.inkColor }
 }
 
-/// The rounded tile with the workout's symbol, in its colour.
+/// The rounded tile with the workout's hand-drawn icon, in its colour — the hub's IconTile.
 struct WorkoutTile: View {
     let workout: Workout
-    var size: CGFloat = 56
+    var size: CGFloat = 44
 
     var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-            .fill(workout.fill)
-            .frame(width: size, height: size)
-            .overlay(
-                Image(systemName: workout.kind.symbol)
-                    .font(.system(size: size * 0.45, weight: .semibold))
-                    .foregroundStyle(workout.inkOnFill)
-            )
+        IconTile(.hand(workout.kind.iconKey), colour: workout.swatch, fallbackTint: Theme.accent,
+                 letter: workout.name, size: size)
             .accessibilityHidden(true)
     }
 }
@@ -112,9 +111,7 @@ struct CloseButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(Theme.muted)
+            Mark(Marks.close, size: 18, colour: Theme.muted)
                 .frame(width: 44, height: 44)
                 .background(Theme.card, in: Circle())
         }
@@ -132,7 +129,7 @@ struct FinishedBadge: View {
             Circle()
                 .fill(workout.fill)
                 .frame(width: 160, height: 160)
-                .overlay(Image(systemName: "checkmark").font(.system(size: 72, weight: .bold)).foregroundStyle(workout.inkOnFill))
+                .overlay(Mark(Marks.check, size: 84, colour: workout.inkOnFill))
                 .shadow(color: workout.fill.opacity(0.45), radius: 24)
             Text("Well done")
                 .font(.system(size: 40, weight: .bold, design: .rounded))

@@ -25,12 +25,12 @@ public enum WorkoutKind: String, Codable, CaseIterable, Sendable {
         }
     }
 
-    /// SF Symbol shown on the workout's tile.
-    public var symbol: String {
+    /// The hand-drawn icon on the workout's tile — a key in the AMS-Icons hub.
+    public var iconKey: String {
         switch self {
-        case .reps: return "figure.strengthtraining.traditional"
-        case .checklist: return "checklist"
-        case .intervals: return "timer"
+        case .reps: return "kettlebell"
+        case .checklist: return "yoga"
+        case .intervals: return "stopwatch"
         }
     }
 
@@ -78,7 +78,7 @@ public struct Workout: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
     public var name: String
     public var kind: WorkoutKind
-    /// A key in `Palette`.
+    /// A colour key of the AMS-Icons hub (`IconColour.palette`).
     public var colour: String
     // Sets & reps
     public var sets: Int
