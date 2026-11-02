@@ -1,0 +1,61 @@
+name: Tests
+
+# Every push: the model's tests (seconds, no simulator), then the UI tests on an
+# iPhone simulator. A red run means the build is not fit for TestFlight.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  tests:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use the newest Xcode on this runner
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$NEWEST/Contents/Developer"
+          xcodebuild -version
+
+      - name: Model tests
+        run: swift test --package-path Core
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the project
+        run: xcodegen generate
+
+      - name: Pick a simulator the runner actually has
+        run: |
+          LINE=$(xcrun simctl list devices available | grep -E "^ +iPhone [0-9]" | sort -V | tail -1)
+          [ -n "$LINE" ] || LINE=$(xcrun simctl list devices available | grep -E "^ +iPhone" | tail -1)
+          UDID=$(echo "$LINE" | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
+          if [ -z "$UDID" ]; then
+            echo "::error::no iPhone simulator on this runner"; exit 1
+          fi
+          echo "SIM_UDID=$UDID" >> $GITHUB_ENV
+          echo "Using:$(echo "$LINE" | sed -E 's/ *\(.*//')"
+
+      - name: UI tests
+        run: |
+          xcodebuild test \
+            -project AMSWorkoutCompanion.xcodeproj \
+            -scheme AMSWorkoutCompanion \
+            -destination "platform=iOS Simulator,id=$SIM_UDID" \
+            -derivedDataPath build \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM=""
+
+      - name: Keep the results when it goes red
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestResults
+          path: TestResults.xcresult

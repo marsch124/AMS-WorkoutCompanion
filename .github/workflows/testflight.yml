@@ -1,0 +1,102 @@
+name: TestFlight
+
+# Archive the app and send it to TestFlight from GitHub's Mac — no Mac of his needed.
+# Run by hand: Actions → TestFlight → Run workflow (works from the GitHub app on
+# the iPhone too). The model and UI tests must pass first; a red suite ships nothing.
+#
+# Signing is done by an App Store Connect API key held as three repository
+# secrets (the same key AMS Workout Sync uses). The build number comes from
+# project.yml (CURRENT_PROJECT_VERSION) — App Store Connect refuses one it already
+# has, so it goes up by one for every upload.
+on:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  upload:
+    needs: tests
+    # Apple refuses anything built with an SDK older than iOS 26; this image has Xcode 26.
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the three secrets are there
+        run: |
+          missing=""
+          [ -n "$ASC_KEY_ID" ]    || missing="$missing ASC_KEY_ID"
+          [ -n "$ASC_ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID"
+          [ -n "$ASC_KEY_P8" ]    || missing="$missing ASC_KEY_P8"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing:$missing — add them under Settings → Secrets and variables → Actions (see TESTFLIGHT.md)."
+            exit 1
+          fi
+
+      - name: Put the key where xcodebuild looks for it
+        run: |
+          mkdir -p "$HOME/private_keys"
+          printf '%s' "$ASC_KEY_P8" > "$HOME/private_keys/AuthKey_$ASC_KEY_ID.p8"
+          chmod 600 "$HOME/private_keys/AuthKey_$ASC_KEY_ID.p8"
+
+      - name: Use the newest Xcode on this runner
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$NEWEST/Contents/Developer"
+          xcodebuild -version
+
+      - name: Which build this is
+        run: |
+          BUILD=$(grep CURRENT_PROJECT_VERSION project.yml | head -1 | tr -dc '0-9')
+          VERSION=$(grep MARKETING_VERSION project.yml | head -1 | cut -d'"' -f2)
+          echo "Building $VERSION ($BUILD) from ${GITHUB_REF_NAME} @ ${GITHUB_SHA:0:7}"
+          echo "BUILD=$BUILD" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Install XcodeGen and generate the project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Archive
+        run: |
+          # Signed ad hoc ("-"): asking Apple for a real certificate here mints one
+          # per runner and fills the account (AMS Workout Sync, build 38). The
+          # export below re-signs for distribution with the App Store Connect key.
+          xcodebuild archive \
+            -project AMSWorkoutCompanion.xcodeproj \
+            -scheme AMSWorkoutCompanion \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/AMSWorkoutCompanion.xcarchive \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="-" \
+            EXPANDED_CODE_SIGN_IDENTITY="-"
+
+      # tools/ExportOptions.plist carries destination=upload, so this step is the upload.
+      - name: Export and send it to TestFlight
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/AMSWorkoutCompanion.xcarchive \
+            -exportOptionsPlist tools/ExportOptions.plist \
+            -exportPath build/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "$VERSION ($BUILD) is on its way to TestFlight. Apple takes a few minutes to process it."
+
+      - name: Keep the log when it goes red
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-build
+          path: build/export
+          if-no-files-found: ignore
+          retention-days: 5
