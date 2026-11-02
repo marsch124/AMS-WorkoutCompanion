@@ -18,6 +18,7 @@ public enum AppText {
             "Changed: the colours are the fifteen shared AMS colours, in two rows of eight. A workout that had Light blue or Light yellow now shows orange until you pick again.",
             "Changed: Workouts, New workout and the exercise list are more compact — smaller tiles, less space between rows, standard text sizes.",
             "Changed: a new workout has Cancel as well as Save.",
+            "Changed: the name under the app icon is now Workouts. It was Companion, which Apple keeps for one of its own apps.",
         ]),
         Release(version: "1.0", date: "2 November 2026", items: [
             "The first version: Sets & reps with a rest timer, Exercise lists with a note and a photo per exercise, and Interval timers.",

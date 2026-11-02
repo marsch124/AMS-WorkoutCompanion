@@ -44,8 +44,9 @@ targets:
     info:
       path: App/Config/Info.plist
       properties:
-        # The name under the icon: "AMS WorkoutCompanion" is too long for the home screen.
-        CFBundleDisplayName: Companion
+        # The name under the icon: "AMS WorkoutCompanion" is too long for the home screen, and
+        # Apple refuses "Companion" (error 90129: the name of one of its own apps).
+        CFBundleDisplayName: Workouts
         CFBundleName: AMS WorkoutCompanion
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)

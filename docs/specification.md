@@ -1,6 +1,6 @@
 # AMS WorkoutCompanion — specification
 
-Version 1.1. iPhone only, portrait, iOS 17+, light and dark.
+Version 1.1. iPhone only, portrait, iOS 17+, light and dark. The name under the app icon is "Workouts" (not "Companion": Apple refuses it, error 90129).
 
 ## Workouts (home)
 - One card per workout: its tile (hand-drawn icon from AMS-Icons on the workout's colour), name, one-line summary, a play button in the workout's colour, a pencil.

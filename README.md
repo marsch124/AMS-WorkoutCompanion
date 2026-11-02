@@ -28,8 +28,9 @@ Intervals and an empty Doctor's exercises.
 - CI on every push: model tests and UI tests on an iPhone simulator (`.github/workflows/tests.yml`).
 - TestFlight from GitHub's Mac, no own Mac needed: [`TESTFLIGHT.md`](TESTFLIGHT.md).
 
-The home screen shows the app as **Companion** — "AMS WorkoutCompanion" is too long
-under an icon (`CFBundleDisplayName` in `project.yml`).
+The home screen shows the app as **Workouts** — "AMS WorkoutCompanion" is too long
+under an icon, and Apple refuses "Companion" (one of its own apps; upload error 90129).
+`CFBundleDisplayName` in `project.yml`.
 
 ## Not in version 1
 
