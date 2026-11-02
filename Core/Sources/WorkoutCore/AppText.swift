@@ -13,6 +13,7 @@ public enum AppText {
         Release(version: "1.1", date: "2 November 2026", items: [
             "New: Settings, from the gear at the top left of Workouts — with How it works, What's new and the version number.",
             "New: every icon is hand-drawn, from the shared AMS icon library — a kettlebell for Sets & reps, a stretching figure for Exercise lists, a stopwatch for Interval timers.",
+            "New: the marks on the buttons (Done, Skip, Pause, Close, Add, Edit…) are hand-drawn too, from the same shared library.",
             "New: the app icon is a white hand-drawn stopwatch on a calm orange background.",
             "Changed: the colours are the fifteen shared AMS colours, in two rows of eight. A workout that had Light blue or Light yellow now shows orange until you pick again.",
             "Changed: Workouts, New workout and the exercise list are more compact — smaller tiles, less space between rows, standard text sizes.",

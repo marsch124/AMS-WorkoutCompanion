@@ -1,3 +1,4 @@
+import AMSIcons
 import SwiftUI
 import WorkoutCore
 
@@ -137,7 +138,7 @@ struct TimerScreen: View {
         switch session.current {
         case .set?:
             Button { next() } label: {
-                MarkLabel(title: "Done", d: Marks.check, size: 26, colour: workout.inkOnFill)
+                MarkLabel(title: "Done", mark: .check, size: 26, colour: workout.inkOnFill)
             }
             .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill, height: 96))
             .accessibilityIdentifier("run-done")
@@ -146,7 +147,7 @@ struct TimerScreen: View {
                 Button("+15 s") { session.addTime(15) }
                     .buttonStyle(SoftButtonStyle())
                     .accessibilityIdentifier("run-add")
-                Button { next() } label: { MarkLabel(title: "Skip", d: Marks.skip, colour: workout.inkOnFill) }
+                Button { next() } label: { MarkLabel(title: "Skip", mark: .skip, colour: workout.inkOnFill) }
                     .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill))
                     .accessibilityIdentifier("run-skip")
             }
@@ -156,11 +157,11 @@ struct TimerScreen: View {
                     if session.isPaused { session.resume(at: Date()) } else { session.pause(at: Date()) }
                 } label: {
                     MarkLabel(title: session.isPaused ? "Resume" : "Pause",
-                              d: session.isPaused ? Marks.play : Marks.pause, colour: Theme.ink)
+                              mark: session.isPaused ? .play : .pause, colour: Theme.ink)
                 }
                 .buttonStyle(SoftButtonStyle())
                 .accessibilityIdentifier("run-pause")
-                Button { next() } label: { MarkLabel(title: "Skip", d: Marks.skip, colour: workout.inkOnFill) }
+                Button { next() } label: { MarkLabel(title: "Skip", mark: .skip, colour: workout.inkOnFill) }
                     .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill))
                     .accessibilityIdentifier("run-skip")
             }

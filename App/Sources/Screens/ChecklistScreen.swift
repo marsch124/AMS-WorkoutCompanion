@@ -1,3 +1,4 @@
+import AMSIcons
 import SwiftUI
 import WorkoutCore
 
@@ -113,7 +114,7 @@ struct ChecklistScreen: View {
                         .frame(maxWidth: .infinity)
                         .clipped()
                         .overlay(alignment: .bottomTrailing) {
-                            Mark(Marks.expand, size: 14, colour: .white)
+                            ControlMarkView(.expand, size: 14, colour: .white)
                                 .padding(8)
                                 .background(.black.opacity(0.45), in: Circle())
                                 .padding(10)
@@ -130,7 +131,7 @@ struct ChecklistScreen: View {
                 Cues.shared.tap()
             } label: {
                 HStack(alignment: .top, spacing: 14) {
-                    Mark(isDone ? Marks.ticked : Marks.circle, size: 32, colour: isDone ? workout.fill : Theme.muted)
+                    ControlMarkView(isDone ? .ticked : .circle, size: 32, colour: isDone ? workout.fill : Theme.muted)
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .firstTextBaseline) {
                             Text("\(number)")

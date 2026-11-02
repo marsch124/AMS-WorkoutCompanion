@@ -34,13 +34,13 @@ struct HomeScreen: View {
             .navigationTitle("Workouts")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { showSettings = true } label: { Mark(Marks.gear, size: 24, colour: Theme.accent) }
+                    Button { showSettings = true } label: { ControlMarkView(.settings, size: 24, colour: Theme.accent) }
                         .accessibilityLabel("Settings")
                         .accessibilityIdentifier("open-settings")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { adding = true } label: {
-                        Mark(Marks.plusAdd, size: 26, colour: Theme.accent)
+                        ControlMarkView(.addCircle, size: 26, colour: Theme.accent)
                     }
                     .accessibilityLabel("New workout")
                     .accessibilityIdentifier("add-workout")
@@ -104,7 +104,7 @@ private struct WorkoutCard: View {
                             .lineLimit(1)
                     }
                     Spacer(minLength: 8)
-                    Mark(Marks.play, size: 18, colour: workout.inkOnFill)
+                    ControlMarkView(.play, size: 18, colour: workout.inkOnFill)
                         .frame(width: 38, height: 38)
                         .background(workout.fill, in: Circle())
                 }
@@ -117,7 +117,7 @@ private struct WorkoutCard: View {
             .accessibilityIdentifier("workout-\(workout.name)")
 
             Button(action: edit) {
-                Mark(Marks.pencil, size: 20, colour: Theme.muted)
+                ControlMarkView(.edit, size: 20, colour: Theme.muted)
                     .frame(width: 44, height: 54)
                     .contentShape(Rectangle())
             }
@@ -168,7 +168,7 @@ struct KindPicker: View {
                                     .multilineTextAlignment(.leading)
                             }
                             Spacer(minLength: 0)
-                            Mark(Marks.chevron, size: 16, colour: Theme.muted)
+                            ControlMarkView(.chevron, size: 16, colour: Theme.muted)
                         }
                         .padding(10)
                         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))

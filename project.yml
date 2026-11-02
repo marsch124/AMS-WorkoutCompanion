@@ -22,7 +22,7 @@ packages:
   # reaches this app by surprise.
   AMSIcons:
     url: https://github.com/marsch124/AMS-Icons
-    revision: 43cbcb1f0ab543070cdbc4b8879c4fa00cba6e57
+    revision: ba966bdc1eae47033f234a49e2678543d868c36b
 targets:
   AMSWorkoutCompanion:
     type: application

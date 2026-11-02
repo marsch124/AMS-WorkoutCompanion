@@ -74,7 +74,7 @@ struct EditorScreen: View {
                     Button {
                         withAnimation { draft.exercises.append(Exercise()) }
                     } label: {
-                        MarkLabel(title: "Add exercise", d: Marks.plusAdd, colour: Theme.accent)
+                        MarkLabel(title: "Add exercise", mark: .addCircle, colour: Theme.accent)
                             .font(.body.weight(.semibold))
                     }
                     .accessibilityIdentifier("editor-add-exercise")
@@ -146,7 +146,7 @@ private struct SwatchGrid: View {
                         .aspectRatio(1, contentMode: .fit)
                         .overlay {
                             if selected == s.key {
-                                Mark(Marks.check, size: 16, colour: s.inkColor)
+                                ControlMarkView(.check, size: 16, colour: s.inkColor)
                             }
                         }
                         .overlay(Circle().stroke(Theme.ink, lineWidth: selected == s.key ? 2.5 : 0).padding(-3))
@@ -200,7 +200,7 @@ private struct ExerciseHeader: View {
                 Button("Move down", action: down).disabled(number == count)
                 Button("Remove", role: .destructive, action: remove)
             } label: {
-                Mark(Marks.more, size: 22, colour: Theme.accent).frame(width: 32, height: 24)
+                ControlMarkView(.more, size: 22, colour: Theme.accent).frame(width: 32, height: 24)
             }
             .accessibilityLabel("Exercise \(number) options")
         }
@@ -239,7 +239,7 @@ private struct ExerciseFields: View {
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
             HStack {
                 PhotosPicker(selection: $pick, matching: .images) {
-                    MarkLabel(title: "Replace photo", d: Marks.photo, colour: Theme.accent)
+                    MarkLabel(title: "Replace photo", mark: .photo, colour: Theme.accent)
                 }
                 Spacer()
                 Button("Remove photo", role: .destructive) { exercise.photo = nil }
@@ -247,7 +247,7 @@ private struct ExerciseFields: View {
             .buttonStyle(.borderless)
         } else {
             PhotosPicker(selection: $pick, matching: .images) {
-                MarkLabel(title: "Add photo", d: Marks.photo, colour: Theme.accent)
+                MarkLabel(title: "Add photo", mark: .photo, colour: Theme.accent)
             }
         }
     }

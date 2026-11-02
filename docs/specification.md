@@ -40,4 +40,4 @@ Version 1.1. iPhone only, portrait, iOS 17+, light and dark.
 - `Documents/workouts.json` (`{"version":1,"workouts":[…]}`), photos in `Documents/Photos/`. Unused photos are removed on save. A file that cannot be read is kept aside, never overwritten. No history, no iCloud, nothing leaves the iPhone.
 
 ## Look
-- Page and text colours as AMS Packing (light / dark pairs). Workout colours and icons from AMS-Icons. Control marks drawn the same way (1.9 stroke, round ends, 24-point grid). No stock symbols, no emoji.
+- Page and text colours as AMS Packing (light / dark pairs). Workout colours, icons and the marks on buttons (ControlMark) all from AMS-Icons, pinned to one commit. No stock symbols, no emoji.

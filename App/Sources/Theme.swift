@@ -111,7 +111,7 @@ struct CloseButton: View {
 
     var body: some View {
         Button(action: action) {
-            Mark(Marks.close, size: 18, colour: Theme.muted)
+            ControlMarkView(.close, size: 18, colour: Theme.muted)
                 .frame(width: 44, height: 44)
                 .background(Theme.card, in: Circle())
         }
@@ -129,7 +129,7 @@ struct FinishedBadge: View {
             Circle()
                 .fill(workout.fill)
                 .frame(width: 160, height: 160)
-                .overlay(Mark(Marks.check, size: 84, colour: workout.inkOnFill))
+                .overlay(ControlMarkView(.check, size: 84, colour: workout.inkOnFill))
                 .shadow(color: workout.fill.opacity(0.45), radius: 24)
             Text("Well done")
                 .font(.system(size: 40, weight: .bold, design: .rounded))
