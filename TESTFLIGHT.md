@@ -33,3 +33,23 @@ other repository — they come from where they were kept when the key was made.
 **Actions → TestFlight → Run workflow** (on `main`). It ships only a version whose tests
 passed after its push, and numbers the build itself. Then Apple takes a few minutes, and
 the TestFlight app offers it.
+
+Or from a Mac with Xcode: archive (Release, `generic/platform=iOS`) and export with
+`tools/ExportOptions.plist`, which uploads. Version 1.1 went this way on 2 Nov 2026.
+
+- **Build number** = the date and time in Sweden, `YYYYMMDDHHMM` (202611021506 =
+  2 Nov 2026 15:06), both ways. Apple refuses a build number lower than one it already
+  has for the version, so the two ways must count the same.
+- **Every build must be added to the tester group** in App Store Connect
+  (TestFlight → the group → Builds → "+"). A group does not pick new builds up by itself.
+
+## Pictures of every screen, day and night
+
+`UITests/ScreenTour.swift` walks the nine main screens and attaches a picture of each.
+It is skipped in normal test runs. To take them, set the simulator to light or dark
+(`xcrun simctl ui <device> appearance dark`) and run:
+
+    TEST_RUNNER_SCREEN_TOUR=1 xcodebuild test -project AMSWorkoutCompanion.xcodeproj \
+      -scheme AMSWorkoutCompanion -destination "platform=iOS Simulator,id=<device>" \
+      -resultBundlePath tour.xcresult -only-testing:AMSWorkoutCompanionUITests/ScreenTour
+    xcrun xcresulttool export attachments --path tour.xcresult --output-path shots
