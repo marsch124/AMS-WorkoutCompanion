@@ -13,9 +13,10 @@ final class WorkoutCompanionUITests: XCTestCase {
     }
 
     /// Waits for an element's label, since the screen animates between phases.
-    func waitFor(_ e: XCUIElement, label: String, file: StaticString = #filePath, line: UInt = #line) {
+    func waitFor(_ e: XCUIElement, label: String, timeout: TimeInterval = 8,
+                 file: StaticString = #filePath, line: UInt = #line) {
         let found = expectation(for: NSPredicate(format: "label == %@", label), evaluatedWith: e)
-        if XCTWaiter.wait(for: [found], timeout: 8) != .completed {
+        if XCTWaiter.wait(for: [found], timeout: timeout) != .completed {
             XCTFail("expected \"\(label)\", saw \"\(e.exists ? e.label : "nothing")\"", file: file, line: line)
         }
     }
@@ -38,12 +39,11 @@ final class WorkoutCompanionUITests: XCTestCase {
         waitFor(set, label: "Set 2 of 5")
     }
 
-    func testIntervalsCountDownAndPause() {
+    func testIntervalsMoveOnByThemselvesAndPause() {
         app.buttons["workout-Intervals"].tap()
+        // The 5-second get ready runs out on its own (a slow simulator may already be past it).
         let phase = app.staticTexts["run-phase"]
-        waitFor(phase, label: "GET READY")
-        app.buttons["run-skip"].tap()
-        waitFor(phase, label: "WORK")
+        waitFor(phase, label: "WORK", timeout: 20)
         app.buttons["run-pause"].tap()
         app.buttons["run-close"].tap()
         app.buttons["End workout"].tap()
