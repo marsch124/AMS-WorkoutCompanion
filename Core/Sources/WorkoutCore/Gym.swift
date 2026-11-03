@@ -77,10 +77,17 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
     /// What it trains (since 1.9); nil = not chosen yet. Time machines count as cardio when not chosen.
     /// A `MuscleGroup` id; nil = not chosen, or its group was deleted.
     public var muscle: String?
+    /// A heavy machine rests longer by default (since 1.11, Settings → Rest); nil = a light machine.
+    public var heavy: Bool?
+    /// Superset partner (since 1.11): the machine done in turn with this one, with no rest in between.
+    public var partner: UUID?
+
+    public var isHeavy: Bool { heavy == true }
 
     public var hasLevel: Bool { noLevel != true }
     public var hasIncline: Bool { noIncline != true }
 
+    /// The rest when the log's defaults are not at hand; use `GymLog.rest(for:)` on the screens.
     public var rest: Int { restSeconds ?? GymLog.restSeconds }
     public var weightStep: Double { step ?? GymLog.step }
     public var repsForMore: Int { topReps ?? GymLog.topReps }
@@ -103,7 +110,7 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
         self.instructions = instructions
     }
 
-    enum CodingKeys: String, CodingKey { case id, gymID, name, photo, setting, logs, instructions, restSeconds, step, topReps, noLevel, noIncline, icon, muscle }
+    enum CodingKeys: String, CodingKey { case id, gymID, name, photo, setting, logs, instructions, restSeconds, step, topReps, noLevel, noIncline, icon, muscle, heavy, partner }
 
     /// Files from before 1.4 have no gym, no `logs` and no instructions.
     public init(from decoder: Decoder) throws {
@@ -123,6 +130,8 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
         // Anything odd reads as not chosen, never as a broken file.
         muscle = (try? c.decodeIfPresent(String.self, forKey: .muscle)) ?? nil
+        heavy = (try? c.decodeIfPresent(Bool.self, forKey: .heavy)) ?? nil
+        partner = (try? c.decodeIfPresent(UUID.self, forKey: .partner)) ?? nil
     }
 }
 
@@ -135,11 +144,16 @@ public struct GymSet: Codable, Hashable, Sendable {
     public var level: Double?
     /// Per cent.
     public var incline: Double?
+    /// A warm-up set (since 1.11): kept and shown, but never a record or a reason for more weight.
+    public var warmup: Bool?
 
-    public init(kg: Double, reps: Int) {
+    public init(kg: Double, reps: Int, warmup: Bool = false) {
         self.kg = kg
         self.reps = reps
+        self.warmup = warmup ? true : nil
     }
+
+    public var isWarmup: Bool { warmup == true }
 
     /// A time set: no weight, no reps.
     public init(seconds: Int, level: Double?, incline: Double?) {
@@ -210,10 +224,16 @@ public struct MachineEntry: Codable, Identifiable, Hashable, Sendable {
         return sets.map { "\($0.kg <= 0 ? "BW" : GymSet.number($0.kg)) × \($0.reps)" }.joined(separator: ", ") + " kg"
     }
 
-    public var heaviest: Double { sets.map(\.kg).max() ?? 0 }
+    /// The sets that count: every set but the warm-ups (all of them when there are only warm-ups).
+    public var working: [GymSet] {
+        let w = sets.filter { !$0.isWarmup }
+        return w.isEmpty ? sets : w
+    }
+
+    public var heaviest: Double { working.map(\.kg).max() ?? 0 }
 
     /// The most reps in one set — the best of a reps-only exercise.
-    public var mostReps: Int { sets.map(\.reps).max() ?? 0 }
+    public var mostReps: Int { working.map(\.reps).max() ?? 0 }
 
     /// "15, 15, 12 reps" — a reps-only exercise has no weight to show.
     public var repsText: String { sets.map { String($0.reps) }.joined(separator: ", ") + " reps" }
@@ -295,7 +315,31 @@ public struct NextSet: Equatable, Sendable {
     public var reason: String?
 }
 
-/// Every machine and every visit — the whole gym log.
+/// The usual rest after a set, by type (since 1.11). Each machine may still set its own.
+public struct RestDefaults: Codable, Equatable, Hashable, Sendable {
+    public var heavy: Int
+    public var light: Int
+    public var exercise: Int
+
+    public init(heavy: Int = 120, light: Int = 90, exercise: Int = 60) {
+        self.heavy = heavy
+        self.light = light
+        self.exercise = exercise
+    }
+}
+
+/// One note found by Search my notes (since 1.11).
+public struct NoteHit: Identifiable, Hashable, Sendable {
+    public enum Kind: String, Sendable { case machineNote, visitNote, setting }
+    public var kind: Kind
+    public var text: String
+    /// The visit's day; nil for a machine's setting.
+    public var date: Date?
+    public var visitID: UUID?
+    public var machineID: UUID?
+    public var id: String { "\(kind.rawValue)-\(visitID?.uuidString ?? "")-\(machineID?.uuidString ?? "")" }
+}
+
 /// A plan saved under a name to use again (since 1.10) — "Leg day".
 public struct PlanTemplate: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
@@ -339,10 +383,14 @@ public struct GymLog: Codable, Equatable, Sendable {
     public var muscles: [MuscleGroup]
     /// Saved plans to use again, each for its gym (since 1.10).
     public var templates: [PlanTemplate]
+    /// The usual rest for heavy machines, light machines and exercises (since 1.11).
+    public var rests: RestDefaults
 
     public init(machines: [Machine] = [], visits: [GymVisit] = [], busyMarks: [BusyMark] = [],
                 gyms: [GymPlace] = [], currentGymID: UUID? = nil, plans: [DayPlan] = [], homeIcon: String? = nil,
-                muscles: [MuscleGroup] = MuscleGroup.defaults, templates: [PlanTemplate] = []) {
+                muscles: [MuscleGroup] = MuscleGroup.defaults, templates: [PlanTemplate] = [],
+                rests: RestDefaults = RestDefaults()) {
+        self.rests = rests
         self.muscles = muscles
         self.templates = templates
         self.machines = machines
@@ -487,7 +535,7 @@ public struct GymLog: Codable, Equatable, Sendable {
     public func best(_ machineID: UUID, excluding visitID: UUID? = nil) -> Double? {
         let sets = visits.filter { $0.id != visitID }
             .flatMap(\.entries).filter { $0.machineID == machineID }
-            .flatMap(\.sets).filter { $0.reps > 0 }
+            .flatMap(\.sets).filter { $0.reps > 0 && !$0.isWarmup }
         if machine(machineID)?.logs == .reps { return sets.map { Double($0.reps) }.max() }
         return sets.map(\.kg).max()
     }
@@ -511,12 +559,13 @@ public struct GymLog: Codable, Equatable, Sendable {
     /// the set just done again; else the same set last time, with 2.5 kg more when every set last
     /// time reached 12 reps; else 20 kg × 10.
     public func next(_ machineID: UUID, in visit: GymVisit) -> NextSet {
-        if let done = visit.entries.last(where: { $0.machineID == machineID })?.sets.last {
+        if var done = visit.entries.last(where: { $0.machineID == machineID })?.sets.last {
+            done.warmup = nil
             return NextSet(set: done, reason: nil)
         }
         let isTime = machine(machineID)?.logs == .time
         let isReps = machine(machineID)?.logs == .reps
-        guard let lastEntry = last(machineID, excluding: visit.id)?.entry, let first = lastEntry.sets.first else {
+        guard let lastEntry = last(machineID, excluding: visit.id)?.entry, let first = lastEntry.working.first else {
             if isReps { return NextSet(set: GymLog.starterReps, reason: nil) }
             guard isTime, let m = machine(machineID) else { return NextSet(set: GymLog.starter, reason: nil) }
             return NextSet(set: GymSet(seconds: 20 * 60, level: m.hasLevel ? 5 : nil, incline: m.hasIncline ? 0 : nil), reason: nil)
@@ -524,7 +573,8 @@ public struct GymLog: Codable, Equatable, Sendable {
         if let planned = lastEntry.nextTime {
             return NextSet(set: planned, reason: "Your plan from last time: \(text(planned, machine: machineID))")
         }
-        let previous = lastEntry.sets
+        // Warm-ups never earn more weight: only the working sets count.
+        let previous = lastEntry.working
         if isTime || first.isTime { return NextSet(set: first, reason: nil) }
         if isReps {
             // Every set reached the first set's reps: one more rep next time.
@@ -554,7 +604,7 @@ public struct GymLog: Codable, Equatable, Sendable {
 
     /// The best of a visit on this machine: its heaviest weight, or most reps on a reps-only exercise.
     public func top(_ machineID: UUID, in visit: GymVisit) -> Double {
-        let sets = visit.entries.filter { $0.machineID == machineID }.flatMap(\.sets)
+        let sets = visit.entries.filter { $0.machineID == machineID }.flatMap(\.sets).filter { !$0.isWarmup }
         return sets.map { score($0, machine: machineID) }.max() ?? 0
     }
 
@@ -562,7 +612,7 @@ public struct GymLog: Codable, Equatable, Sendable {
     public func history(_ machineID: UUID) -> [(date: Date, kg: Double, entry: MachineEntry)] {
         visits.sorted { $0.date < $1.date }.compactMap { v in
             let entries = v.entries.filter { $0.machineID == machineID && !$0.sets.isEmpty }
-            let score: (MachineEntry) -> Double = { e in e.sets.map { self.score($0, machine: machineID) }.max() ?? 0 }
+            let score: (MachineEntry) -> Double = { e in e.working.map { self.score($0, machine: machineID) }.max() ?? 0 }
             guard let top = entries.max(by: { score($0) < score($1) }) else { return nil }
             return (v.date, score(top), top)
         }
@@ -660,6 +710,7 @@ public struct GymLog: Codable, Equatable, Sendable {
         for i in visits.indices { visits[i].entries.removeAll { $0.machineID == id } }
         visits.removeAll { $0.entries.isEmpty }
         busyMarks.removeAll { $0.machineID == id }
+        for i in machines.indices where machines[i].partner == id { machines[i].partner = nil }
         for i in templates.indices { templates[i].order.removeAll { $0 == id } }
         templates.removeAll { $0.order.isEmpty }
         removeFromPlan(id)
@@ -724,6 +775,97 @@ public struct GymLog: Codable, Equatable, Sendable {
 
     public mutating func deleteTemplate(_ id: UUID) { templates.removeAll { $0.id == id } }
 
+    // MARK: Rest per exercise type (since 1.11)
+
+    /// The rest after a set: the machine's own, else the usual one for its type.
+    public func rest(for machine: Machine?) -> Int {
+        guard let machine else { return rests.light }
+        if let own = machine.restSeconds { return own }
+        if machine.logs == .reps { return rests.exercise }
+        return machine.isHeavy ? rests.heavy : rests.light
+    }
+
+    // MARK: Supersets (since 1.11)
+
+    /// Pairs two machines of one gym; their old partners are let go. Pairing a machine with itself
+    /// or with nil takes its pair apart.
+    public mutating func pair(_ a: UUID, with b: UUID?) {
+        func letGo(_ id: UUID) {
+            guard let i = machines.firstIndex(where: { $0.id == id }) else { return }
+            if let p = machines[i].partner, let j = machines.firstIndex(where: { $0.id == p }), machines[j].partner == id {
+                machines[j].partner = nil
+            }
+            machines[i].partner = nil
+        }
+        letGo(a)
+        guard let b, b != a, machine(b) != nil, let i = machines.firstIndex(where: { $0.id == a }),
+              let j = machines.firstIndex(where: { $0.id == b }) else { return }
+        letGo(b)
+        machines[i].partner = b
+        machines[j].partner = a
+    }
+
+    /// The partner of a machine, while both still exist.
+    public func partner(of machineID: UUID) -> Machine? {
+        guard let p = machine(machineID)?.partner, let m = machine(p), m.partner == machineID else { return nil }
+        return m
+    }
+
+    /// After a set in a superset: the partner to go to straight away, without rest, while it has done
+    /// fewer sets today than this machine. nil = the round is complete: rest, then the partner again.
+    public func supersetJump(after machineID: UUID, in visit: GymVisit?) -> UUID? {
+        guard let p = partner(of: machineID), let visit else { return nil }
+        func sets(_ id: UUID) -> Int { visit.entries.filter { $0.machineID == id }.reduce(0) { $0 + $1.sets.count } }
+        return sets(p.id) < sets(machineID) ? p.id : nil
+    }
+
+    // MARK: Finding (since 1.11)
+
+    /// The machines of a gym whose name or setting holds the words; empty words = all of them.
+    public func machines(in gym: UUID?, matching words: String) -> [Machine] {
+        let w = words.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !w.isEmpty else { return machines(in: gym) }
+        return machines(in: gym).filter {
+            $0.name.localizedStandardContains(w) || $0.setting.localizedStandardContains(w)
+        }
+    }
+
+    /// Every note holding the words, newest first: the note on a machine in a visit (with its
+    /// "next time"), a visit's title and notes, and a machine's setting.
+    public func searchNotes(_ words: String) -> [NoteHit] {
+        let w = words.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !w.isEmpty else { return [] }
+        var hits: [NoteHit] = []
+        for v in visitsNewestFirst {
+            for e in v.entries {
+                let next = e.nextTime.map { "Next time: " + text($0, machine: e.machineID) }
+                let haystack = [e.note, next].compactMap { $0 }.joined(separator: " · ")
+                if let note = e.note, note.localizedStandardContains(w) {
+                    hits.append(NoteHit(kind: .machineNote, text: haystack, date: v.date, visitID: v.id, machineID: e.machineID))
+                }
+            }
+            let visitText = [v.title, v.notes].compactMap { $0 }.joined(separator: " — ")
+            if !visitText.isEmpty, visitText.localizedStandardContains(w) {
+                hits.append(NoteHit(kind: .visitNote, text: visitText, date: v.date, visitID: v.id, machineID: nil))
+            }
+        }
+        for m in machines where !m.setting.isEmpty && m.setting.localizedStandardContains(w) {
+            hits.append(NoteHit(kind: .setting, text: m.setting, date: nil, visitID: nil, machineID: m.id))
+        }
+        return hits
+    }
+
+    /// Changes or removes (`nil`) one set of one entry of a visit — for fixing a visit afterwards
+    /// (since 1.11). An entry left empty goes; a visit left empty goes too.
+    public mutating func change(visit visitID: UUID, entry entryID: UUID, set index: Int, to set: GymSet?) {
+        guard var v = visits.first(where: { $0.id == visitID }),
+              let e = v.entries.firstIndex(where: { $0.id == entryID }),
+              v.entries[e].sets.indices.contains(index) else { return }
+        if let set { v.entries[e].sets[index] = set } else { v.entries[e].sets.remove(at: index) }
+        if v.entries[e].sets.isEmpty { v.entries.remove(at: e) }
+        if v.entries.isEmpty { visits.removeAll { $0.id == visitID } } else { put(v) }
+    }
+
     public var photosInUse: Set<String> { Set(machines.compactMap(\.photo) + machines.compactMap(\.instructions)) }
 }
 
@@ -743,6 +885,7 @@ public enum GymFile {
         var homeIcon: String?
         var muscles: [MuscleGroup]?
         var templates: [PlanTemplate]?
+        var rests: RestDefaults?
     }
 
     public static func encode(_ log: GymLog) throws -> Data {
@@ -752,7 +895,7 @@ public enum GymFile {
         return try enc.encode(Envelope(version: 1, machines: log.machines, visits: log.visits, busy: log.busyMarks,
                                         gyms: log.gyms, currentGym: log.currentGymID, plan: nil,
                                         plans: log.plans, homeIcon: log.homeIcon,
-                                        muscles: log.muscles, templates: log.templates))
+                                        muscles: log.muscles, templates: log.templates, rests: log.rests))
     }
 
     public static func decode(_ data: Data) throws -> GymLog {
@@ -762,7 +905,8 @@ public enum GymFile {
         var log = GymLog(machines: e.machines, visits: e.visits, busyMarks: e.busy ?? [],
                          gyms: e.gyms ?? [], currentGymID: e.currentGym,
                          plans: e.plans ?? (e.plan.map { [$0] } ?? []), homeIcon: e.homeIcon,
-                         muscles: e.muscles ?? MuscleGroup.defaults, templates: e.templates ?? [])
+                         muscles: e.muscles ?? MuscleGroup.defaults, templates: e.templates ?? [],
+                         rests: e.rests ?? RestDefaults())
         log.ensureGym()
         return log
     }

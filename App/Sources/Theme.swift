@@ -197,3 +197,15 @@ extension View {
                                   tint: tint, cancelID: cancelID, saveID: saveID))
     }
 }
+
+/// Warm-up sets: amber, apart from the indigo of the working sets (since 1.11).
+enum Warmup {
+    static let swatch = IconColour.of(key: "yellow")!
+    static let tint = Color.pair("#a16207", "#fcd34d")
+}
+
+/// Supersets: teal-ish green, so the pair stands out on the machine page (since 1.11).
+enum Superset {
+    static let swatch = IconColour.of(key: "olive")!
+    static let tint = Color.pair("#4d7c0f", "#bef264")
+}

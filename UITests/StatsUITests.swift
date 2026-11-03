@@ -28,6 +28,9 @@ final class StatsUITests: XCTestCase {
         for id in ["stats-muscle", "stats-warmup", "stats-streak", "stats-badges"] {
             XCTAssertTrue(any(id).waitForExistence(timeout: 5), id)
         }
-        XCTAssertTrue(any("stats-badge-first").exists)
+        // Since 1.11 Muscle balance sits above the badges: scroll down to them first.
+        let first = any("stats-badge-first")
+        for _ in 0..<4 where !first.exists { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
     }
 }

@@ -32,6 +32,25 @@ public struct Badge: Identifiable, Equatable, Sendable {
     public var earned: Bool
 }
 
+/// One machine's best ever, for the Records wall (since 1.11).
+public struct RecordRow: Identifiable, Equatable, Sendable {
+    public var machine: Machine
+    /// The best set: heaviest weight (most reps at it), most reps on an exercise, longest time on a time machine.
+    public var set: GymSet
+    /// The day it was first done.
+    public var date: Date
+    public var visitID: UUID
+    public var id: UUID { machine.id }
+}
+
+/// Sets per week for one muscle group, oldest week first (since 1.11).
+public struct MuscleWeeks: Equatable, Sendable {
+    /// nil = machines with no group chosen.
+    public var muscle: MuscleGroup?
+    public var weeks: [Int]
+    public var total: Int { weeks.reduce(0, +) }
+}
+
 public enum Stats {
     /// Gym visits that started in the interval.
     static func visits(_ gym: GymLog, in interval: DateInterval) -> [GymVisit] {
@@ -92,7 +111,7 @@ public enum Stats {
         for v in gym.visits.sorted(by: { ($0.started ?? $0.date) < ($1.started ?? $1.date) }) {
             var today: [UUID: Double] = [:]
             for e in v.entries {
-                let score = e.sets.filter { $0.reps > 0 }.map { gym.score($0, machine: e.machineID) }.max() ?? 0
+                let score = e.sets.filter { $0.reps > 0 && !$0.isWarmup }.map { gym.score($0, machine: e.machineID) }.max() ?? 0
                 if score > 0 { today[e.machineID] = max(today[e.machineID] ?? 0, score) }
             }
             for (id, score) in today {
@@ -134,5 +153,53 @@ public enum Stats {
             Badge(id: "cardio60", title: "60 cardio minutes", hint: "Spend 60 minutes on time machines in one week", icon: "heart",
                   earned: w.cardio.values.contains { $0 >= 60 }),
         ]
+    }
+
+    // MARK: Since 1.11
+
+    /// Every machine's best ever, newest record first. Warm-ups never count; machines never used are left out.
+    public static func records(_ gym: GymLog) -> [RecordRow] {
+        // The visit's day, not when its first set was typed: an earlier day logged later keeps its day.
+        let visits = gym.visits.sorted { $0.date < $1.date }
+        var rows: [UUID: RecordRow] = [:]
+        func better(_ a: GymSet, than b: GymSet, logs: MachineLogs) -> Bool {
+            switch logs {
+            case .time: return (a.seconds ?? 0) > (b.seconds ?? 0)
+            case .reps: return a.reps > b.reps
+            case .weights: return a.kg != b.kg ? a.kg > b.kg : a.reps > b.reps
+            }
+        }
+        for v in visits {
+            for e in v.entries {
+                guard let m = gym.machine(e.machineID) else { continue }
+                for set in e.sets where !set.isWarmup && (set.reps > 0 || set.isTime) {
+                    if let old = rows[m.id], !better(set, than: old.set, logs: m.logs) { continue }
+                    rows[m.id] = RecordRow(machine: m, set: set, date: v.date, visitID: v.id)
+                }
+            }
+        }
+        return rows.values.sorted { $0.date != $1.date ? $0.date > $1.date : $0.machine.name < $1.machine.name }
+    }
+
+    /// Sets per muscle group in each of the last `weeks` weeks (this week last), every group in your
+    /// order — groups with no sets too, so a neglected one shows as empty. Machines with no group come last,
+    /// only when they have sets.
+    public static func muscleWeeks(_ gym: GymLog, weeks: Int = 4, now: Date = Date(), calendar: Calendar = .current) -> [MuscleWeeks] {
+        let thisWeek = History.period(.weekOfYear, around: now, calendar: calendar).start
+        let starts = (0..<weeks).reversed().compactMap { calendar.date(byAdding: .weekOfYear, value: -$0, to: thisWeek) }
+        var counts: [String?: [Int]] = [:]
+        for v in gym.visits {
+            let week = History.period(.weekOfYear, around: v.date, calendar: calendar).start
+            guard let w = starts.firstIndex(of: week) else { continue }
+            for e in v.entries where !e.sets.isEmpty {
+                let key = gym.muscle(for: gym.machine(e.machineID))?.id
+                var row = counts[key] ?? Array(repeating: 0, count: weeks)
+                row[w] += e.sets.count
+                counts[key] = row
+            }
+        }
+        var out = gym.muscles.map { MuscleWeeks(muscle: $0, weeks: counts[$0.id] ?? Array(repeating: 0, count: weeks)) }
+        if let none = counts[nil] { out.append(MuscleWeeks(muscle: nil, weeks: none)) }
+        return out
     }
 }

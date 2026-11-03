@@ -47,6 +47,7 @@ struct HistoryScreen: View {
                     .padding(.top, 40)
                 } else {
                     chips
+                    shortcuts
                     stats
                     chart
                     list
@@ -123,6 +124,7 @@ struct HistoryScreen: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(statsMonth ? "stats-month" : "stats-week")
             muscles
+            balance
             warmup
             gamified
         }
@@ -172,6 +174,65 @@ struct HistoryScreen: View {
                 Text("Choose a muscle group in the machine's edit page.").font(.caption).foregroundStyle(Theme.muted)
             }
         }
+    }
+
+    // MARK: Muscle balance, records, notes (since 1.11)
+
+    private var balance: some View {
+        let rows = Stats.muscleWeeks(library.gym)
+        let top = Double(rows.flatMap(\.weeks).max() ?? 1)
+        return card("Muscle balance — last 4 weeks", colour: IconColour.of(key: "green") ?? Past.swatch, id: "stats-muscle-balance") {
+            ForEach(rows, id: \.muscle?.id) { r in
+                let c = IconColour.of(key: r.muscle?.colour ?? "slate") ?? Past.swatch
+                HStack(spacing: 8) {
+                    Text(r.muscle?.name ?? "Not chosen")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(c.fillColor)
+                        .frame(width: 92, alignment: .leading).lineLimit(1)
+                    if r.total == 0 {
+                        Text("Not trained").font(.subheadline.weight(.semibold)).foregroundStyle(Gym.busyTint)
+                        Spacer(minLength: 0)
+                    } else {
+                        HStack(alignment: .bottom, spacing: 4) {
+                            ForEach(Array(r.weeks.enumerated()), id: \.offset) { _, n in
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(n == 0 ? c.fillColor.opacity(0.15) : c.fillColor)
+                                    .frame(width: 16, height: max(3, 22 * Double(n) / top))
+                            }
+                        }
+                        .frame(height: 22, alignment: .bottom)
+                        Spacer(minLength: 0)
+                        Text("\(r.total) set\(r.total == 1 ? "" : "s")").font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(c.fillColor)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("muscle-balance-\(r.muscle?.id ?? "none")")
+            }
+        }
+    }
+
+    private var shortcuts: some View {
+        VStack(spacing: 0) {
+            NavigationLink { RecordsScreen() } label: { shortcut("trophy", "Records", "yellow") }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("open-records")
+            Divider().padding(.leading, 52)
+            NavigationLink { NotesSearchScreen() } label: { shortcut("notebook", "Search my notes", "blue") }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("open-notes-search")
+        }
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.line, lineWidth: 1))
+    }
+
+    private func shortcut(_ icon: String, _ title: String, _ colour: String) -> some View {
+        HStack(spacing: 10) {
+            IconTile(.hand(icon), colour: IconColour.of(key: colour) ?? Past.swatch, fallbackTint: Theme.accent, letter: "R", size: 32)
+            Text(title).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
+            Spacer()
+            ControlMarkView(.chevron, size: 14, colour: Theme.muted)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 7)
+        .contentShape(Rectangle())
     }
 
     private var warmup: some View {

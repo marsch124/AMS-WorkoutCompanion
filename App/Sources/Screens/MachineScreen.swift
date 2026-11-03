@@ -28,6 +28,8 @@ struct MachineScreen: View {
     @State private var changingSet: Int?
     @State private var zoom = false
     @State private var newBest = false
+    /// The next set is a warm-up (since 1.11); off again after that set.
+    @State private var warmup = false
     @FocusState private var typing: Bool
 
     private let clock = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
@@ -47,6 +49,8 @@ struct MachineScreen: View {
     private var target: Int? { library.gym.last(machineID, excluding: visit.id)?.entry.sets.count }
     private var today: [GymSet] { visit.entries.last { $0.machineID == machineID }?.sets ?? [] }
     private var next: NextSet { library.gym.next(machineID, in: visit) }
+    /// The superset partner, done in turn with this machine (since 1.11).
+    private var partner: Machine? { library.gym.partner(of: machineID) }
 
     var body: some View {
         ScrollView {
@@ -76,6 +80,23 @@ struct MachineScreen: View {
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("gym-instructions")
                         }
+                    }
+                    if let partner {
+                        HStack(spacing: 8) {
+                            AppMarkView(.pair, size: 20, colour: Superset.tint)
+                            Text("Superset with \(partner.name)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Superset.tint)
+                            Spacer()
+                            Text("no rest between")
+                                .font(.caption)
+                                .foregroundStyle(Theme.muted)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Superset.swatch.fillColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("gym-superset")
                     }
                 }
                 lastTime
@@ -228,10 +249,15 @@ struct MachineScreen: View {
             ForEach(Array(today.enumerated()), id: \.offset) { i, s in
                 Button { changingSet = i } label: {
                     HStack {
-                        Text("Set \(i + 1)").foregroundStyle(Theme.muted)
+                        if s.isWarmup {
+                            AppMarkView(.warmup, size: 15, colour: Warmup.tint)
+                            Text("Warm-up").foregroundStyle(Warmup.tint)
+                        } else {
+                            Text("Set \(i + 1)").foregroundStyle(Theme.muted)
+                        }
                         Spacer()
-                        Text(said(s)).fontWeight(.semibold).foregroundStyle(Theme.ink)
-                        ControlMarkView(.check, size: 16, colour: Gym.tint)
+                        Text(said(s)).fontWeight(s.isWarmup ? .regular : .semibold).foregroundStyle(s.isWarmup ? Theme.muted : Theme.ink)
+                        ControlMarkView(.check, size: 16, colour: s.isWarmup ? Warmup.tint : Gym.tint)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
@@ -239,7 +265,7 @@ struct MachineScreen: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Set \(i + 1), \(said(s))")
+                .accessibilityLabel("\(s.isWarmup ? "Warm-up" : "Set \(i + 1)"), \(said(s))")
                 .accessibilityIdentifier("gym-set-\(i + 1)")
                 if i < today.count - 1 { Divider().padding(.leading, 12) }
             }
@@ -251,11 +277,28 @@ struct MachineScreen: View {
     private var entry: some View {
         VStack(spacing: 10) {
             HStack {
-                Text("Set \(today.count + 1)")
+                Text(warmup ? "Warm-up set" : "Set \(today.count + 1)")
                     .font(.headline)
-                    .foregroundStyle(Gym.tint)
+                    .foregroundStyle(warmup ? Warmup.tint : Gym.tint)
                     .accessibilityIdentifier("gym-next-set")
                 Spacer()
+                // Warm-up: kept, but never a record or a reason for more weight (since 1.11).
+                Button { warmup.toggle() } label: {
+                    HStack(spacing: 4) {
+                        AppMarkView(.warmup, size: 15, colour: warmup ? Warmup.swatch.inkColor : Warmup.tint)
+                        Text("Warm-up").font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(warmup ? Warmup.swatch.inkColor : Warmup.tint)
+                    .padding(.horizontal, 10)
+                    .frame(height: 30)
+                    .background(warmup ? AnyShapeStyle(Warmup.swatch.fillColor) : AnyShapeStyle(Color.clear), in: Capsule())
+                    .overlay(Capsule().stroke(Warmup.swatch.fillColor, lineWidth: warmup ? 0 : 1))
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(warmup ? "Warm-up on" : "Warm-up off")
+                .accessibilityAddTraits(warmup ? .isSelected : [])
+                .accessibilityIdentifier("gym-warmup")
                 if newBest {
                     HStack(spacing: 4) {
                         IconMark(.hand("trophy"), size: 18, colour: Gym.tint)
@@ -317,7 +360,17 @@ struct MachineScreen: View {
             Text("Next: set \(today.count + 1) · \(said(GymSet(kg: isReps ? 0 : kg, reps: reps)))")
                 .font(.subheadline)
                 .foregroundStyle(Theme.muted)
-            if let target, today.count >= target {
+            if let partner {
+                // A superset round is done: after the rest, the partner again (since 1.11).
+                Button { moveOn(partner.id) } label: {
+                    HStack(spacing: 8) {
+                        AppMarkView(.pair, size: 18, colour: Superset.swatch.inkColor)
+                        Text("Next: \(partner.name)")
+                    }
+                }
+                .buttonStyle(BigButtonStyle(fill: Superset.swatch.fillColor, ink: Superset.swatch.inkColor, height: 48))
+                .accessibilityIdentifier("gym-superset-next")
+            } else if let target, today.count >= target {
                 // As many sets as last time: offer to move on.
                 Button { moveOn(upNext?.id) } label: {
                     MarkLabel(title: upNext.map { "Next machine: \($0.name)" } ?? "Done with this machine",
@@ -521,12 +574,18 @@ struct MachineScreen: View {
 
     private func setDone() {
         typing = false
-        let set = GymSet(kg: isReps ? 0 : max(0, kg), reps: max(1, reps))
+        let set = GymSet(kg: isReps ? 0 : max(0, kg), reps: max(1, reps), warmup: warmup)
         let before = library.gym.best(machineID)
         library.changeGym { $0.add(set, machine: machineID, on: day) }
-        newBest = before.map { library.gym.score(set, machine: machineID) > $0 } ?? false
+        newBest = !set.isWarmup && (before.map { library.gym.score(set, machine: machineID) > $0 } ?? false)
+        warmup = false
         Cues.shared.tap()
-        restLength = Double(machine?.rest ?? GymLog.restSeconds)
+        // Superset: straight on to the partner while it is behind — no rest in between (since 1.11).
+        if let jump = library.gym.supersetJump(after: machineID, in: library.gym.visit(on: day, gym: gymID)) {
+            moveOn(jump)
+            return
+        }
+        restLength = Double(library.gym.rest(for: machine))
         // A machine with no rest goes straight on to the next set.
         restEnd = restLength > 0 ? Date().addingTimeInterval(restLength) : nil
         now = Date()
@@ -610,6 +669,11 @@ private struct SetEditor: View {
                 }
                 Stepper("Reps: \(set.reps)", value: $set.reps, in: 1...500)
                     .accessibilityIdentifier("set-edit-reps")
+                Toggle("Warm-up", isOn: Binding(get: { set.isWarmup }, set: { set.warmup = $0 ? true : nil }))
+                    .tint(Warmup.swatch.fillColor)
+                    .accessibilityIdentifier("set-edit-warmup")
+            } footer: {
+                Text("A warm-up is kept, but never counts as a best or for more weight next time.")
             }
             Section {
                 Button("Remove set", role: .destructive, action: remove)
@@ -782,14 +846,28 @@ struct MachineForm: View {
             }
             if draft.logs != .time {
                 Section {
-                    Stepper(value: Binding(get: { draft.rest }, set: { draft.restSeconds = $0 }), in: 0...300, step: 15) {
+                    if draft.logs == .weights {
+                        Toggle("Heavy machine", isOn: Binding(get: { draft.isHeavy }, set: { draft.heavy = $0 ? true : nil }))
+                            .tint(Gym.fill)
+                            .accessibilityIdentifier("machine-heavy")
+                    }
+                    // Its own rest, or the usual one for its type (Settings → Rest times, since 1.11).
+                    let rest = draft.restSeconds ?? usualRest
+                    Stepper(value: Binding(get: { rest }, set: { draft.restSeconds = $0 }), in: 0...300, step: 15) {
                         HStack {
                             Text("Rest")
                             Spacer()
-                            Text(draft.rest == 0 ? "None" : Clock.text(draft.rest)).foregroundStyle(Gym.tint).monospacedDigit()
+                            Text(draft.restSeconds == nil ? "Usual · \(Clock.text(rest))" : rest == 0 ? "None" : Clock.text(rest))
+                                .foregroundStyle(Gym.tint).monospacedDigit()
+                                .accessibilityIdentifier("machine-rest-value")
                         }
                     }
                     .accessibilityIdentifier("machine-rest")
+                    if draft.restSeconds != nil {
+                        Button("Use the usual rest (\(Clock.text(usualRest)))") { draft.restSeconds = nil }
+                            .foregroundStyle(Gym.tint)
+                            .accessibilityIdentifier("machine-rest-usual")
+                    }
                     if draft.logs == .weights {
                     Picker("Weight step", selection: Binding(get: { draft.weightStep }, set: { draft.step = $0 })) {
                         Text("1 kg").tag(1.0)
@@ -812,6 +890,22 @@ struct MachineForm: View {
                 } footer: {
                     Text(draft.logs == .reps ? "Rest after each set. When every set reaches the first set's reps, it suggests one rep more next time."
                          : "Rest after each set; how much − and + change the weight; and when every set reaches this many reps, the machine suggests one step more next time.")
+                }
+            }
+            if draft.logs != .time {
+                Section {
+                    Picker("Superset with", selection: $draft.partner) {
+                        Text("None").tag(UUID?.none)
+                        ForEach(partners) { m in
+                            Text(m.name).tag(UUID?.some(m.id))
+                        }
+                    }
+                    .tint(Superset.tint)
+                    .accessibilityIdentifier("machine-partner")
+                } header: {
+                    Text("Superset")
+                } footer: {
+                    Text("Two machines in turn: after a set here, straight on to the other with no rest; the rest comes after both.")
                 }
             }
             Section {
@@ -887,12 +981,32 @@ struct MachineForm: View {
         }
     }
 
+    /// The usual rest for this machine's type, from Settings → Rest times.
+    private var usualRest: Int {
+        var d = draft
+        d.restSeconds = nil
+        return library.gym.rest(for: d)
+    }
+
+    /// Machines and exercises of the same gym that can be its superset partner.
+    private var partners: [Machine] {
+        library.gym.machines(in: draft.gymID).filter { $0.id != draft.id && $0.logs != .time }
+    }
+
     private func save() {
         guard !draft.name.trimmingCharacters(in: .whitespaces).isEmpty else {
             needsName = true
             return
         }
-        library.changeGym { $0.save(draft) }
+        // Pairs go both ways: the old partner is let go, the new one points back.
+        let chosen = draft.logs == .time ? nil : draft.partner
+        var d = draft
+        d.partner = library.gym.machine(d.id)?.partner
+        library.changeGym {
+            $0.save(d)
+            if chosen != d.partner { $0.pair(d.id, with: chosen) }
+        }
+        draft.partner = chosen
         done(draft)
     }
 }

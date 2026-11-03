@@ -88,6 +88,9 @@ final class Library {
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
             if ProcessInfo.processInfo.arguments.contains("-gymdemo") {
                 var demo = GymLog.demo()
+                // -gymextras (1.11): muscle groups on the demo machines, six more machines (so the search field
+                // shows) and Chest press + Lat pulldown as a superset.
+                if ProcessInfo.processInfo.arguments.contains("-gymextras") { demo.addExtras() }
                 // -tallphotos: an upright photo on every machine, like his home-gym photos (1.9.2 test).
                 if ProcessInfo.processInfo.arguments.contains("-tallphotos") {
                     let photos = dir.appendingPathComponent("Photos", isDirectory: true)

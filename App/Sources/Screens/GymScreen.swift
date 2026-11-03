@@ -87,6 +87,9 @@ struct GymScreen: View {
     @State private var naming: GymNaming?
     @State private var gymName = ""
     @State private var pickingDay = false
+    @State private var search = ""
+    @State private var namingRepeat = false
+    @State private var repeatName = ""
 
     private var gymID: UUID? { library.gym.currentGym?.id }
     private var visit: GymVisit? { library.gym.visit(on: day, gym: gymID) }
@@ -143,8 +146,29 @@ struct GymScreen: View {
                         .padding(.top, 4)
                 }
 
+                // A long list gets a search field (since 1.11): name or setting ("Seat 4").
+                if machines.count > GymScreen.searchFrom {
+                    HStack(spacing: 6) {
+                        AppMarkView(.search, size: 16, colour: Gym.tint)
+                        TextField("Find a machine", text: $search)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .accessibilityIdentifier("gym-search")
+                        if !search.isEmpty {
+                            Button { search = "" } label: { ControlMarkView(.close, size: 12, colour: Theme.muted) }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Clear")
+                                .accessibilityIdentifier("gym-search-clear")
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .frame(height: 36)
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Gym.fill.opacity(0.5), lineWidth: 1))
+                }
+                let found = Set(library.gym.machines(in: gymID, matching: search).map(\.id))
                 LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(machines.filter { m in !busy.contains { $0.id == m.id } }) { tile($0, busy: false) }
+                    ForEach(machines.filter { m in !busy.contains { $0.id == m.id } && found.contains(m.id) }) { tile($0, busy: false) }
                     Button(action: addMachine) { NewMachineTile() }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("gym-new-machine")
@@ -382,7 +406,33 @@ struct GymScreen: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("gym-repeat")
+                // Keep last visit as a template, without planning first (since 1.11).
+                Button {
+                    repeatName = ""
+                    namingRepeat = true
+                } label: {
+                    Text("Save as template")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Gym.tint)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .overlay(Capsule().stroke(Gym.fill, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("gym-repeat-template")
             }
+            }
+            .alert("Save last visit as template", isPresented: $namingRepeat) {
+                TextField("For example: Leg day", text: $repeatName)
+                Button("Cancel", role: .cancel) {}
+                    .accessibilityIdentifier("gym-repeat-template-cancel")
+                Button("Save") {
+                    let name = repeatName, o = library.gym.lastOrder(gym: gymID, before: day), g = gymID
+                    library.changeGym { _ = $0.saveTemplate(named: name, order: o, gym: g) }
+                }
+                .accessibilityIdentifier("gym-repeat-template-save")
+            } message: {
+                Text("Last visit's machines, in their order. Use it later under Plan today. The same name in this gym is replaced.")
             }
         }
     }
@@ -502,6 +552,11 @@ struct GymScreen: View {
         Cues.shared.finished("Well done")
         summary = library.gym.visits.first { $0.id == visit.id }
     }
+}
+
+extension GymScreen {
+    /// More machines than this, and the gym screen gets a search field.
+    static let searchFrom = 8
 }
 
 private enum GymNaming { case new, rename }
@@ -694,6 +749,7 @@ private struct MachineTile: View {
     let busy: Bool
 
     private var border: Color { busy ? Gym.busy.fillColor : done ? Gym.fill : Theme.line }
+    private var stripe: IconColour? { library.gym.muscle(for: machine).flatMap { IconColour.of(key: $0.colour) } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -716,7 +772,17 @@ private struct MachineTile: View {
                 .lineLimit(1)
         }
         .padding(6)
+        .padding(.leading, stripe == nil ? 0 : 3)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        // The machine's muscle group colour, as a thin stripe down the left edge (since 1.11).
+        .overlay(alignment: .leading) {
+            if let stripe {
+                stripe.fillColor
+                    .frame(width: 5)
+                    .accessibilityIdentifier("tile-stripe-\(machine.name)")
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(border, lineWidth: busy ? 1.5 : 1))
         .accessibilityElement(children: .combine)
     }
@@ -820,211 +886,6 @@ extension GymVisit {
     }
 }
 
-/// One earlier visit: its title and notes, and every machine with its sets.
-struct VisitScreen: View {
-    @Environment(Library.self) private var library
-    let visitID: UUID
-    @State private var editing = false
-
-    // A colourful page (1.9.1, his "This history page is boring"): the visit in tiles, then a card per machine.
-    var body: some View {
-        let visit = library.gym.visits.first { $0.id == visitID }
-        ScrollView {
-            if let visit {
-                VStack(alignment: .leading, spacing: 10) {
-                    header(visit)
-                    let bests = library.gym.newBests(in: visit)
-                    if !bests.isEmpty {
-                        HStack(spacing: 8) {
-                            IconMark(.hand("trophy"), size: 22, colour: Gym.tint)
-                            Text("New best: " + bests.compactMap { library.gym.machine($0)?.name }.joined(separator: ", "))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(Theme.ink)
-                        }
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Gym.fill.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .accessibilityElement(children: .combine)
-                        .accessibilityIdentifier("visit-bests")
-                    }
-                    if visit.title != nil || visit.notes != nil {
-                        VStack(alignment: .leading, spacing: 4) {
-                            if let t = visit.title {
-                                Text(t).font(.headline).foregroundStyle(Gym.tint).accessibilityIdentifier("visit-title")
-                            }
-                            if let n = visit.notes {
-                                Text(n).font(.subheadline).foregroundStyle(Theme.ink).accessibilityIdentifier("visit-notes")
-                            }
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                    ForEach(visit.entries) { e in machineCard(e) }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-            }
-        }
-        .background(Theme.bg.ignoresSafeArea())
-        .navigationTitle(visit?.date.formatted(date: .abbreviated, time: .omitted) ?? "Visit")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { editing = true } label: { ControlMarkView(.edit, size: 22, colour: Gym.tint) }
-                    .accessibilityLabel("Title and notes")
-                    .accessibilityIdentifier("visit-edit")
-            }
-        }
-        .sheet(isPresented: $editing) {
-            if let visit {
-                NavigationStack {
-                    NotesForm(placeholder: visit.suggestedTitle(in: library.gym), title: visit.title ?? "",
-                              notes: visit.notes ?? "", colour: Gym.fill) { result in
-                        editing = false
-                        if let result { library.changeGym { $0.describe(visit: visitID, title: result.title, notes: result.notes) } }
-                    }
-                }
-            }
-        }
-    }
-
-    private func header(_ visit: GymVisit) -> some View {
-        let place = library.gym.gyms.first { $0.id == visit.gymID }?.name ?? "At the gym"
-        return VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(visit.date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(Gym.ink)
-                Text(place).font(.subheadline.weight(.semibold)).foregroundStyle(Gym.ink.opacity(0.85))
-            }
-            HStack(spacing: 8) {
-                tile("Time", visit.minutes.map { "\($0) min" } ?? "–", "green", id: "visit-time")
-                tile("Sets", "\(visit.setCount)", "orange", id: "visit-sets")
-            }
-            HStack(spacing: 8) {
-                tile("Lifted", "\(GymSet.number(visit.totalKg)) kg", "plum", id: "visit-kg")
-                tile("Machines", "\(visit.entries.count)", "blue", id: "visit-machines")
-            }
-        }
-        .padding(12)
-        .background(Gym.fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    private func tile(_ title: String, _ value: String, _ colour: String, id: String) -> some View {
-        let c = IconColour.of(key: colour) ?? Gym.busy
-        return VStack(alignment: .leading, spacing: 0) {
-            Text(title).font(.caption.weight(.semibold)).foregroundStyle(c.inkColor.opacity(0.85))
-            Text(value).font(.title3.weight(.bold)).monospacedDigit().foregroundStyle(c.inkColor)
-                .accessibilityIdentifier(id)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(c.fillColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    private func machineCard(_ e: MachineEntry) -> some View {
-        let m = library.gym.machine(e.machineID)
-        let muscle = library.gym.muscle(for: m)
-        let accent = muscle.flatMap { IconColour.of(key: $0.colour) }?.fillColor ?? Gym.fill
-        return HStack(alignment: .top, spacing: 10) {
-            MachinePhoto(name: m?.photo, height: 56, icon: m?.icon)
-                .frame(width: 56)
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 6) {
-                    Text(m?.name ?? "Machine").font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
-                    if let muscle {
-                        Text(muscle.name)
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(accent)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .overlay(Capsule().stroke(accent, lineWidth: 1))
-                    }
-                }
-                // Each set as a small chip: "32,5 × 12".
-                FlowChips(items: e.sets.map { set in
-                    set.isTime || m?.logs == .reps ? library.gym.text(set, machine: e.machineID)
-                        : "\(set.kg <= 0 ? "BW" : GymSet.number(set.kg)) × \(set.reps)"
-                }, colour: accent)
-                if let next = e.nextTime {
-                    Text("Next time: \(library.gym.text(next, machine: e.machineID))")
-                        .font(.caption.weight(.semibold)).foregroundStyle(Gym.tint)
-                }
-                if let note = e.note {
-                    Text("“\(note)”").font(.caption).foregroundStyle(Theme.ink)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(10)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2).fill(accent).frame(width: 4).padding(.vertical, 10)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("visit-machine-\(m?.name ?? "")")
-    }
-}
-
-/// Small capsules that wrap onto the next line.
-private struct FlowChips: View {
-    let items: [String]
-    let colour: Color
-
-    var body: some View {
-        ChipLayout(spacing: 5) {
-            ForEach(Array(items.enumerated()), id: \.offset) { _, t in
-                Text(t)
-                    .font(.caption.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.ink)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(colour.opacity(0.16), in: Capsule())
-            }
-        }
-    }
-}
-
-private struct ChipLayout: Layout {
-    var spacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        rows(proposal.width ?? 300, subviews).last.map { CGSize(width: proposal.width ?? 300, height: $0.y + $0.h) } ?? .zero
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        for (i, p) in place(bounds.width, subviews).enumerated() {
-            subviews[i].place(at: CGPoint(x: bounds.minX + p.x, y: bounds.minY + p.y), proposal: .unspecified)
-        }
-    }
-
-    private func place(_ width: CGFloat, _ subviews: Subviews) -> [CGPoint] {
-        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0, out: [CGPoint] = []
-        for v in subviews {
-            let s = v.sizeThatFits(.unspecified)
-            if x > 0 && x + s.width > width { x = 0; y += rowH + spacing; rowH = 0 }
-            out.append(CGPoint(x: x, y: y))
-            x += s.width + spacing
-            rowH = max(rowH, s.height)
-        }
-        return out
-    }
-
-    private func rows(_ width: CGFloat, _ subviews: Subviews) -> [(y: CGFloat, h: CGFloat)] {
-        var y: CGFloat = 0, x: CGFloat = 0, rowH: CGFloat = 0, out: [(CGFloat, CGFloat)] = []
-        for v in subviews {
-            let s = v.sizeThatFits(.unspecified)
-            if x > 0 && x + s.width > width { out.append((y, rowH)); x = 0; y += rowH + spacing; rowH = 0 }
-            x += s.width + spacing
-            rowH = max(rowH, s.height)
-        }
-        if !subviews.isEmpty { out.append((y, rowH)) }
-        return out.map { (y: $0.0, h: $0.1) }
-    }
-}
 
 /// After Finish: what this session came to, and a title and notes for it.
 struct SummaryScreen: View {
@@ -1136,5 +997,21 @@ extension GymLog {
         }
         log.ensureGym()
         return log
+    }
+
+    /// For tests and pictures of 1.11 (-gymextras) — made-up data.
+    mutating func addExtras() {
+        let groups = ["Chest press": "chest", "Leg press": "legs", "Lat pulldown": "back"]
+        for i in machines.indices { machines[i].muscle = groups[machines[i].name] }
+        let gym = currentGym?.id
+        for (name, muscle) in [("Shoulder press", "shoulders"), ("Biceps curl", "arms"), ("Triceps pushdown", "arms"),
+                               ("Leg curl", "legs"), ("Seated row", "back"), ("Ab crunch", "core")] {
+            var m = Machine(gymID: gym, name: name)
+            m.muscle = muscle
+            save(m)
+        }
+        if let a = machines.first(where: { $0.name == "Chest press" }), let b = machines.first(where: { $0.name == "Lat pulldown" }) {
+            pair(a.id, with: b.id)
+        }
     }
 }
