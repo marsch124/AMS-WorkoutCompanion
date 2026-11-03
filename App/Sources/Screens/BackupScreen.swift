@@ -10,6 +10,9 @@ struct BackupScreen: View {
     @Environment(Library.self) private var library
     @State private var sharing: SharedFile?
     @State private var importing = false
+    @State private var choosingFolder = false
+    /// What the open picker is for; kept until the next picker, so closing it cannot mix them up.
+    @State private var pickFolder = false
     @State private var pending: Pending?
     @State private var message: String?
     @State private var copies: [(url: URL, made: Date)] = []
@@ -25,11 +28,43 @@ struct BackupScreen: View {
                 .buttonStyle(BigButtonStyle(fill: Self.colour.fillColor, ink: Self.colour.inkColor, height: 50))
                 .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                 .accessibilityIdentifier("backup-now")
-                Button("Restore from a file…") { importing = true }
+                Button("Restore from a file…") { pickFolder = false; importing = true }
                     .foregroundStyle(Theme.accent)
                     .accessibilityIdentifier("backup-restore-file")
             } footer: {
                 Text("One file with all workouts, the gym log, history and every photo. Save it to Files or iCloud Drive — it stays safe even if the app is deleted.")
+            }
+            Section {
+                if let folder = library.autoFolderName {
+                    HStack {
+                        Text("Every day to").foregroundStyle(Theme.ink)
+                        Spacer()
+                        Text(folder).foregroundStyle(Self.colour.fillColor).fontWeight(.semibold)
+                            .accessibilityIdentifier("backup-auto-folder")
+                    }
+                    if let last = library.autoLast {
+                        Text("Last: \(last.formatted(.dateTime.weekday(.wide).day().month(.wide).hour().minute()))")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.muted)
+                            .accessibilityIdentifier("backup-auto-last")
+                    }
+                    if let problem = library.autoProblem {
+                        Text(problem).font(.subheadline).foregroundStyle(Theme.problem)
+                    }
+                    Button("Choose another folder…") { pickFolder = true; choosingFolder = true }
+                        .foregroundStyle(Theme.accent)
+                        .accessibilityIdentifier("backup-auto-change")
+                    Button("Stop automatic backup", role: .destructive) { library.stopAutoBackup(); message = nil }
+                        .accessibilityIdentifier("backup-auto-stop")
+                } else {
+                    Button("Back up automatically…") { pickFolder = true; choosingFolder = true }
+                        .foregroundStyle(Theme.accent)
+                        .accessibilityIdentifier("backup-auto-on")
+                }
+            } header: {
+                Text("Automatic").foregroundStyle(Self.colour.fillColor)
+            } footer: {
+                Text("Choose a folder once — best in iCloud Drive. Then the app saves a backup there by itself once a day, when you open or leave it. The newest 7 stay.")
             }
             if let message {
                 Section {
@@ -73,8 +108,17 @@ struct BackupScreen: View {
             ShareSheet(url: file.url)
                 .presentationDetents([.medium, .large])
         }
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
+        // One file picker for both jobs: SwiftUI opens only one picker per screen.
+        .fileImporter(isPresented: Binding(get: { importing || choosingFolder },
+                                           set: { if !$0 { importing = false; choosingFolder = false } }),
+                      allowedContentTypes: pickFolder ? [.folder] : [.json]) { result in
+            let forFolder = pickFolder
             guard case .success(let url) = result else { return }
+            if forFolder {
+                library.chooseAutoFolder(url)
+                message = library.autoProblem ?? "Backed up to \(url.lastPathComponent). From now on, once a day by itself."
+                return
+            }
             let access = url.startAccessingSecurityScopedResource()
             defer { if access { url.stopAccessingSecurityScopedResource() } }
             open(url)

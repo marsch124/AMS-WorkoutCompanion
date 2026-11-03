@@ -86,6 +86,7 @@ final class Library {
         let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let library = Library(folder: docs)
         library.weeklyBackup()
+        library.autoBackupIfDue()
         return library
     }
 
@@ -248,6 +249,66 @@ final class Library {
             let made = (try? url.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
             return (url, made)
         }.sorted { $0.made > $1.made }
+    }
+
+    // MARK: Automatic backup (since 1.7)
+
+    /// The folder chosen once (iCloud Drive or anywhere in Files); a bookmark keeps the permission.
+    private static let autoKey = "autoBackupFolder"
+    private static let autoLastKey = "autoBackupLast"
+    private var defaults: UserDefaults { .standard }
+
+    /// The chosen folder's name, or nil when automatic backup is off.
+    var autoFolderName: String? { autoFolder()?.lastPathComponent }
+    var autoLast: Date? { defaults.object(forKey: Self.autoLastKey) as? Date }
+    /// Why the last automatic backup failed, shown in Backups.
+    private(set) var autoProblem: String?
+
+    private func autoFolder() -> URL? {
+        guard let data = defaults.data(forKey: Self.autoKey) else { return nil }
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale) else { return nil }
+        if stale, let fresh = try? url.bookmarkData() { defaults.set(fresh, forKey: Self.autoKey) }
+        return url
+    }
+
+    /// Turns automatic backup on with this folder and makes the first backup at once.
+    func chooseAutoFolder(_ url: URL) {
+        let access = url.startAccessingSecurityScopedResource()
+        defer { if access { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? url.bookmarkData() else {
+            autoProblem = "That folder cannot be used. Choose another one."
+            return
+        }
+        defaults.set(data, forKey: Self.autoKey)
+        defaults.removeObject(forKey: Self.autoLastKey)
+        autoBackupIfDue()
+    }
+
+    func stopAutoBackup() {
+        defaults.removeObject(forKey: Self.autoKey)
+        defaults.removeObject(forKey: Self.autoLastKey)
+        autoProblem = nil
+    }
+
+    /// Once a day — at launch and when the app goes to the background — a backup in the chosen
+    /// folder; only the newest 7 of the app's own backups there are kept.
+    func autoBackupIfDue(now: Date = Date()) {
+        guard let url = autoFolder(), Backup.dailyDue(last: autoLast, now: now) else { return }
+        let access = url.startAccessingSecurityScopedResource()
+        defer { if access { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Backup.encode(makeBackup(at: now)),
+              (try? data.write(to: url.appendingPathComponent(Backup.fileName(now)), options: .atomic)) != nil else {
+            autoProblem = "The last automatic backup could not be saved in \(url.lastPathComponent)."
+            return
+        }
+        autoProblem = nil
+        defaults.set(now, forKey: Self.autoLastKey)
+        let fm = FileManager.default
+        let ours = ((try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: [.creationDateKey])) ?? [])
+            .filter { $0.lastPathComponent.hasPrefix("Workouts backup ") && $0.pathExtension == "json" }
+            .map { (name: $0.lastPathComponent, date: (try? $0.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast) }
+        for name in Backup.toRemove(ours, keep: 7) { try? fm.removeItem(at: url.appendingPathComponent(name)) }
     }
 
     /// Puts a backup's data in place of today's. Today's files and photos are first kept aside in

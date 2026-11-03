@@ -355,6 +355,7 @@ struct GymScreen: View {
                 .font(.caption)
                 .foregroundStyle(Theme.muted)
         } else if !machines.isEmpty {
+            HStack(spacing: 8) {
             Button { planning = true } label: {
                 MarkLabel(title: "Plan today", mark: .list, size: 18, colour: Gym.tint)
                     .font(.subheadline.weight(.semibold))
@@ -365,6 +366,23 @@ struct GymScreen: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("gym-plan")
+            // Same machines, same order as last time — a plan in one tap (since 1.7).
+            let repeatOrder = library.gym.lastOrder(gym: gymID, before: day)
+            if !repeatOrder.isEmpty {
+                Button {
+                    library.changeGym { $0.setPlan(repeatOrder, on: day, gym: gymID) }
+                } label: {
+                    MarkLabel(title: "Repeat last visit", mark: .play, size: 16, colour: Gym.ink)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Gym.ink)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(Gym.fill, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("gym-repeat")
+            }
+            }
         }
     }
 

@@ -174,4 +174,21 @@ final class ScreenTour: XCTestCase {
         XCTAssertTrue(app.buttons["backup-copy-0"].waitForExistence(timeout: 5))
         snap("21 Backups")
     }
+
+    /// 1.7: Repeat last visit on the gym screen, and automatic backup.
+    func testNewIn17Tour() {
+        app.launchArguments += ["-gymdemo"]
+        app.launch()
+        app.buttons["open-gym"].tap()
+        XCTAssertTrue(app.buttons["gym-repeat"].waitForExistence(timeout: 5))
+        snap("22 Repeat last visit")
+        app.buttons["gym-repeat"].tap()
+        XCTAssertTrue(app.buttons["plan-row-1"].waitForExistence(timeout: 5))
+        snap("23 Repeated plan")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["open-settings"].tap()
+        app.buttons["settings-backups"].tap()
+        XCTAssertTrue(app.buttons["backup-auto-on"].waitForExistence(timeout: 5))
+        snap("24 Backups automatic")
+    }
 }

@@ -349,6 +349,18 @@ public struct GymLog: Codable, Equatable, Sendable {
         plans.first { $0.gymID == gym && calendar.isDate($0.day, inSameDayAs: day) }
     }
 
+    /// Repeat last visit (since 1.7): the machines of this gym's latest visit before `day`,
+    /// in the order they were first used; machines deleted since then drop out.
+    public func lastOrder(gym: UUID?, before day: Date, calendar: Calendar = .current) -> [UUID] {
+        let start = calendar.startOfDay(for: day)
+        guard let last = visits(in: gym).first(where: { $0.date < start && $0.setCount > 0 }) else { return [] }
+        var order: [UUID] = []
+        for e in last.entries where !e.sets.isEmpty && !order.contains(e.machineID) && machine(e.machineID) != nil {
+            order.append(e.machineID)
+        }
+        return order
+    }
+
     /// Sets this gym's plan; the other gyms keep theirs.
     public mutating func setPlan(_ order: [UUID], on day: Date, gym: UUID?) {
         plans.removeAll { $0.gymID == gym }

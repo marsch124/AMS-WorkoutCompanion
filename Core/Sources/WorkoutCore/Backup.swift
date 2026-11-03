@@ -83,6 +83,12 @@ public struct Backup: Codable, Equatable, Sendable {
         return now.timeIntervalSince(newest) >= 7 * 24 * 3600
     }
 
+    /// The automatic backup to the chosen folder (since 1.7) runs once per calendar day.
+    public static func dailyDue(last: Date?, now: Date, calendar: Calendar = .current) -> Bool {
+        guard let last else { return true }
+        return !calendar.isDate(last, inSameDayAs: now)
+    }
+
     /// The weekly copies to remove so only the newest `keep` stay.
     public static func toRemove(_ made: [(name: String, date: Date)], keep: Int = 4) -> [String] {
         made.sorted { $0.date > $1.date }.dropFirst(keep).map(\.name)

@@ -131,3 +131,13 @@ Version 1.6. iPhone only, portrait, iOS 17+, light and dark. The name under the 
 - At the gym tile: `GymLog.homeIcon` in `gym.json` (`homeIcon`); touch and hold the tile → "Change icon…" (`gym-change-icon`).
 - Machine or exercise without a photo: `Machine.icon`; form row "Icon" (`machine-icon`), shown only while there is no photo; tiles and the machine screen show it instead of the usual strength mark.
 - The At the gym tile title is `.title2` bold (1.5: `.title3`).
+
+## Repeat last visit (since 1.7)
+- Gym screen, no plan today and a last visit at this gym before today: capsule "Repeat last visit" (`gym-repeat`, full indigo) beside "Plan today".
+- `GymLog.lastOrder(gym:before:)`: the latest visit of this gym before the start of the day with sets; its machines in first-use order, without duplicates and without deleted machines. Tapping sets today's plan for this gym to that order.
+
+## Automatic backup (since 1.7)
+- Backups → section "Automatic": "Back up automatically…" (`backup-auto-on`) opens the folder picker. The folder is kept as a bookmark in the app's settings (`autoBackupFolder`); the last time in `autoBackupLast`.
+- Due once per calendar day (`Backup.dailyDue`): checked at launch and when the app goes to the background. The file is the same as Back up now ("Workouts backup YYYY-MM-DD HHMM.json"). Only files named "Workouts backup *.json" in that folder are counted; the newest 7 stay.
+- Shown: folder (`backup-auto-folder`), last time (`backup-auto-last`), a red line on failure; "Choose another folder…" (`backup-auto-change`), "Stop automatic backup" (`backup-auto-stop`, leaves the files).
+- One file picker on the page serves Restore and the folder (two pickers on one page do not open in SwiftUI).

@@ -98,9 +98,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.6 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.7 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.6"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.7"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -486,5 +486,28 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["icon-run"].tap()
         app.buttons["icon-picker-save"].tap()
         XCTAssertTrue(tile.waitForExistence(timeout: 5))
+    }
+
+    // MARK: 1.7
+
+    func testRepeatLastVisitPlansTheSameMachines() {
+        launchGymDemo()
+        let repeatButton = app.buttons["gym-repeat"]
+        XCTAssertTrue(repeatButton.waitForExistence(timeout: 5))
+        repeatButton.tap()
+        XCTAssertTrue(app.buttons["plan-row-1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["plan-row-1"].label.hasSuffix("up next"), app.buttons["plan-row-1"].label)
+        XCTAssertFalse(app.buttons["gym-repeat"].exists)
+    }
+
+    func testAutomaticBackupAsksForAFolder() {
+        app.buttons["open-settings"].tap()
+        app.buttons["settings-backups"].tap()
+        let on = app.buttons["backup-auto-on"]
+        XCTAssertTrue(on.waitForExistence(timeout: 5))
+        on.tap()
+        // The iPhone's own folder picker opens.
+        XCTAssertTrue(app.navigationBars.buttons["Cancel"].waitForExistence(timeout: 8)
+                      || app.buttons["Cancel"].waitForExistence(timeout: 2))
     }
 }
