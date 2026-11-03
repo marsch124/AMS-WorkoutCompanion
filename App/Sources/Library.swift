@@ -9,10 +9,13 @@ final class Library {
     private(set) var workouts: [Workout] = []
     /// The gym log: machines and visits, in its own file.
     private(set) var gym = GymLog()
+    /// Every Sets & reps, Interval and Exercise-list workout done (gym visits live in the gym log).
+    private(set) var history: [SessionRecord] = []
     let folder: URL
 
     private var file: URL { folder.appendingPathComponent("workouts.json") }
     private var gymFile: URL { folder.appendingPathComponent("gym.json") }
+    private var historyFile: URL { folder.appendingPathComponent("history.json") }
     var photoFolder: URL { folder.appendingPathComponent("Photos", isDirectory: true) }
 
     init(folder: URL) {
@@ -40,7 +43,19 @@ final class Library {
                 try? fm.copyItem(at: gymFile, to: aside)
             }
         }
+        if let data = try? Data(contentsOf: historyFile) {
+            if let list = try? HistoryFile.decode(data) {
+                history = list
+            } else {
+                historyUnreadable = true
+                let aside = folder.appendingPathComponent("history-unreadable-\(Int(Date().timeIntervalSince1970)).json")
+                try? fm.copyItem(at: historyFile, to: aside)
+            }
+        }
     }
+
+    /// True when history.json could not be read: it is kept aside and never overwritten.
+    private var historyUnreadable = false
 
     /// True when gym.json could not be read: it is kept aside and never overwritten.
     private var gymUnreadable = false
@@ -106,6 +121,30 @@ final class Library {
         persistGym()
     }
 
+    // MARK: History
+
+    func record(_ r: SessionRecord) {
+        history.append(r)
+        persistHistory()
+    }
+
+    func describe(record id: UUID, title: String, notes: String) {
+        guard let i = history.firstIndex(where: { $0.id == id }) else { return }
+        let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let n = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        history[i].title = t.isEmpty ? nil : t
+        history[i].notes = n.isEmpty ? nil : n
+        persistHistory()
+    }
+
+    func deleteRecord(_ id: UUID) {
+        history.removeAll { $0.id == id }
+        persistHistory()
+    }
+
+    /// Gym visits and workouts together, newest first.
+    var historyItems: [HistoryItem] { History.items(records: history, gym: gym) }
+
     // MARK: Photos
 
     func image(_ name: String?) -> UIImage? {
@@ -157,6 +196,11 @@ final class Library {
         guard !gymUnreadable, let data = try? GymFile.encode(gym) else { return }
         try? data.write(to: gymFile, options: .atomic)
         removeUnusedPhotos()
+    }
+
+    private func persistHistory() {
+        guard !historyUnreadable, let data = try? HistoryFile.encode(history) else { return }
+        try? data.write(to: historyFile, options: .atomic)
     }
 
     /// Photos no workout or machine uses any more (replaced, removed, deleted) go.

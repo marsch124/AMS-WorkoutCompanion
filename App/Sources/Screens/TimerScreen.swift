@@ -4,6 +4,7 @@ import WorkoutCore
 
 /// Runs a Sets & reps or an Interval workout: big numbers, a ring, spoken cues.
 struct TimerScreen: View {
+    @Environment(Library.self) private var library
     let workout: Workout
     let onClose: () -> Void
 
@@ -11,6 +12,8 @@ struct TimerScreen: View {
     @State private var now = Date()
     @State private var lastBeep = -1
     @State private var askClose = false
+    @State private var startedAt = Date()
+    @State private var kept = false
     private let clock = Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()
 
     init(workout: Workout, onClose: @escaping () -> Void) {
@@ -36,6 +39,7 @@ struct TimerScreen: View {
             Cues.shared.begin()
             let t = Date()
             now = t
+            startedAt = t
             session.start(at: t)
             announce()
         }
@@ -49,7 +53,10 @@ struct TimerScreen: View {
             beepIfDue()
         }
         .confirmationDialog("End this workout?", isPresented: $askClose, titleVisibility: .visible) {
-            Button("End workout", role: .destructive, action: onClose)
+            Button("End workout", role: .destructive) {
+                keep()
+                onClose()
+            }
                 .accessibilityIdentifier("run-end-confirm")
         }
     }
@@ -148,11 +155,11 @@ struct TimerScreen: View {
                 Button("+15 s") { session.addTime(15) }
                     .buttonStyle(SoftButtonStyle())
                     .accessibilityIdentifier("run-add")
-                Button { next() } label: { MarkLabel(title: "Skip", mark: .skip, colour: workout.inkOnFill) }
+                Button { next() } label: { MarkLabel(title: "Skip rest", mark: .skip, colour: workout.inkOnFill) }
                     .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill))
                     .accessibilityIdentifier("run-skip")
             }
-        case .some:
+        case let phase?:
             HStack(spacing: 12) {
                 Button {
                     if session.isPaused { session.resume(at: Date()) } else { session.pause(at: Date()) }
@@ -162,9 +169,11 @@ struct TimerScreen: View {
                 }
                 .buttonStyle(SoftButtonStyle())
                 .accessibilityIdentifier("run-pause")
-                Button { next() } label: { MarkLabel(title: "Skip", mark: .skip, colour: workout.inkOnFill) }
-                    .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill))
-                    .accessibilityIdentifier("run-skip")
+                Button { next() } label: {
+                    MarkLabel(title: phase.isRest ? "Skip rest" : "Skip", mark: .skip, colour: workout.inkOnFill)
+                }
+                .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill))
+                .accessibilityIdentifier("run-skip")
             }
         case nil:
             Button("Close", action: onClose)
@@ -183,6 +192,16 @@ struct TimerScreen: View {
         announce()
     }
 
+    /// Into History, once: how far the workout got. Nothing when ended before the first set or round.
+    private func keep() {
+        guard !kept else { return }
+        kept = true
+        if let r = SessionRecord.of(workout, started: startedAt, ended: Date(),
+                                    phasesDone: Array(session.phases.prefix(session.index)), finished: session.isFinished) {
+            library.record(r)
+        }
+    }
+
     private func words(for phase: Phase) -> (String, String) {
         switch phase {
         case .getReady: return ("GET READY", "Round 1 of \(workout.rounds)")
@@ -197,7 +216,10 @@ struct TimerScreen: View {
         let cues = Cues.shared
         switch session.current {
         case nil:
-            if session.isFinished { cues.finished("Well done. Workout complete.") }
+            if session.isFinished {
+                keep()
+                cues.finished("Well done. Workout complete.")
+            }
         case .getReady?:
             cues.rest("Get ready")
         case .set(let n, let of, let reps)?:

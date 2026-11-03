@@ -1,16 +1,30 @@
 import Foundation
 
+/// One gym — each has its own machines (since 1.4).
+public struct GymPlace: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+
+    public init(id: UUID = UUID(), name: String) {
+        self.id = id
+        self.name = name
+    }
+}
+
 /// A machine or exercise at the gym, with its photo and how it is set up.
 public struct Machine: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
+    /// The gym it stands in; nil only in files from before 1.4, until they are opened.
+    public var gymID: UUID?
     public var name: String
     /// File name in the Photos folder.
     public var photo: String?
     /// How the machine is set up — "Seat 4, handles 2".
     public var setting: String
 
-    public init(id: UUID = UUID(), name: String = "", photo: String? = nil, setting: String = "") {
+    public init(id: UUID = UUID(), gymID: UUID? = nil, name: String = "", photo: String? = nil, setting: String = "") {
         self.id = id
+        self.gymID = gymID
         self.name = name
         self.photo = photo
         self.setting = setting
@@ -72,14 +86,20 @@ public struct MachineEntry: Codable, Identifiable, Hashable, Sendable {
 /// One trip to the gym: its date and the machines used, in the order they were used.
 public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
+    public var gymID: UUID?
     public var date: Date
     public var entries: [MachineEntry]
     /// When the first set was done and when Finish was tapped.
     public var started: Date?
     public var finished: Date?
+    /// A heading and notes, given after Finish (since 1.4).
+    public var title: String?
+    public var notes: String?
 
-    public init(id: UUID = UUID(), date: Date, entries: [MachineEntry] = [], started: Date? = nil, finished: Date? = nil) {
+    public init(id: UUID = UUID(), gymID: UUID? = nil, date: Date, entries: [MachineEntry] = [],
+                started: Date? = nil, finished: Date? = nil) {
         self.id = id
+        self.gymID = gymID
         self.date = date
         self.entries = entries
         self.started = started
@@ -87,6 +107,12 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
     }
 
     public var setCount: Int { entries.reduce(0) { $0 + $1.sets.count } }
+
+    /// Minutes from the first set to Finish, when both are known.
+    public var minutes: Int? {
+        guard let started, let finished else { return nil }
+        return max(1, Int(finished.timeIntervalSince(started) / 60))
+    }
 
     /// Everything lifted, in kilograms: weight × reps of every set.
     public var totalKg: Double {
@@ -102,6 +128,22 @@ public struct BusyMark: Codable, Hashable, Sendable {
     public init(machineID: UUID, day: Date) {
         self.machineID = machineID
         self.day = day
+    }
+}
+
+/// Today's order of machines, planned before starting (since 1.4). Optional: without one, roam freely.
+public struct DayPlan: Codable, Hashable, Sendable {
+    public var day: Date
+    public var gymID: UUID?
+    public var order: [UUID]
+    /// Left out today — out of order, or no time.
+    public var skipped: [UUID]
+
+    public init(day: Date, gymID: UUID?, order: [UUID], skipped: [UUID] = []) {
+        self.day = day
+        self.gymID = gymID
+        self.order = order
+        self.skipped = skipped
     }
 }
 
@@ -125,18 +167,113 @@ public struct GymLog: Codable, Equatable, Sendable {
     public var visits: [GymVisit]
     /// Machines marked Busy, in the order they were marked.
     public var busyMarks: [BusyMark]
+    public var gyms: [GymPlace]
+    /// The gym chosen last; the gym screen opens there.
+    public var currentGymID: UUID?
+    public var plan: DayPlan?
 
-    public init(machines: [Machine] = [], visits: [GymVisit] = [], busyMarks: [BusyMark] = []) {
+    public init(machines: [Machine] = [], visits: [GymVisit] = [], busyMarks: [BusyMark] = [],
+                gyms: [GymPlace] = [], currentGymID: UUID? = nil, plan: DayPlan? = nil) {
         self.machines = machines
         self.visits = visits
         self.busyMarks = busyMarks
+        self.gyms = gyms
+        self.currentGymID = currentGymID
+        self.plan = plan
     }
 
     public func machine(_ id: UUID) -> Machine? { machines.first { $0.id == id } }
 
-    /// The visit on this calendar day, if there is one.
-    public func visit(on day: Date, calendar: Calendar = .current) -> GymVisit? {
-        visits.first { calendar.isDate($0.date, inSameDayAs: day) }
+    /// The visit on this calendar day at this gym, if there is one.
+    public func visit(on day: Date, gym: UUID? = nil, calendar: Calendar = .current) -> GymVisit? {
+        visits.first { $0.gymID == gym && calendar.isDate($0.date, inSameDayAs: day) }
+    }
+
+    // MARK: Gyms
+
+    public static let firstGymName = "My gym"
+
+    /// The gym the screen shows: the one chosen last, else the first.
+    public var currentGym: GymPlace? { gyms.first { $0.id == currentGymID } ?? gyms.first }
+
+    public func machines(in gym: UUID?) -> [Machine] { machines.filter { $0.gymID == gym } }
+
+    public func visits(in gym: UUID?) -> [GymVisit] { visitsNewestFirst.filter { $0.gymID == gym } }
+
+    /// Before 1.4 there were no gyms: everything goes into one, "My gym", which can be renamed.
+    public mutating func ensureGym() {
+        if gyms.isEmpty { gyms = [GymPlace(name: GymLog.firstGymName)] }
+        let first = gyms[0].id
+        for i in machines.indices where machines[i].gymID == nil { machines[i].gymID = first }
+        for i in visits.indices where visits[i].gymID == nil { visits[i].gymID = first }
+        if plan?.gymID == nil { plan?.gymID = first }
+        if currentGym?.id != currentGymID { currentGymID = currentGym?.id }
+    }
+
+    @discardableResult
+    public mutating func addGym(_ name: String) -> UUID {
+        let g = GymPlace(name: name.trimmingCharacters(in: .whitespacesAndNewlines))
+        gyms.append(g)
+        currentGymID = g.id
+        return g.id
+    }
+
+    public mutating func renameGym(_ id: UUID, to name: String) {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !n.isEmpty, let i = gyms.firstIndex(where: { $0.id == id }) else { return }
+        gyms[i].name = n
+    }
+
+    // MARK: Today's plan
+
+    /// Today's plan at this gym, if one was made.
+    public func plan(on day: Date, gym: UUID?, calendar: Calendar = .current) -> DayPlan? {
+        guard let plan, plan.gymID == gym, calendar.isDate(plan.day, inSameDayAs: day) else { return nil }
+        return plan
+    }
+
+    public mutating func setPlan(_ order: [UUID], on day: Date, gym: UUID?) {
+        plan = order.isEmpty ? nil : DayPlan(day: day, gymID: gym, order: order)
+    }
+
+    /// A planned machine counts as done once it has a set in today's visit.
+    public func isDone(_ machineID: UUID, on day: Date, gym: UUID?, calendar: Calendar = .current) -> Bool {
+        visit(on: day, gym: gym, calendar: calendar)?.entries.contains { $0.machineID == machineID && !$0.sets.isEmpty } ?? false
+    }
+
+    /// The next planned machine: not done today, not skipped and not busy.
+    public func upNext(on day: Date, gym: UUID?, excluding current: UUID? = nil, calendar: Calendar = .current) -> UUID? {
+        guard let p = plan(on: day, gym: gym, calendar: calendar) else { return nil }
+        return p.order.first { id in
+            id != current && !p.skipped.contains(id) && !isBusy(id, on: day, calendar: calendar)
+                && !isDone(id, on: day, gym: gym, calendar: calendar)
+        }
+    }
+
+    /// Moves a planned machine to the end, for later.
+    public mutating func later(_ machineID: UUID) {
+        guard plan?.order.contains(machineID) == true else { return }
+        plan?.order.removeAll { $0 == machineID }
+        plan?.order.append(machineID)
+    }
+
+    /// Leaves a planned machine out today, or brings it back.
+    public mutating func skip(_ machineID: UUID, _ on: Bool = true) {
+        plan?.skipped.removeAll { $0 == machineID }
+        if on { plan?.skipped.append(machineID) }
+    }
+
+    /// Puts another machine in a planned machine's place.
+    public mutating func swap(_ machineID: UUID, for other: UUID) {
+        guard let i = plan?.order.firstIndex(of: machineID), plan?.order.contains(other) == false else { return }
+        plan?.order[i] = other
+        plan?.skipped.removeAll { $0 == machineID }
+    }
+
+    public mutating func removeFromPlan(_ machineID: UUID) {
+        plan?.order.removeAll { $0 == machineID }
+        plan?.skipped.removeAll { $0 == machineID }
+        if plan?.order.isEmpty == true { plan = nil }
     }
 
     /// Visits, newest first.
@@ -218,19 +355,31 @@ public struct GymLog: Codable, Equatable, Sendable {
         if !busy { busyMarks.removeAll { $0.machineID == machineID } }
     }
 
-    /// Finish: the visit's end time, and every Busy mark of that day goes.
+    /// Finish: the visit's end time; every Busy mark of that day and the day's plan go.
     public mutating func finish(visit visitID: UUID, at now: Date = Date(), calendar: Calendar = .current) {
         guard var v = visits.first(where: { $0.id == visitID }) else { return }
         v.finished = now
         put(v)
         busyMarks.removeAll { calendar.isDate($0.day, inSameDayAs: v.date) }
+        if plan(on: v.date, gym: v.gymID, calendar: calendar) != nil { plan = nil }
+    }
+
+    /// The heading and notes of a visit; empty words are kept as none.
+    public mutating func describe(visit visitID: UUID, title: String, notes: String) {
+        guard var v = visits.first(where: { $0.id == visitID }) else { return }
+        let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let n = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        v.title = t.isEmpty ? nil : t
+        v.notes = n.isEmpty ? nil : n
+        put(v)
     }
 
     /// Adds a set on a machine to the visit on `day`, making the visit and the entry when needed.
     /// A machine used again later in the same visit carries on in its entry.
     public mutating func add(_ set: GymSet, machine machineID: UUID, on day: Date, now: Date = Date(),
                              calendar: Calendar = .current) {
-        var v = visit(on: day, calendar: calendar) ?? GymVisit(date: day)
+        let gym = machine(machineID)?.gymID
+        var v = visit(on: day, gym: gym, calendar: calendar) ?? GymVisit(gymID: gym, date: day)
         if v.started == nil { v.started = now }
         if let i = v.entries.lastIndex(where: { $0.machineID == machineID }) {
             v.entries[i].sets.append(set)
@@ -268,31 +417,40 @@ public struct GymLog: Codable, Equatable, Sendable {
         for i in visits.indices { visits[i].entries.removeAll { $0.machineID == id } }
         visits.removeAll { $0.entries.isEmpty }
         busyMarks.removeAll { $0.machineID == id }
+        removeFromPlan(id)
     }
 
     public var photosInUse: Set<String> { Set(machines.compactMap(\.photo)) }
 }
 
-/// `gym.json`: `{"version":1,"machines":[…],"visits":[…],"busy":[…]}` (`busy` since 1.3; older files have none).
+/// `gym.json`: `{"version":1,"machines":[…],"visits":[…],"busy":[…],"gyms":[…],"currentGym":…,"plan":…}`
+/// (`busy` since 1.3; `gyms`, `currentGym` and `plan` since 1.4 — older files have none and read as one gym).
 public enum GymFile {
     struct Envelope: Codable {
         var version: Int
         var machines: [Machine]
         var visits: [GymVisit]
         var busy: [BusyMark]?
+        var gyms: [GymPlace]?
+        var currentGym: UUID?
+        var plan: DayPlan?
     }
 
     public static func encode(_ log: GymLog) throws -> Data {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         enc.dateEncodingStrategy = .iso8601
-        return try enc.encode(Envelope(version: 1, machines: log.machines, visits: log.visits, busy: log.busyMarks))
+        return try enc.encode(Envelope(version: 1, machines: log.machines, visits: log.visits, busy: log.busyMarks,
+                                        gyms: log.gyms, currentGym: log.currentGymID, plan: log.plan))
     }
 
     public static func decode(_ data: Data) throws -> GymLog {
         let dec = JSONDecoder()
         dec.dateDecodingStrategy = .iso8601
         let e = try dec.decode(Envelope.self, from: data)
-        return GymLog(machines: e.machines, visits: e.visits, busyMarks: e.busy ?? [])
+        var log = GymLog(machines: e.machines, visits: e.visits, busyMarks: e.busy ?? [],
+                         gyms: e.gyms ?? [], currentGymID: e.currentGym, plan: e.plan)
+        log.ensureGym()
+        return log
     }
 }

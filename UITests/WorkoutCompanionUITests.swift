@@ -34,6 +34,8 @@ final class WorkoutCompanionUITests: XCTestCase {
 
         app.buttons["run-done"].tap()
         waitFor(app.staticTexts["run-phase"], label: "REST")
+        // "Skip rest", so it cannot be read as skipping the whole workout.
+        waitFor(app.buttons["run-skip"], label: "Skip rest")
 
         app.buttons["run-skip"].tap()
         waitFor(set, label: "Set 2 of 5")
@@ -153,6 +155,7 @@ final class WorkoutCompanionUITests: XCTestCase {
 
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+        waitFor(app.buttons["gym-finish"], label: "Finish this session")
         app.buttons["gym-finish"].tap()
         waitFor(app.staticTexts["gym-summary-sets"], label: "2")
         waitFor(app.staticTexts["gym-summary-machines"], label: "1")
@@ -185,5 +188,88 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         waitFor(app.buttons["busy-Leg press"], label: "Mark Leg press busy")
         XCTAssertFalse(app.staticTexts["gym-come-back"].exists)
+    }
+
+    // MARK: 1.4
+
+    func launchGymDemo() {
+        app.terminate()
+        app.launchArguments = ["-uitest", "-gymdemo"]
+        app.launch()
+        app.buttons["open-gym"].tap()
+        XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+    }
+
+    func testAPlanLeadsFromMachineToMachine() {
+        launchGymDemo()
+        app.buttons["gym-plan"].tap()
+        app.buttons["plan-machine-Leg press"].tap()
+        app.buttons["plan-machine-Chest press"].tap()
+        app.buttons["plan-save"].tap()
+        waitFor(app.buttons["plan-row-1"], label: "1, Leg press, up next")
+        waitFor(app.buttons["plan-row-2"], label: "2, Chest press")
+
+        app.buttons["plan-row-1"].tap()
+        XCTAssertTrue(app.buttons["gym-set-done"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["gym-machine-done"].exists)
+        app.buttons["gym-set-done"].tap()
+        waitFor(app.buttons["gym-rest-skip"], label: "Skip rest")
+        app.buttons["gym-rest-skip"].tap()
+        // Done with this machine goes straight on to the next planned one.
+        waitFor(app.buttons["gym-machine-done"], label: "Done with this machine, next: Chest press")
+        app.buttons["gym-machine-done"].tap()
+        waitFor(app.staticTexts["gym-setting"], label: "Seat 4, handles 2")
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        waitFor(app.buttons["plan-row-1"], label: "1, Leg press, done")
+        waitFor(app.buttons["gym-finish"], label: "Finish this session")
+    }
+
+    func testASecondGymHasItsOwnMachines() {
+        launchGymDemo()
+        waitFor(app.buttons["gym-place-menu"], label: "Gym: My gym")
+        app.buttons["gym-place-menu"].tap()
+        app.buttons["gym-place-new"].tap()
+        let name = app.textFields["gym-place-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 3))
+        name.typeText("Hotel gym")
+        app.buttons["gym-place-save"].tap()
+        waitFor(app.buttons["gym-place-menu"], label: "Gym: Hotel gym")
+        XCTAssertFalse(app.buttons["machine-Chest press"].exists)
+
+        app.buttons["gym-place-menu"].tap()
+        app.buttons["gym-place-My gym"].tap()
+        XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 3))
+    }
+
+    func testFinishTakesAHeadingAndHistoryShowsEverything() {
+        launchGymDemo()
+        app.buttons["machine-Chest press"].tap()
+        app.buttons["gym-set-done"].tap()
+        app.buttons["gym-rest-skip"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["gym-finish"].tap()
+        let title = app.textFields["gym-summary-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        title.tap()
+        title.typeText("Chest day")
+        app.buttons["gym-summary-done"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        // A Sets & reps workout ended early is kept too.
+        app.buttons["workout-Push-ups"].tap()
+        app.buttons["run-done"].tap()
+        app.buttons["run-close"].tap()
+        app.buttons["run-end-confirm"].tap()
+
+        app.buttons["open-history"].tap()
+        let first = app.buttons["history-row-1"]
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        XCTAssertTrue(first.label.hasPrefix("Push-ups"), first.label)
+        XCTAssertTrue(app.buttons["history-row-2"].label.hasPrefix("Chest day"), app.buttons["history-row-2"].label)
+        XCTAssertTrue(app.staticTexts["history-week-sessions"].exists)
+        app.buttons["history-filter-gym"].tap()
+        XCTAssertTrue(app.buttons["history-row-1"].label.hasPrefix("Chest day"))
+        XCTAssertFalse(app.buttons["history-row-2"].exists && app.buttons["history-row-2"].label.hasPrefix("Push-ups"))
     }
 }

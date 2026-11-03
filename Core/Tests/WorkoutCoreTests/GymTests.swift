@@ -121,6 +121,7 @@ final class GymTests: XCTestCase {
     func testTheFileRoundTrips() throws {
         var log = GymLog(machines: [Machine(name: "Row", photo: "a.jpg", setting: "Seat 3")])
         log.add(GymSet(kg: 22.5, reps: 12), machine: log.machines[0].id, on: Date(timeIntervalSince1970: 1_793_000_000), calendar: cal)
+        log.ensureGym()
         let back = try GymFile.decode(GymFile.encode(log))
         XCTAssertEqual(back.machines, log.machines)
         XCTAssertEqual(back.visits.first?.entries, log.visits.first?.entries)

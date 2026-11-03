@@ -10,6 +10,8 @@ struct ChecklistScreen: View {
 
     @State private var done: Set<UUID> = []
     @State private var zoom: ZoomedPhoto?
+    @State private var startedAt = Date()
+    @State private var kept = false
 
     private var allDone: Bool { !workout.exercises.isEmpty && done.count == workout.exercises.count }
 
@@ -33,7 +35,7 @@ struct ChecklistScreen: View {
                         if allDone {
                             VStack(spacing: 24) {
                                 FinishedBadge(workout: workout)
-                                Button("Close", action: onClose)
+                                Button("Close", action: close)
                                     .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill))
                                     .accessibilityIdentifier("run-finish-close")
                             }
@@ -46,6 +48,7 @@ struct ChecklistScreen: View {
                 }
                 .onChange(of: done) { _, now in
                     if allDone {
+                        keep()
                         Cues.shared.finished("Well done. All exercises done.")
                         withAnimation(.spring(duration: 0.5)) { proxy.scrollTo("finished", anchor: .center) }
                     } else if let next = workout.exercises.first(where: { !now.contains($0.id) }) {
@@ -69,10 +72,22 @@ struct ChecklistScreen: View {
         }
     }
 
+    private func close() {
+        keep()
+        onClose()
+    }
+
+    /// Into History, once, when at least one exercise was ticked off.
+    private func keep() {
+        guard !kept, let r = SessionRecord.of(workout, started: startedAt, ended: Date(), ticked: done.count) else { return }
+        kept = true
+        library.record(r)
+    }
+
     private var header: some View {
         VStack(spacing: 14) {
             HStack {
-                CloseButton(action: onClose)
+                CloseButton(action: close)
                 Spacer()
                 VStack(spacing: 2) {
                     Text(workout.name)
