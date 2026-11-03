@@ -19,24 +19,36 @@ public enum MachineLogs: String, Codable, CaseIterable, Sendable {
     case reps
 }
 
-/// The muscle group a machine or exercise trains — for the statistics (since 1.9).
-public enum Muscle: String, Codable, CaseIterable, Sendable {
-    case chest, back, shoulders, arms, legs, core, cardio
-
-    public var title: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
-
+/// A muscle group a machine or exercise trains — for the statistics (since 1.9; yours to rename,
+/// add, arrange, colour and delete since 1.10). The seven first groups keep their old names as ids
+/// ("chest" …), so machines from 1.9 keep their group without any change to the file.
+public struct MuscleGroup: Codable, Identifiable, Hashable, Sendable {
+    public var id: String
+    public var name: String
     /// Its colour in History and on a visit (an AMS-Icons colour key), the same everywhere.
-    public var colourKey: String {
-        switch self {
-        case .chest: "red"
-        case .back: "blue"
-        case .shoulders: "orange"
-        case .arms: "pink"
-        case .legs: "green"
-        case .core: "olive"
-        case .cardio: "violet"
-        }
+    public var colour: String
+
+    public init(id: String = UUID().uuidString, name: String, colour: String) {
+        self.id = id
+        self.name = name
+        self.colour = colour
     }
+
+    /// Time machines without a group count here, while it exists.
+    public static let cardioID = "cardio"
+
+    public static let defaults: [MuscleGroup] = [
+        MuscleGroup(id: "chest", name: "Chest", colour: "red"),
+        MuscleGroup(id: "back", name: "Back", colour: "blue"),
+        MuscleGroup(id: "shoulders", name: "Shoulders", colour: "orange"),
+        MuscleGroup(id: "arms", name: "Arms", colour: "pink"),
+        MuscleGroup(id: "legs", name: "Legs", colour: "green"),
+        MuscleGroup(id: "core", name: "Core", colour: "olive"),
+        MuscleGroup(id: cardioID, name: "Cardio", colour: "violet"),
+    ]
+
+    /// The colours to choose from (AMS-Icons keys).
+    public static let colours = ["red", "orange", "yellow", "olive", "green", "plum", "blue", "indigo", "violet", "pink", "brown", "slate"]
 }
 
 /// A machine or exercise at the gym, with its photo and how it is set up.
@@ -63,7 +75,8 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
     /// The hand-drawn icon shown when there is no photo (an AMS-Icons key, since 1.6); nil = the usual one.
     public var icon: String?
     /// What it trains (since 1.9); nil = not chosen yet. Time machines count as cardio when not chosen.
-    public var muscle: Muscle?
+    /// A `MuscleGroup` id; nil = not chosen, or its group was deleted.
+    public var muscle: String?
 
     public var hasLevel: Bool { noLevel != true }
     public var hasIncline: Bool { noIncline != true }
@@ -108,8 +121,8 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
         noLevel = try c.decodeIfPresent(Bool.self, forKey: .noLevel)
         noIncline = try c.decodeIfPresent(Bool.self, forKey: .noIncline)
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
-        // An unknown muscle from a newer version reads as not chosen, never as a broken file.
-        muscle = (try? c.decodeIfPresent(Muscle.self, forKey: .muscle)) ?? nil
+        // Anything odd reads as not chosen, never as a broken file.
+        muscle = (try? c.decodeIfPresent(String.self, forKey: .muscle)) ?? nil
     }
 }
 
@@ -283,6 +296,21 @@ public struct NextSet: Equatable, Sendable {
 }
 
 /// Every machine and every visit — the whole gym log.
+/// A plan saved under a name to use again (since 1.10) — "Leg day".
+public struct PlanTemplate: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var gymID: UUID?
+    public var order: [UUID]
+
+    public init(id: UUID = UUID(), name: String, gymID: UUID?, order: [UUID]) {
+        self.id = id
+        self.name = name
+        self.gymID = gymID
+        self.order = order
+    }
+}
+
 public struct GymLog: Codable, Equatable, Sendable {
     /// When every set last time reached this many reps, the next time suggests more weight.
     public static let topReps = 12
@@ -307,9 +335,16 @@ public struct GymLog: Codable, Equatable, Sendable {
     public var plans: [DayPlan]
     /// The icon on the At the gym tile (an AMS-Icons key, since 1.6); nil = the usual one.
     public var homeIcon: String?
+    /// The muscle groups, in your order (since 1.10; files without them get the seven defaults).
+    public var muscles: [MuscleGroup]
+    /// Saved plans to use again, each for its gym (since 1.10).
+    public var templates: [PlanTemplate]
 
     public init(machines: [Machine] = [], visits: [GymVisit] = [], busyMarks: [BusyMark] = [],
-                gyms: [GymPlace] = [], currentGymID: UUID? = nil, plans: [DayPlan] = [], homeIcon: String? = nil) {
+                gyms: [GymPlace] = [], currentGymID: UUID? = nil, plans: [DayPlan] = [], homeIcon: String? = nil,
+                muscles: [MuscleGroup] = MuscleGroup.defaults, templates: [PlanTemplate] = []) {
+        self.muscles = muscles
+        self.templates = templates
         self.machines = machines
         self.visits = visits
         self.busyMarks = busyMarks
@@ -625,8 +660,69 @@ public struct GymLog: Codable, Equatable, Sendable {
         for i in visits.indices { visits[i].entries.removeAll { $0.machineID == id } }
         visits.removeAll { $0.entries.isEmpty }
         busyMarks.removeAll { $0.machineID == id }
+        for i in templates.indices { templates[i].order.removeAll { $0 == id } }
+        templates.removeAll { $0.order.isEmpty }
         removeFromPlan(id)
     }
+
+    // MARK: Muscle groups (since 1.10)
+
+    public func muscle(_ id: String?) -> MuscleGroup? { id.flatMap { id in muscles.first { $0.id == id } } }
+
+    /// The group a machine counts for: its own, else Cardio for a time machine, else none.
+    public func muscle(for machine: Machine?) -> MuscleGroup? {
+        guard let machine else { return nil }
+        return muscle(machine.muscle) ?? (machine.logs == .time ? muscle(MuscleGroup.cardioID) : nil)
+    }
+
+    /// Adds a group at the end (or saves changes to one); an empty name is not saved.
+    public mutating func save(muscle group: MuscleGroup) {
+        var g = group
+        g.name = g.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !g.name.isEmpty else { return }
+        if let i = muscles.firstIndex(where: { $0.id == g.id }) { muscles[i] = g } else { muscles.append(g) }
+    }
+
+    public mutating func moveMuscles(from source: IndexSet, to destination: Int) {
+        let moving = source.sorted().map { muscles[$0] }
+        var rest = muscles.enumerated().filter { !source.contains($0.offset) }.map(\.element)
+        let at = destination - source.filter { $0 < destination }.count
+        rest.insert(contentsOf: moving, at: max(0, min(at, rest.count)))
+        muscles = rest
+    }
+
+    /// Removes a group; its machines go back to "Not chosen". Their sets stay.
+    public mutating func delete(muscle id: String) {
+        muscles.removeAll { $0.id == id }
+        for i in machines.indices where machines[i].muscle == id { machines[i].muscle = nil }
+    }
+
+    /// How many machines (in any gym) have this group.
+    public func machineCount(muscle id: String) -> Int { machines.filter { $0.muscle == id }.count }
+
+    // MARK: Plan templates (since 1.10)
+
+    public func templates(gym: UUID?) -> [PlanTemplate] { templates.filter { $0.gymID == gym } }
+
+    /// Saves the order as a template for the gym; the same name in that gym is replaced.
+    @discardableResult
+    public mutating func saveTemplate(named name: String, order: [UUID], gym: UUID?) -> UUID? {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !n.isEmpty, !order.isEmpty else { return nil }
+        if let i = templates.firstIndex(where: { $0.gymID == gym && $0.name.caseInsensitiveCompare(n) == .orderedSame }) {
+            templates[i].name = n
+            templates[i].order = order
+            return templates[i].id
+        }
+        let t = PlanTemplate(name: n, gymID: gym, order: order)
+        templates.append(t)
+        return t.id
+    }
+
+    /// A template's machines that still exist, in its order.
+    public func order(of template: PlanTemplate) -> [UUID] { template.order.filter { machine($0) != nil } }
+
+    public mutating func deleteTemplate(_ id: UUID) { templates.removeAll { $0.id == id } }
 
     public var photosInUse: Set<String> { Set(machines.compactMap(\.photo) + machines.compactMap(\.instructions)) }
 }
@@ -645,6 +741,8 @@ public enum GymFile {
         var plan: DayPlan?
         var plans: [DayPlan]?
         var homeIcon: String?
+        var muscles: [MuscleGroup]?
+        var templates: [PlanTemplate]?
     }
 
     public static func encode(_ log: GymLog) throws -> Data {
@@ -653,7 +751,8 @@ public enum GymFile {
         enc.dateEncodingStrategy = .iso8601
         return try enc.encode(Envelope(version: 1, machines: log.machines, visits: log.visits, busy: log.busyMarks,
                                         gyms: log.gyms, currentGym: log.currentGymID, plan: nil,
-                                        plans: log.plans, homeIcon: log.homeIcon))
+                                        plans: log.plans, homeIcon: log.homeIcon,
+                                        muscles: log.muscles, templates: log.templates))
     }
 
     public static func decode(_ data: Data) throws -> GymLog {
@@ -662,7 +761,8 @@ public enum GymFile {
         let e = try dec.decode(Envelope.self, from: data)
         var log = GymLog(machines: e.machines, visits: e.visits, busyMarks: e.busy ?? [],
                          gyms: e.gyms ?? [], currentGymID: e.currentGym,
-                         plans: e.plans ?? (e.plan.map { [$0] } ?? []), homeIcon: e.homeIcon)
+                         plans: e.plans ?? (e.plan.map { [$0] } ?? []), homeIcon: e.homeIcon,
+                         muscles: e.muscles ?? MuscleGroup.defaults, templates: e.templates ?? [])
         log.ensureGym()
         return log
     }

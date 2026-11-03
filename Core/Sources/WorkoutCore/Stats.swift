@@ -12,7 +12,7 @@ public struct StatsOverview: Equatable, Sendable {
 
 /// Sets on one muscle group; `muscle` nil = not chosen yet.
 public struct MuscleCount: Equatable, Sendable {
-    public var muscle: Muscle?
+    public var muscle: MuscleGroup?
     public var sets: Int
 }
 
@@ -46,17 +46,16 @@ public enum Stats {
                              sets: v.reduce(0) { $0 + $1.setCount }, kg: t.kg)
     }
 
-    /// Sets per muscle group, biggest first. A time machine without a muscle counts as Cardio,
-    /// any other machine without one as "not chosen" (nil, last). Groups with no sets are left out.
+    /// Sets per muscle group, biggest first (ties in your order). A time machine without a group
+    /// counts as Cardio, any other machine without one as "not chosen" (nil, last). Groups with no
+    /// sets are left out.
     public static func muscles(_ gym: GymLog, in interval: DateInterval) -> [MuscleCount] {
-        var counts: [Muscle?: Int] = [:]
+        var counts: [String?: Int] = [:]
         for e in visits(gym, in: interval).flatMap(\.entries) where !e.sets.isEmpty {
-            let m = gym.machine(e.machineID)
-            let key: Muscle? = m?.muscle ?? (m?.logs == .time ? .cardio : nil)
-            counts[key, default: 0] += e.sets.count
+            counts[gym.muscle(for: gym.machine(e.machineID))?.id, default: 0] += e.sets.count
         }
-        let chosen = Muscle.allCases.compactMap { m in counts[m].map { MuscleCount(muscle: m, sets: $0) } }
-            .sorted { $0.sets > $1.sets }
+        let chosen = gym.muscles.enumerated().compactMap { i, g in counts[g.id].map { (i, MuscleCount(muscle: g, sets: $0)) } }
+            .sorted { $0.1.sets != $1.1.sets ? $0.1.sets > $1.1.sets : $0.0 < $1.0 }.map(\.1)
         return chosen + (counts[nil].map { [MuscleCount(muscle: nil, sets: $0)] } ?? [])
     }
 

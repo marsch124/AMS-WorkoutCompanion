@@ -128,10 +128,6 @@ struct HistoryScreen: View {
         }
     }
 
-    private static let muscleColour: [Muscle: String] = [
-        .chest: "red", .back: "blue", .shoulders: "orange", .arms: "pink", .legs: "green", .core: "olive", .cardio: "violet",
-    ]
-
     private func card<Content: View>(_ title: String, colour: IconColour, id: String, @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(colour.fillColor)
@@ -168,9 +164,9 @@ struct HistoryScreen: View {
             if counts.isEmpty {
                 Text("No gym sets \(statsMonth ? "this month" : "this week") yet.").font(.subheadline).foregroundStyle(Theme.muted)
             }
-            ForEach(counts, id: \.muscle) { c in
-                bar(c.muscle?.title ?? "Not chosen", "\(c.sets) set\(c.sets == 1 ? "" : "s")", fraction: Double(c.sets) / top,
-                    colour: IconColour.of(key: c.muscle.flatMap { Self.muscleColour[$0] } ?? "slate") ?? Past.swatch)
+            ForEach(counts, id: \.muscle?.id) { c in
+                bar(c.muscle?.name ?? "Not chosen", "\(c.sets) set\(c.sets == 1 ? "" : "s")", fraction: Double(c.sets) / top,
+                    colour: IconColour.of(key: c.muscle?.colour ?? "slate") ?? Past.swatch)
             }
             if counts.contains(where: { $0.muscle == nil }) {
                 Text("Choose a muscle group in the machine's edit page.").font(.caption).foregroundStyle(Theme.muted)

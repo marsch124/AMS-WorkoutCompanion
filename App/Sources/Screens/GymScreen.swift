@@ -254,7 +254,7 @@ struct GymScreen: View {
         }
         .sheet(isPresented: $planning) {
             NavigationStack {
-                PlanSheet(machines: machines, order: plan?.order ?? []) { order in
+                PlanSheet(machines: machines, gymID: gymID, order: plan?.order ?? []) { order in
                     planning = false
                     if let order { library.changeGym { $0.setPlan(order, on: day, gym: gymID) } }
                 }
@@ -527,12 +527,51 @@ private struct DayPicker: View {
 
 /// Plan today: tap the machines in the order you want them. Nothing is kept until Save.
 private struct PlanSheet: View {
+    @Environment(Library.self) private var library
     let machines: [Machine]
+    let gymID: UUID?
     @State var order: [UUID]
     let done: ([UUID]?) -> Void
+    @State private var namingTemplate = false
+    @State private var templateName = ""
+    @State private var deleting: PlanTemplate?
+
+    private var templates: [PlanTemplate] { library.gym.templates(gym: gymID) }
 
     var body: some View {
         List {
+            if !templates.isEmpty {
+                Section {
+                    ForEach(templates) { t in
+                        HStack {
+                            Button {
+                                order = library.gym.order(of: t)
+                            } label: {
+                                HStack {
+                                    Text(t.name).foregroundStyle(Theme.ink)
+                                    Spacer()
+                                    let n = library.gym.order(of: t).count
+                                    Text(n == 1 ? "1 machine" : "\(n) machines")
+                                        .font(.subheadline).foregroundStyle(.secondary)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("plan-template-\(t.name)")
+                            Button { deleting = t } label: {
+                                ControlMarkView(.close, size: 18, colour: .red)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Delete the template \(t.name)")
+                            .accessibilityIdentifier("plan-template-delete-\(t.name)")
+                        }
+                    }
+                    .moveDisabled(true)
+                    .deleteDisabled(true)
+                } header: {
+                    Text("Use a template")
+                }
+            }
             // Today's order with drag handles (1.9.3, his "adjust the plan — maybe with drag handles?").
             if !order.isEmpty {
                 Section {
@@ -559,6 +598,22 @@ private struct PlanSheet: View {
                     Text("Today's order")
                 } footer: {
                     Text("Drag the handles to change the order; the red minus takes a machine out.")
+                }
+                // Right under the order, so it is never hidden behind Cancel and Save (1.10).
+                Section {
+                    Button {
+                        templateName = ""
+                        namingTemplate = true
+                    } label: {
+                        Text("Save as template…")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Gym.ink)
+                            .frame(maxWidth: .infinity, minHeight: 36)
+                            .background(Gym.fill, in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    .accessibilityIdentifier("plan-save-template")
                 }
             }
             Section {
@@ -597,6 +652,29 @@ private struct PlanSheet: View {
                         .accessibilityIdentifier("plan-clear")
                 }
             }
+        }
+        .alert("Save as template", isPresented: $namingTemplate) {
+            TextField("For example: Leg day", text: $templateName)
+            Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("plan-template-cancel")
+            Button("Save") {
+                let name = templateName, o = order, g = gymID
+                library.changeGym { _ = $0.saveTemplate(named: name, order: o, gym: g) }
+            }
+            .accessibilityIdentifier("plan-template-name-save")
+        } message: {
+            Text("The same name in this gym is replaced.")
+        }
+        .alert("Delete the template \"\(deleting?.name ?? "")\"?", isPresented: Binding(
+            get: { deleting != nil }, set: { if !$0 { deleting = nil } }
+        )) {
+            Button("Cancel", role: .cancel) { deleting = nil }
+            Button("Delete", role: .destructive) {
+                if let t = deleting { library.changeGym { $0.deleteTemplate(t.id) } }
+                deleting = nil
+            }
+        } message: {
+            Text("Today's plan stays.")
         }
         // Always in edit mode, so the handles show without an Edit button.
         .environment(\.editMode, .constant(.active))
@@ -848,8 +926,8 @@ struct VisitScreen: View {
 
     private func machineCard(_ e: MachineEntry) -> some View {
         let m = library.gym.machine(e.machineID)
-        let muscle = m?.muscle ?? (m?.logs == .time ? .cardio : nil)
-        let accent = muscle.flatMap { IconColour.of(key: $0.colourKey) }?.fillColor ?? Gym.fill
+        let muscle = library.gym.muscle(for: m)
+        let accent = muscle.flatMap { IconColour.of(key: $0.colour) }?.fillColor ?? Gym.fill
         return HStack(alignment: .top, spacing: 10) {
             MachinePhoto(name: m?.photo, height: 56, icon: m?.icon)
                 .frame(width: 56)
@@ -857,7 +935,7 @@ struct VisitScreen: View {
                 HStack(spacing: 6) {
                     Text(m?.name ?? "Machine").font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
                     if let muscle {
-                        Text(muscle.title)
+                        Text(muscle.name)
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(accent)
                             .padding(.horizontal, 6)

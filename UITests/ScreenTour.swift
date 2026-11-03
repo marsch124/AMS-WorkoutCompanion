@@ -275,4 +275,35 @@ final class ScreenTour: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["plan-order-3"].waitForExistence(timeout: 5))
         snap("36 Plan with handles")
     }
+
+    /// 1.10: plan templates and the Muscle groups page.
+    func testNewIn110Tour() {
+        app.launchArguments += ["-gymdemo"]
+        app.launch()
+        app.buttons["open-gym"].tap()
+        app.buttons["gym-plan"].tap()
+        app.buttons["plan-machine-Leg press"].tap()
+        app.buttons["plan-machine-Chest press"].tap()
+        app.buttons["plan-save-template"].tap()
+        let field = app.alerts.firstMatch.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        snap("37 Save as template")
+        field.typeText("Leg day")
+        app.alerts.firstMatch.buttons["Save"].firstMatch.tap()
+        app.buttons["plan-cancel"].tap()
+        app.buttons["gym-plan"].tap()
+        XCTAssertTrue(app.buttons["plan-template-Leg day"].waitForExistence(timeout: 5))
+        app.buttons["plan-template-Leg day"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["plan-order-2"].waitForExistence(timeout: 5))
+        snap("38 Use a template")
+        app.buttons["plan-cancel"].tap()
+        goBack()
+        app.buttons["open-settings"].tap()
+        app.descendants(matching: .any)["open-muscle-groups"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["muscle-add"].firstMatch.waitForExistence(timeout: 5))
+        snap("39 Muscle groups")
+        app.descendants(matching: .any)["muscle-row-Legs"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["muscle-name"].firstMatch.waitForExistence(timeout: 5))
+        snap("40 Edit a muscle group")
+    }
 }

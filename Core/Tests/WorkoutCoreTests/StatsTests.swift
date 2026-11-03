@@ -22,7 +22,7 @@ final class StatsTests: XCTestCase {
     var pushups = Machine(name: "Push-ups", logs: .reps)
 
     override func setUp() {
-        chest.muscle = .chest
+        chest.muscle = "chest"
     }
 
     func log(_ adds: [(Date, Machine, GymSet)]) -> GymLog {
@@ -64,9 +64,9 @@ final class StatsTests: XCTestCase {
                      (day(3), tread, GymSet(seconds: 600, level: nil, incline: nil)),
                      (day(1), chest, GymSet(kg: 20, reps: 10))])
         let m = Stats.muscles(g, in: week)
-        XCTAssertEqual(m, [MuscleCount(muscle: .chest, sets: 2), MuscleCount(muscle: .cardio, sets: 1),
+        XCTAssertEqual(m, [MuscleCount(muscle: g.muscle("chest"), sets: 2), MuscleCount(muscle: g.muscle("cardio"), sets: 1),
                            MuscleCount(muscle: nil, sets: 1)])
-        XCTAssertEqual(Stats.muscles(g, in: month).first, MuscleCount(muscle: .chest, sets: 3))
+        XCTAssertEqual(Stats.muscles(g, in: month).first, MuscleCount(muscle: g.muscle("chest"), sets: 3))
         XCTAssertEqual(Stats.muscles(GymLog(), in: week), [])
     }
 

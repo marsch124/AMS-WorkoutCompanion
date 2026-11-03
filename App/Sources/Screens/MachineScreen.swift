@@ -743,9 +743,9 @@ struct MachineForm: View {
             }
             Section {
                 Picker("Muscle group", selection: $draft.muscle) {
-                    Text("Not chosen").tag(Muscle?.none)
-                    ForEach(Muscle.allCases, id: \.self) { m in
-                        Text(m.title).tag(Muscle?.some(m))
+                    Text("Not chosen").tag(String?.none)
+                    ForEach(library.gym.muscles) { m in
+                        Text(m.name).tag(String?.some(m.id))
                     }
                 }
                 .tint(Gym.tint)
