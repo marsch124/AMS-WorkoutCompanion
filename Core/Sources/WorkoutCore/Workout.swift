@@ -168,6 +168,16 @@ public enum Clock {
 }
 
 /// The ready-made workouts a fresh install starts with.
+extension Workout {
+    /// The icon the tile shows: the one chosen, else push-ups get the push-up drawing (1.9, his pick),
+    /// else the kind's usual icon.
+    public var shownIcon: String { icon ?? usualIcon }
+
+    public var usualIcon: String {
+        name.lowercased().replacingOccurrences(of: "-", with: "").contains("pushup") ? "pushup" : kind.iconKey
+    }
+}
+
 public enum Starters {
     public static var all: [Workout] {
         [

@@ -11,7 +11,7 @@ settings:
     DEVELOPMENT_TEAM: D24ENP83QQ
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.8"
+    MARKETING_VERSION: "1.9"
     CURRENT_PROJECT_VERSION: "1"
 packages:
   # The model — workouts, their phases and the clock, with no screen in it.
@@ -22,7 +22,7 @@ packages:
   # reaches this app by surprise.
   AMSIcons:
     url: https://github.com/marsch124/AMS-Icons
-    revision: ba966bdc1eae47033f234a49e2678543d868c36b
+    revision: 089121f5be32406f60908b5f3e0120da79a1e8c7
 targets:
   AMSWorkoutCompanion:
     type: application

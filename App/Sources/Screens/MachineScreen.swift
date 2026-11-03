@@ -114,6 +114,19 @@ struct MachineScreen: View {
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle(machine?.name ?? "Machine")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Button { moveOn(nil) } label: {   // back to the machines; the green Next goes on to the next planned one
+                Text("Exercise done")
+            }
+            .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 50))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .background(Theme.bg.opacity(0.96).ignoresSafeArea(edges: .bottom))
+            .accessibilityLabel("Exercise done")
+            .accessibilityIdentifier("machine-done-pill")
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { editing = true } label: { ControlMarkView(.edit, size: 22, colour: Gym.tint) }
@@ -182,7 +195,7 @@ struct MachineScreen: View {
                     }
                 }
             }
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.large])   // full height: the note field stays clear of the bottom Save bar (1.9)
         }
     }
 
@@ -452,14 +465,28 @@ struct MachineScreen: View {
                     .frame(height: 120)
                     .accessibilityIdentifier("gym-chart")
                 }
-                ForEach(points.reversed(), id: \.date) { p in
-                    HStack {
-                        Text(p.date.formatted(.dateTime.day().month(.abbreviated).year()))
-                            .foregroundStyle(Theme.muted)
-                        Spacer()
-                        Text(library.gym.text(p.entry)).foregroundStyle(Theme.ink)
+                ForEach(Array(points.reversed().enumerated()), id: \.element.date) { i, p in
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(p.date.formatted(.dateTime.day().month(.abbreviated).year()))
+                                .foregroundStyle(Theme.muted)
+                            Spacer()
+                            Text(library.gym.text(p.entry)).foregroundStyle(Theme.ink)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        .font(.subheadline)
+                        if let plan = p.entry.nextTime {
+                            Text("Next time: \(library.gym.text(plan, machine: machineID))")
+                                .font(.caption).foregroundStyle(Gym.tint)
+                                .accessibilityIdentifier("history-visit-recommendation")
+                        }
+                        if let note = p.entry.note, !note.isEmpty {
+                            Text(note).font(.caption).foregroundStyle(Theme.ink)
+                                .accessibilityIdentifier("history-visit-note")
+                        }
                     }
-                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if i < points.count - 1 { Divider() }
                 }
             }
             .padding(12)
@@ -591,17 +618,7 @@ private struct SetEditor: View {
         }
         .navigationTitle("Set \(number)")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { done(nil) }
-                    .accessibilityIdentifier("set-edit-cancel")
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { done(set) }
-                    .saveButton()
-                    .accessibilityIdentifier("set-edit-save")
-            }
-        }
+        .bottomActions(cancel: { done(nil) }, save: { done(set) }, cancelID: "set-edit-cancel", saveID: "set-edit-save")
     }
 }
 
@@ -658,18 +675,8 @@ private struct NextTimeForm: View {
         }
         .navigationTitle("Next time")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { done(nil) }
-                    .keyboardShortcut(.cancelAction)
-                    .accessibilityIdentifier("next-time-cancel")
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { done((planned ? set : nil, note)) }
-                    .saveButton(Gym.fill)
-                    .accessibilityIdentifier("next-time-save")
-            }
-        }
+        .bottomActions(cancel: { done(nil) }, save: { done((planned ? set : nil, note)) }, tint: Gym.fill,
+                       cancelID: "next-time-cancel", saveID: "next-time-save")
     }
 }
 
@@ -733,6 +740,16 @@ struct MachineForm: View {
                 Text("How it is set up")
             } footer: {
                 Text("Shown each time you use the machine.")
+            }
+            Section {
+                Picker("Muscle group", selection: $draft.muscle) {
+                    Text("Not chosen").tag(Muscle?.none)
+                    ForEach(Muscle.allCases, id: \.self) { m in
+                        Text(m.title).tag(Muscle?.some(m))
+                    }
+                }
+                .tint(Gym.tint)
+                .accessibilityIdentifier("machine-muscle")
             }
             Section {
                 Picker("Logs", selection: $draft.logs) {
@@ -831,17 +848,7 @@ struct MachineForm: View {
         }
         .navigationTitle(draft.logs == .reps ? (isNew ? "New exercise" : "Edit exercise") : (isNew ? "New machine" : "Edit machine"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { done(nil) }
-                    .accessibilityIdentifier("machine-cancel")
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save", action: save)
-                    .saveButton()
-                    .accessibilityIdentifier("machine-save")
-            }
-        }
+        .bottomActions(cancel: { done(nil) }, save: save, cancelID: "machine-cancel", saveID: "machine-save")
         .onChange(of: pick) { _, item in
             Task {
                 if let data = try? await item?.loadTransferable(type: Data.self),

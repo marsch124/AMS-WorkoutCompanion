@@ -81,6 +81,11 @@ final class Library {
                let data = try? GymFile.encode(GymLog.demo()) {
                 try? data.write(to: dir.appendingPathComponent("gym.json"))
             }
+            // UI tests can start from a given gym file (to replay a problem with real data on the Mac only).
+            if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "-gymfile"),
+               i + 1 < ProcessInfo.processInfo.arguments.count {
+                try? fm.copyItem(atPath: ProcessInfo.processInfo.arguments[i + 1], toPath: dir.appendingPathComponent("gym.json").path)
+            }
             return Library(folder: dir)
         }
         let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]

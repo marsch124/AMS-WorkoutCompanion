@@ -80,18 +80,7 @@ struct IconPicker: View {
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search icons")
         .navigationTitle("Icon")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel", action: onCancel)
-                    .keyboardShortcut(.cancelAction)
-                    .accessibilityIdentifier("icon-picker-cancel")
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { onSave(chosen) }
-                    .saveButton()
-                    .accessibilityIdentifier("icon-picker-save")
-            }
-        }
+        .bottomActions(cancel: onCancel, save: { onSave(chosen) }, cancelID: "icon-picker-cancel", saveID: "icon-picker-save")
     }
 }
 

@@ -19,6 +19,16 @@ final class WorkoutCompanionUITests: XCTestCase {
     }
 
     /// Waits for an element's label, since the screen animates between phases.
+    /// Back one page: on a machine (no back arrow since 1.9) "Exercise done", else the back arrow.
+    func goBack() {
+        let done = app.buttons["machine-done-pill"]
+        if done.exists && done.isHittable { done.tap(); return }
+        let arrow = app.navigationBars.buttons["BackButton"]
+        if arrow.exists && arrow.isHittable { arrow.tap(); return }
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.005, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)))
+    }
+
     func waitFor(_ e: XCUIElement, label: String, timeout: TimeInterval = 8,
                  file: StaticString = #filePath, line: UInt = #line) {
         let found = expectation(for: NSPredicate(format: "label == %@", label), evaluatedWith: e)
@@ -98,9 +108,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.8 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.9 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.8"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.9"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -159,7 +169,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["gym-set-done"].tap()
         waitFor(app.buttons["gym-set-2"], label: "Set 2, 25 kg × 9")
 
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
         waitFor(app.buttons["gym-finish"], label: "Finish this session")
         app.buttons["gym-finish"].tap()
@@ -191,7 +201,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["gym-come-back"].waitForExistence(timeout: 3))
         app.buttons["machine-Leg press"].tap()
         XCTAssertTrue(app.staticTexts["gym-next-set"].waitForExistence(timeout: 5))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         waitFor(app.buttons["busy-Leg press"], label: "Mark Leg press busy")
         XCTAssertFalse(app.staticTexts["gym-come-back"].exists)
     }
@@ -231,7 +241,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["gym-machine-done"].tap()
         waitFor(app.staticTexts["gym-setting"], label: "Seat 4, handles 2")
 
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         waitFor(app.buttons["plan-row-1"], label: "1, Leg press, done")
         waitFor(app.buttons["gym-finish"], label: "Finish this session")
     }
@@ -259,14 +269,14 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["machine-Chest press"].tap()
         app.buttons["gym-set-done"].tap()
         app.buttons["gym-rest-skip"].tap()
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         app.buttons["gym-finish"].tap()
         let title = app.textFields["gym-summary-title"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         title.tap()
         title.typeText("Chest day")
         app.buttons["gym-summary-done"].tap()
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
 
         // A Sets & reps workout ended early is kept too.
         app.buttons["workout-Push-ups"].tap()
@@ -288,8 +298,10 @@ final class WorkoutCompanionUITests: XCTestCase {
         let row = app.buttons["history-row-2"]
         row.tap()
         XCTAssertTrue(app.buttons["visit-edit"].waitForExistence(timeout: 5))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         let gymChip = app.buttons["history-filter-gym"]
+        // Since 1.9 the statistics push the list down: scroll back up to the chips.
+        for _ in 0..<4 where !gymChip.isHittable { app.swipeDown() }
         waitHittable(gymChip)
         gymChip.tap()
         XCTAssertTrue(app.buttons["history-row-1"].label.hasPrefix("Chest day"))
@@ -302,7 +314,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["machine-Lat pulldown"].tap()
         XCTAssertTrue(app.staticTexts["gym-last-note"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["gym-suggestion"].label.contains("Your plan from last time"))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
 
         app.buttons["machine-Treadmill"].tap()
         XCTAssertTrue(app.staticTexts["gym-last"].waitForExistence(timeout: 5))
@@ -317,7 +329,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["gym-next-time"].tap()
         let note = app.textFields["next-time-note"]
         XCTAssertTrue(note.waitForExistence(timeout: 3))
-        note.tap()
+        note.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
         note.typeText("Felt easy")
         app.buttons["next-time-save"].tap()
         XCTAssertTrue(app.buttons["gym-next-time"].waitForExistence(timeout: 3))
@@ -396,7 +408,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         waitFor(app.buttons["gym-set-1"], label: "Set 1, 11 reps")
 
         app.buttons["gym-rest-skip"].tap()
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         XCTAssertTrue(app.buttons["machine-Push-ups"].waitForExistence(timeout: 5))
         app.buttons["gym-finish"].tap()
         waitFor(app.staticTexts["gym-summary-sets"], label: "1")
@@ -451,7 +463,7 @@ final class WorkoutCompanionUITests: XCTestCase {
             name.typeText(n)
             app.buttons["machine-save"].tap()
             XCTAssertTrue(app.buttons["gym-set-done"].waitForExistence(timeout: 5))
-            app.navigationBars.buttons.element(boundBy: 0).tap()
+            goBack()
             XCTAssertTrue(app.buttons["machine-\(n)"].waitForExistence(timeout: 5))
         }
         app.buttons["gym-plan"].tap()
@@ -467,15 +479,15 @@ final class WorkoutCompanionUITests: XCTestCase {
         let icon = app.buttons["editor-icon"]
         XCTAssertTrue(icon.waitForExistence(timeout: 5))
         icon.tap()
-        let run = app.buttons["icon-run"]
+        let run = app.buttons["icon-car"]
         XCTAssertTrue(run.waitForExistence(timeout: 5))
         run.tap()
         app.buttons["icon-picker-save"].tap()
-        XCTAssertEqual(app.buttons["editor-icon"].value as? String, "run")
+        XCTAssertEqual(app.buttons["editor-icon"].value as? String, "car")
         app.buttons["editor-save"].tap()
         app.buttons["edit-Push-ups"].tap()
         XCTAssertTrue(app.buttons["editor-icon"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["editor-icon"].value as? String, "run")
+        XCTAssertEqual(app.buttons["editor-icon"].value as? String, "car")
     }
 
     func testTheGymTileIconCanBeChanged() {
@@ -485,8 +497,8 @@ final class WorkoutCompanionUITests: XCTestCase {
         let change = app.buttons["gym-change-icon"].firstMatch
         XCTAssertTrue(change.waitForExistence(timeout: 5))
         change.tap()
-        XCTAssertTrue(app.buttons["icon-run"].waitForExistence(timeout: 5))
-        app.buttons["icon-run"].tap()
+        XCTAssertTrue(app.buttons["icon-car"].waitForExistence(timeout: 5))
+        app.buttons["icon-car"].tap()
         app.buttons["icon-picker-save"].tap()
         XCTAssertTrue(tile.waitForExistence(timeout: 5))
     }
@@ -549,14 +561,14 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["backup-reminder"].waitForExistence(timeout: 5))
         app.buttons["backup-reminder-open"].tap()
         XCTAssertTrue(app.buttons["backup-now"].waitForExistence(timeout: 5))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         app.buttons["backup-reminder-later"].tap()
         XCTAssertFalse(app.staticTexts["backup-reminder"].waitForExistence(timeout: 2))
     }
 
     func testTheWeekPictureSwitchesAndTheDataCheckIsAllGood() {
         launchGymDemo()
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         app.buttons["open-history"].tap()
         let sw = app.segmentedControls["history-week-switch"]
         XCTAssertTrue(sw.waitForExistence(timeout: 5))

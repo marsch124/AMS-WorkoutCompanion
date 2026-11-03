@@ -10,6 +10,17 @@ public struct Release: Sendable, Equatable {
 /// The words of Settings: What's new (every version, newest first) and How it works.
 public enum AppText {
     public static let releases: [Release] = [
+        Release(version: "1.9", date: "3 November 2026", items: [
+            "New: statistics in History. A \"This week | This month\" switch over colourful tiles: sessions, minutes, exercises (one per machine per visit), sets and kilograms lifted.",
+            "New: muscle groups. Each machine or exercise can have one — chest, back, shoulders, arms, legs, core or cardio — chosen in its edit page under \"Muscle group\". History shows sets per muscle group as coloured bars. Time machines without a group count as cardio; others show as \"Not chosen\" with a hint.",
+            "New: warm-up and cardio in History: minutes on each time machine (treadmill, rower, bike) in the week or month, with small bars.",
+            "New: streaks, records and badges. Weeks in a row, your best streak and records this month, and seven badges — First session, 10 sessions, 50 sessions, 4 weeks in a row, 1000 kg in one visit, 100 reps in one week, 60 cardio minutes in one week. Earned badges are in full colour; locked ones say how to get them.",
+            "New: \"Exercise done\" — a big pill at the bottom of every machine and exercise. It takes you back to the machines, in place of the back arrow at the top left, which is gone. The green \"Next ›\" beside Set done still goes straight on to the next machine in today's plan.",
+            "New: a machine's History at the bottom shows each visit's sets, the plan for next time and your note.",
+            "Changed: Cancel and Save are at the bottom of every edit page, for one hand — workouts, machines, sets, next time, notes, plan today, the calendar and the icon picker. Escape is still Cancel on a keyboard.",
+            "Changed: the gym screen has a large, bold \"At the gym\" heading, and says \"Tap the machine you'll use next — or plan today's order.\"",
+            "Changed: new hand-drawn icons — a gym building for At the gym, a push-up for Push-ups (unless you chose another icon), and a real gear with six teeth for Settings instead of the sun.",
+        ]),
         Release(version: "1.8", date: "3 November 2026", items: [
             "New: a rest alarm that works with the iPhone locked. When a rest ends — at the gym, in a Sets & reps workout, or before an interval round — the phone buzzes and shows \"Rest over\" with what comes next (\"Set 3 on Leg press\"), even with the screen off or another app open. The first time, the iPhone asks whether the app may send notifications: tap Allow. With the app open you hear the app's own sound as before.",
             "New: Undo. After deleting a workout, a machine or exercise, a set, or a session in History, a dark bar at the bottom says what was deleted, with an Undo button, for 10 seconds. Undo puts everything back, photos included.",
@@ -145,6 +156,8 @@ public enum AppText {
         ("Undo", "Deleted something by mistake — a workout, a machine or exercise, a set, or a History session? Tap Undo in the dark bar at the bottom within 10 seconds, and everything comes back, photos too."),
         ("Backup reminder and Check my data", "After 2 weeks without a backup, Train shows a note: \"Back up\" opens Backups, \"Later\" waits 3 days. Settings → \"Check my data\" reads everything and says All good, or what is damaged or missing. It never changes anything."),
         ("Week picture", "In History, the bars show the last 12 weeks — switch between Sessions and Minutes. Tap a bar to list that week's sessions."),
+        ("Statistics", "History starts with your numbers: switch between This week and This month. Tiles show sessions, minutes, exercises, sets and kilograms. Below: sets per muscle group, minutes on cardio machines, weeks in a row, your best streak, records this month, and badges — tap one to see how to earn it. Give each machine a muscle group in its edit page so the bars are right."),
+        ("Exercise done and one-hand buttons", "On a machine, the big \"Exercise done\" pill at the bottom takes you back to the machines; the green \"Next ›\" beside Set done goes on to the next planned machine. Every edit page has Cancel and Save at the bottom, within reach of your thumb."),
         ("Making a workout", "Give it a name, pick a colour and choose its type. The numbers change with − and +. For an exercise list, Add exercise adds one; its ••• menu moves it up or down or removes it. Add photo takes a picture from your Photos. Nothing is kept until you tap Save; Cancel leaves everything as it was. Save needs a name — without one it tells you so."),
         ("Where things are kept", "Everything stays on this iPhone unless you save a backup file somewhere. The gym log keeps every visit in every gym, and History keeps your workouts, so you can see last time and your progress. Apple Health is not connected."),
     ]

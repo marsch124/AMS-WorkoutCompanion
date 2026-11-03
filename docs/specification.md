@@ -160,3 +160,11 @@ Version 1.6. iPhone only, portrait, iOS 17+, light and dark. The name under the 
 ## Quality (since 1.8)
 - `LargeDataTests`: 2 years of visits (312 visits, 2 gyms, 16 machines), 300 sessions, 30 workouts, 200 photos × 300 KB; file round-trip, History, Backup (≈83 MB, < 1 s locally) and machine look-ups within limits.
 - GitHub Tests: the runner's compiler gave up on one long sum in `GymTests`; written as a typed constant.
+
+## Version 1.9
+- **Statistics** (History, `Stats.swift`): `stats-period` This week | This month; tiles `stats-week`/`stats-month` (sessions, minutes, exercises = one per machine per visit, sets, kg when > 0); `stats-muscle` sets per `Muscle`; time machines without a muscle = cardio, others "Not chosen"; `stats-warmup` minutes per time machine; `stats-streak` weeks in a row, best streak, records this month (a machine's best beaten; first time is no record); `stats-badges` 7 badges (`stats-badge-<id>`). Stats use all items, not the chip filter.
+- **Muscle group**: `Machine.muscle: Muscle?` (chest, back, shoulders, arms, legs, core, cardio); unknown values read as nil. Picker `machine-muscle` in the machine form.
+- **Machine screen**: back arrow hidden; bottom pill `machine-done-pill` "Exercise done" = back to the machine list (`moveOn(nil)`; hiding the back arrow also turns off swipe-back, so this is the way back); the green Next goes to the next planned machine; History per visit with sets, `history-visit-recommendation`, `history-visit-note`.
+- **Bottom actions**: `.bottomActions(...)` in Theme.swift — Cancel (soft, Escape) left, Save/Done full colour right, pinned to the bottom of every edit page; identifiers unchanged.
+- **Gym screen**: large bold title; `gym-intro` "Tap the machine you'll use next — or plan today's order."
+- **Icons**: AMS-Icons 089121f adds hand icons `gym` and `pushup` (end of Sport) and a 6-tooth gear for the `settings` control mark. At the gym tile usual icon `gym`; `Workout.shownIcon` = chosen icon, else `pushup` for a name containing "push-up", else the kind's icon. Not yet in AMS Packing's catalog or the icon-library folder (its build script is out of date).

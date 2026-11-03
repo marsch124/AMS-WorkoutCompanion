@@ -40,7 +40,7 @@ struct EditorScreen: View {
             }
 
             Section {
-                IconRow(icon: draft.icon, usual: draft.kind.iconKey, tint: draft.swatch.fillColor,
+                IconRow(icon: draft.icon, usual: draft.usualIcon, tint: draft.swatch.fillColor,
                         identifier: "editor-icon") { draft.icon = $0 }
             }
 
@@ -105,22 +105,12 @@ struct EditorScreen: View {
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle(isNew ? draft.kind.title : "Edit workout")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel", action: onDone)
-                    .accessibilityIdentifier("editor-cancel")
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
-                    // Never a grey, disabled Save: it says what is missing instead.
-                    guard canSave else { needsName = true; return }
-                    library.save(draft)
-                    onDone()
-                }
-                .saveButton()
-                .accessibilityIdentifier("editor-save")
-            }
-        }
+        .bottomActions(cancel: onDone, save: {
+            // Never a grey, disabled Save: it says what is missing instead.
+            guard canSave else { needsName = true; return }
+            library.save(draft)
+            onDone()
+        }, cancelID: "editor-cancel", saveID: "editor-save")
         .confirmationDialog("Delete \(draft.name)?", isPresented: $askDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 library.delete(draft)

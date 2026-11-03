@@ -36,7 +36,7 @@ struct GymCard: View {
     var body: some View {
         Button(action: open) {
             HStack(spacing: 12) {
-                IconMark(.hand(library.gym.homeIcon ?? "strength"), size: 34, colour: Gym.ink)
+                IconMark(.hand(library.gym.homeIcon ?? "gym"), size: 34, colour: Gym.ink)
                     .frame(width: 44, height: 44)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
@@ -119,9 +119,10 @@ struct GymScreen: View {
                 }
                 Text(machines.isEmpty
                      ? "At each machine: take a photo, give it a name, then log your sets."
-                     : plan == nil ? "Tap whichever machine is free — or plan today's order." : "Follow the plan, or tap any machine that is free.")
+                     : plan == nil ? "Tap the machine you'll use next — or plan today's order." : "Follow the plan, or tap any machine that is free.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
+                    .accessibilityIdentifier("gym-intro")
 
                 planSection
 
@@ -184,7 +185,7 @@ struct GymScreen: View {
         }
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("At the gym")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .onAppear {
             if library.gym.gyms.isEmpty { library.changeGym { $0.ensureGym() } }
         }
@@ -519,18 +520,8 @@ private struct DayPicker: View {
         }
         .navigationTitle("Log an earlier day")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { done(nil) }
-                    .keyboardShortcut(.cancelAction)
-                    .accessibilityIdentifier("gym-date-cancel")
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Done") { done(day) }
-                    .saveButton(Gym.fill)
-                    .accessibilityIdentifier("gym-date-done")
-            }
-        }
+        .bottomActions(cancel: { done(nil) }, save: { done(day) }, saveTitle: "Done", tint: Gym.fill,
+                       cancelID: "gym-date-cancel", saveID: "gym-date-done")
     }
 }
 
@@ -577,18 +568,8 @@ private struct PlanSheet: View {
         }
         .navigationTitle("Plan today")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { done(nil) }
-                    .keyboardShortcut(.cancelAction)
-                    .accessibilityIdentifier("plan-cancel")
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { done(order) }
-                    .saveButton(Gym.fill)
-                    .accessibilityIdentifier("plan-save")
-            }
-        }
+        .bottomActions(cancel: { done(nil) }, save: { done(order) }, tint: Gym.fill,
+                       cancelID: "plan-cancel", saveID: "plan-save")
     }
 }
 
@@ -859,16 +840,10 @@ struct SummaryScreen: View {
             title = visit?.title ?? ""
             notes = visit?.notes ?? ""
         }
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Done") {
-                    library.changeGym { $0.describe(visit: visitID, title: title, notes: notes) }
-                    done()
-                }
-                .saveButton(Gym.fill)
-                .accessibilityIdentifier("gym-summary-done")
-            }
-        }
+        .bottomActions(cancel: nil, save: {
+            library.changeGym { $0.describe(visit: visitID, title: title, notes: notes) }
+            done()
+        }, saveTitle: "Done", tint: Gym.fill, saveID: "gym-summary-done")
     }
 
     private func row(_ title: String, _ value: String, id: String) -> some View {

@@ -48,7 +48,7 @@ struct WorkoutTile: View {
     var size: CGFloat = 44
 
     var body: some View {
-        IconTile(.hand(workout.icon ?? workout.kind.iconKey), colour: workout.swatch, fallbackTint: Theme.accent,
+        IconTile(.hand(workout.shownIcon), colour: workout.swatch, fallbackTint: Theme.accent,
                  letter: workout.name, size: size)
             .accessibilityHidden(true)
     }
@@ -150,5 +150,50 @@ extension View {
             .buttonBorderShape(.capsule)
             .tint(colour)
             .fontWeight(.semibold)
+    }
+}
+
+/// Cancel (soft, left) and Save (full colour, right) pinned at the bottom, within thumb reach.
+struct BottomActionsBar: ViewModifier {
+    var cancel: (() -> Void)?
+    var cancelTitle = "Cancel"
+    let save: () -> Void
+    var saveTitle = "Save"
+    var tint: Color = Theme.accent
+    var cancelID = "cancel"
+    var saveID = "save"
+
+    func body(content: Content) -> some View {
+        content.safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack(spacing: 12) {
+                if let cancel {
+                    Button(cancelTitle, action: cancel)
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
+                        .tint(Theme.muted)
+                        .foregroundStyle(Theme.ink)
+                        .keyboardShortcut(.cancelAction)
+                        .accessibilityIdentifier(cancelID)
+                }
+                Button(saveTitle, action: save)
+                    .saveButton(tint)
+                    .accessibilityIdentifier(saveID)
+            }
+            .controlSize(.large)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .background(Theme.bg.opacity(0.96).ignoresSafeArea(edges: .bottom))
+        }
+    }
+}
+
+extension View {
+    /// Cancel and Save (or Done) at the bottom for one-handed use.
+    func bottomActions(cancel: (() -> Void)?, cancelTitle: String = "Cancel", save: @escaping () -> Void,
+                       saveTitle: String = "Save", tint: Color = Theme.accent,
+                       cancelID: String = "cancel", saveID: String = "save") -> some View {
+        modifier(BottomActionsBar(cancel: cancel, cancelTitle: cancelTitle, save: save, saveTitle: saveTitle,
+                                  tint: tint, cancelID: cancelID, saveID: saveID))
     }
 }

@@ -22,17 +22,7 @@ struct NotesForm: View {
         }
         .navigationTitle("Title and notes")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { done(nil) }
-                    .keyboardShortcut(.cancelAction)
-                    .accessibilityIdentifier("notes-cancel")
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { done((title, notes)) }
-                    .saveButton(colour)
-                    .accessibilityIdentifier("notes-save")
-            }
-        }
+        .bottomActions(cancel: { done(nil) }, save: { done((title, notes)) }, tint: colour,
+                       cancelID: "notes-cancel", saveID: "notes-save")
     }
 }

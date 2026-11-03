@@ -133,7 +133,7 @@ final class WorkoutTests: XCTestCase {
 
 final class AppTextTests: XCTestCase {
     func testWhatsNewIsNewestFirstAndStartsWithThisVersion() {
-        XCTAssertEqual(AppText.releases.map(\.version), ["1.8", "1.7", "1.6", "1.5", "1.4", "1.3", "1.2", "1.1", "1.0"])
+        XCTAssertEqual(AppText.releases.map(\.version), ["1.9", "1.8", "1.7", "1.6", "1.5", "1.4", "1.3", "1.2", "1.1", "1.0"])
         XCTAssertTrue(AppText.releases.allSatisfy { !$0.items.isEmpty })
     }
 
@@ -146,5 +146,17 @@ final class AppTextTests: XCTestCase {
         for part in ["At the gym", "Logging a set", "Getting stronger"] {
             XCTAssertTrue(titles.contains(part), part)
         }
+    }
+}
+
+/// 1.9: push-ups show the push-up drawing unless another icon was chosen.
+final class ShownIconTests: XCTestCase {
+    func testPushUpsGetThePushUpIcon() {
+        XCTAssertEqual(Workout(name: "Push-ups", kind: .reps).shownIcon, "pushup")
+        XCTAssertEqual(Workout(name: "Morning pushups", kind: .reps).shownIcon, "pushup")
+        XCTAssertEqual(Workout(name: "Squats", kind: .reps).shownIcon, "kettlebell")
+        var w = Workout(name: "Push-ups", kind: .reps)
+        w.icon = "run"
+        XCTAssertEqual(w.shownIcon, "run")
     }
 }

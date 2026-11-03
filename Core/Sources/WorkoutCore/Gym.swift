@@ -19,6 +19,13 @@ public enum MachineLogs: String, Codable, CaseIterable, Sendable {
     case reps
 }
 
+/// The muscle group a machine or exercise trains — for the statistics (since 1.9).
+public enum Muscle: String, Codable, CaseIterable, Sendable {
+    case chest, back, shoulders, arms, legs, core, cardio
+
+    public var title: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
+}
+
 /// A machine or exercise at the gym, with its photo and how it is set up.
 public struct Machine: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
@@ -42,6 +49,8 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
     public var noIncline: Bool?
     /// The hand-drawn icon shown when there is no photo (an AMS-Icons key, since 1.6); nil = the usual one.
     public var icon: String?
+    /// What it trains (since 1.9); nil = not chosen yet. Time machines count as cardio when not chosen.
+    public var muscle: Muscle?
 
     public var hasLevel: Bool { noLevel != true }
     public var hasIncline: Bool { noIncline != true }
@@ -68,7 +77,7 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
         self.instructions = instructions
     }
 
-    enum CodingKeys: String, CodingKey { case id, gymID, name, photo, setting, logs, instructions, restSeconds, step, topReps, noLevel, noIncline, icon }
+    enum CodingKeys: String, CodingKey { case id, gymID, name, photo, setting, logs, instructions, restSeconds, step, topReps, noLevel, noIncline, icon, muscle }
 
     /// Files from before 1.4 have no gym, no `logs` and no instructions.
     public init(from decoder: Decoder) throws {
@@ -86,6 +95,8 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
         noLevel = try c.decodeIfPresent(Bool.self, forKey: .noLevel)
         noIncline = try c.decodeIfPresent(Bool.self, forKey: .noIncline)
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
+        // An unknown muscle from a newer version reads as not chosen, never as a broken file.
+        muscle = (try? c.decodeIfPresent(Muscle.self, forKey: .muscle)) ?? nil
     }
 }
 

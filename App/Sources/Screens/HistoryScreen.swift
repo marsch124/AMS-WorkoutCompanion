@@ -18,6 +18,7 @@ struct HistoryScreen: View {
     @State private var filter = "all"
     @State private var weekShows = "sessions"
     @State private var pickedWeek: Date?
+    @State private var statsMonth = false
 
     private var all: [HistoryItem] { library.historyItems }
     private var items: [HistoryItem] { filter == "all" ? all : all.filter { $0.group == filter } }
@@ -95,27 +96,157 @@ struct HistoryScreen: View {
         return all.first { $0.group == key }.flatMap { IconColour.of(key: $0.colour) } ?? Past.swatch
     }
 
+    // MARK: Statistics (since 1.9)
+
+    private var period: DateInterval { History.period(statsMonth ? .month : .weekOfYear, around: Date()) }
+
     private var stats: some View {
-        let week = History.totals(items, in: History.period(.weekOfYear, around: Date()))
-        let month = History.totals(items, in: History.period(.month, around: Date()))
-        let streak = History.weekStreak(items, now: Date())
-        let showKg = items.contains { $0.kg > 0 }
+        let o = Stats.overview(all, gym: library.gym, in: period)
+        let key = statsMonth ? "month" : "week"
         return VStack(alignment: .leading, spacing: 6) {
-            Text("This week")
+            Text(statsMonth ? "This month" : "This week")
                 .font(.headline)
                 .foregroundStyle(Past.tint)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                tile("Sessions", "\(week.sessions)", "plum", id: "history-week-sessions")
-                tile("Minutes", "\(week.minutes)", "green", id: "history-week-minutes")
-                if showKg { tile("Lifted", "\(GymSet.number(week.kg)) kg", "indigo", id: "history-week-kg") }
-                tile("Weeks in a row", "\(streak)", "orange", id: "history-streak")
+            Picker("Period", selection: $statsMonth) {
+                Text("This week").tag(false)
+                Text("This month").tag(true)
             }
-            Text("This month: \(month.sessions) session\(month.sessions == 1 ? "" : "s") · \(month.minutes) min"
-                 + (showKg ? " · \(GymSet.number(month.kg)) kg" : ""))
-                .font(.subheadline)
-                .foregroundStyle(Theme.muted)
-                .accessibilityIdentifier("history-month")
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("stats-period")
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                tile("Sessions", "\(o.sessions)", "plum", id: "history-\(key)-sessions")
+                tile("Minutes", "\(o.minutes)", "green", id: "history-\(key)-minutes")
+                tile("Exercises", "\(o.exercises)", "orange", id: "history-\(key)-exercises")
+                tile("Sets", "\(o.sets)", "blue", id: "history-\(key)-sets")
+                if o.kg > 0 { tile("Lifted", "\(GymSet.number(o.kg)) kg", "indigo", id: "history-\(key)-kg") }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(statsMonth ? "stats-month" : "stats-week")
+            muscles
+            warmup
+            gamified
         }
+    }
+
+    private static let muscleColour: [Muscle: String] = [
+        .chest: "red", .back: "blue", .shoulders: "orange", .arms: "pink", .legs: "green", .core: "olive", .cardio: "violet",
+    ]
+
+    private func card<Content: View>(_ title: String, colour: IconColour, id: String, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(colour.fillColor)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(colour.fillColor.opacity(0.5), lineWidth: 1))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(id)
+    }
+
+    private func bar(_ label: String, _ value: String, fraction: Double, colour: IconColour) -> some View {
+        HStack(spacing: 8) {
+            Text(label).font(.subheadline).foregroundStyle(Theme.ink).frame(width: 92, alignment: .leading).lineLimit(1)
+            GeometryReader { geo in
+                Capsule().fill(colour.fillColor.opacity(0.15))
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(colour.fillColor).frame(width: max(8, geo.size.width * fraction))
+                    }
+            }
+            .frame(height: 10)
+            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(colour.fillColor)
+                .frame(minWidth: 48, alignment: .trailing)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var muscles: some View {
+        let counts = Stats.muscles(library.gym, in: period)
+        let top = Double(counts.map(\.sets).max() ?? 1)
+        return card("Muscle groups", colour: IconColour.of(key: "red") ?? Past.swatch, id: "stats-muscle") {
+            if counts.isEmpty {
+                Text("No gym sets \(statsMonth ? "this month" : "this week") yet.").font(.subheadline).foregroundStyle(Theme.muted)
+            }
+            ForEach(counts, id: \.muscle) { c in
+                bar(c.muscle?.title ?? "Not chosen", "\(c.sets) set\(c.sets == 1 ? "" : "s")", fraction: Double(c.sets) / top,
+                    colour: IconColour.of(key: c.muscle.flatMap { Self.muscleColour[$0] } ?? "slate") ?? Past.swatch)
+            }
+            if counts.contains(where: { $0.muscle == nil }) {
+                Text("Choose a muscle group in the machine's edit page.").font(.caption).foregroundStyle(Theme.muted)
+            }
+        }
+    }
+
+    private var warmup: some View {
+        let rows = Stats.cardio(library.gym, in: period)
+        let top = Double(rows.map(\.minutes).max() ?? 1)
+        return card("Warm-up and cardio", colour: IconColour.of(key: "violet") ?? Past.swatch, id: "stats-warmup") {
+            if rows.isEmpty {
+                Text("No time on a treadmill, rower or bike \(statsMonth ? "this month" : "this week") yet.").font(.subheadline).foregroundStyle(Theme.muted)
+            }
+            ForEach(rows, id: \.name) { r in
+                bar(r.name, "\(r.minutes) min", fraction: Double(r.minutes) / top, colour: IconColour.of(key: "violet") ?? Past.swatch)
+            }
+        }
+    }
+
+    private static let badgeColour: [String: String] = [
+        "first": "green", "sessions10": "blue", "sessions50": "plum", "streak4": "orange",
+        "kg1000": "indigo", "pushups100": "red", "cardio60": "violet",
+    ]
+
+    private var gamified: some View {
+        let streak = History.weekStreak(all, now: Date())
+        let best = max(streak, Stats.bestStreak(all))
+        let records = Stats.personalRecords(library.gym, in: History.period(.month, around: Date()))
+        let badges = Stats.badges(all, gym: library.gym)
+        let won = badges.filter(\.earned).count
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                tile("Weeks in a row", "\(streak)", "orange", id: "history-streak")
+                tile("Best streak", "\(best)", "red", id: "stats-best")
+                tile("Records this month", "\(records)", "yellow", id: "stats-records")
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("stats-streak")
+            Text("Badges · \(won) of \(badges.count)")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Past.tint)
+                .padding(.top, 4)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                ForEach(badges) { b in badgeView(b) }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("stats-badges")
+        }
+    }
+
+    private func badgeView(_ b: Badge) -> some View {
+        let c = IconColour.of(key: Self.badgeColour[b.id] ?? "plum") ?? Past.swatch
+        return HStack(spacing: 8) {
+            ZStack {
+                Circle().fill(b.earned ? c.fillColor : Color.clear)
+                Circle().stroke(b.earned ? c.fillColor : Theme.line, lineWidth: 1.5)
+                IconMark(.hand(b.icon), size: 20, colour: b.earned ? c.inkColor : Theme.muted.opacity(0.6))
+            }
+            .frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(b.title).font(.subheadline.weight(.semibold)).foregroundStyle(b.earned ? c.fillColor : Theme.muted)
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                Text(b.earned ? "Earned" : b.hint).font(.caption).foregroundStyle(Theme.muted)
+                    .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(b.earned ? c.fillColor.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .stroke(b.earned ? c.fillColor.opacity(0.5) : Theme.line, lineWidth: 1))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(b.title), \(b.earned ? "earned" : "locked. " + b.hint)")
+        .accessibilityIdentifier("stats-badge-\(b.id)")
     }
 
     private func tile(_ title: String, _ value: String, _ colour: String, id: String) -> some View {

@@ -31,6 +31,16 @@ final class ScreenTour: XCTestCase {
         add(shot)
     }
 
+    /// Back one page: on a machine (no back arrow since 1.9) "Exercise done", else the back arrow.
+    func goBack() {
+        let done = app.buttons["machine-done-pill"]
+        if done.exists && done.isHittable { done.tap(); return }
+        let arrow = app.navigationBars.buttons["BackButton"]
+        if arrow.exists && arrow.isHittable { arrow.tap(); return }
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.005, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)))
+    }
+
     func waitFor(_ e: XCUIElement, label: String, timeout: TimeInterval = 10) {
         let found = expectation(for: NSPredicate(format: "label == %@", label), evaluatedWith: e)
         XCTAssertEqual(XCTWaiter.wait(for: [found], timeout: timeout), .completed, "expected \(label)")
@@ -114,7 +124,7 @@ final class ScreenTour: XCTestCase {
         app.buttons["plan-row-3"].tap()
         XCTAssertTrue(app.buttons["gym-minutes-plus"].waitForExistence(timeout: 5))
         snap("11e Treadmill")
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         app.buttons["machine-Chest press"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["gym-suggestion"].waitForExistence(timeout: 5))
         snap("12 Machine")
@@ -127,7 +137,7 @@ final class ScreenTour: XCTestCase {
         XCTAssertTrue(app.textFields["next-time-note"].waitForExistence(timeout: 3))
         snap("13c Next time")
         app.buttons["next-time-cancel"].tap()
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         app.buttons["gym-finish"].tap()
         XCTAssertTrue(app.staticTexts["gym-summary-sets"].waitForExistence(timeout: 5))
         snap("14 Summary")
@@ -137,8 +147,8 @@ final class ScreenTour: XCTestCase {
         XCTAssertTrue(app.textFields["machine-name"].waitForExistence(timeout: 5))
         snap("15 Machine form")
         app.buttons["machine-cancel"].tap()
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
+        goBack()
         app.buttons["open-history"].tap()
         XCTAssertTrue(app.buttons["history-row-1"].waitForExistence(timeout: 5))
         snap("16 History")
@@ -167,7 +177,7 @@ final class ScreenTour: XCTestCase {
         app.buttons["gym-set-done"].tap()
         app.buttons["gym-rest-skip"].tap()
         snap("20 Reps only")
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         app.buttons["open-settings"].tap()
         app.buttons["settings-backups"].tap()
         app.buttons["backup-keep-copy"].tap()
@@ -185,7 +195,7 @@ final class ScreenTour: XCTestCase {
         app.buttons["gym-repeat"].tap()
         XCTAssertTrue(app.buttons["plan-row-1"].waitForExistence(timeout: 5))
         snap("23 Repeated plan")
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack()
         app.buttons["open-settings"].tap()
         app.buttons["settings-backups"].tap()
         XCTAssertTrue(app.buttons["backup-auto-on"].waitForExistence(timeout: 5))
@@ -209,5 +219,30 @@ final class ScreenTour: XCTestCase {
         app.buttons["settings-health"].tap()
         XCTAssertTrue(app.staticTexts["health-ok"].waitForExistence(timeout: 5))
         snap("27 Check my data")
+    }
+
+    /// 1.9: new icons and gear, bold gym title, Exercise done, history with notes, bottom buttons, statistics.
+    func testNewIn19Tour() {
+        app.launchArguments += ["-gymdemo"]
+        app.launch()
+        XCTAssertTrue(app.buttons["open-gym"].waitForExistence(timeout: 10))
+        snap("28 Train")
+        app.buttons["open-gym"].tap()
+        XCTAssertTrue(app.staticTexts["gym-intro"].waitForExistence(timeout: 5))
+        snap("29 Gym")
+        app.buttons["machine-Lat pulldown"].tap()
+        XCTAssertTrue(app.buttons["machine-done-pill"].waitForExistence(timeout: 5))
+        app.swipeUp()
+        snap("30 Machine history")
+        app.buttons["gym-edit-machine"].tap()
+        XCTAssertTrue(app.buttons["machine-save"].waitForExistence(timeout: 5))
+        snap("31 Form buttons at the bottom")
+        app.buttons["machine-cancel"].tap()
+        app.buttons["machine-done-pill"].tap()
+        app.buttons["open-history"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["stats-period"].waitForExistence(timeout: 5))
+        snap("32 Statistics")
+        app.swipeUp()
+        snap("33 Badges")
     }
 }
