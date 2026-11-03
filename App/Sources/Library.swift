@@ -7,9 +7,12 @@ import WorkoutCore
 @Observable
 final class Library {
     private(set) var workouts: [Workout] = []
+    /// The gym log: machines and visits, in its own file.
+    private(set) var gym = GymLog()
     let folder: URL
 
     private var file: URL { folder.appendingPathComponent("workouts.json") }
+    private var gymFile: URL { folder.appendingPathComponent("gym.json") }
     var photoFolder: URL { folder.appendingPathComponent("Photos", isDirectory: true) }
 
     init(folder: URL) {
@@ -28,7 +31,19 @@ final class Library {
             workouts = Starters.all
             persist()
         }
+        if let data = try? Data(contentsOf: gymFile) {
+            if let log = try? GymFile.decode(data) {
+                gym = log
+            } else {
+                gymUnreadable = true
+                let aside = folder.appendingPathComponent("gym-unreadable-\(Int(Date().timeIntervalSince1970)).json")
+                try? fm.copyItem(at: gymFile, to: aside)
+            }
+        }
     }
+
+    /// True when gym.json could not be read: it is kept aside and never overwritten.
+    private var gymUnreadable = false
 
     /// Documents on the iPhone; a fresh, empty folder for UI tests.
     static func launch() -> Library {
@@ -37,6 +52,10 @@ final class Library {
             let dir = fm.temporaryDirectory.appendingPathComponent("uitest", isDirectory: true)
             try? fm.removeItem(at: dir)
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            if ProcessInfo.processInfo.arguments.contains("-gymdemo"),
+               let data = try? GymFile.encode(GymLog.demo()) {
+                try? data.write(to: dir.appendingPathComponent("gym.json"))
+            }
             return Library(folder: dir)
         }
         let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -77,6 +96,14 @@ final class Library {
     func move(from: IndexSet, to: Int) {
         workouts.move(fromOffsets: from, toOffset: to)
         persist()
+    }
+
+    // MARK: Gym
+
+    /// Every change to the gym log goes through here and is written at once.
+    func changeGym(_ change: (inout GymLog) -> Void) {
+        change(&gym)
+        persistGym()
     }
 
     // MARK: Photos
@@ -123,8 +150,20 @@ final class Library {
     private func persist() {
         guard let data = try? WorkoutFile.encode(workouts) else { return }
         try? data.write(to: file, options: .atomic)
-        // Photos no workout uses any more (replaced, removed, deleted) go.
-        let inUse = WorkoutFile.photosInUse(workouts)
+        removeUnusedPhotos()
+    }
+
+    private func persistGym() {
+        guard !gymUnreadable, let data = try? GymFile.encode(gym) else { return }
+        try? data.write(to: gymFile, options: .atomic)
+        removeUnusedPhotos()
+    }
+
+    /// Photos no workout or machine uses any more (replaced, removed, deleted) go.
+    private func removeUnusedPhotos() {
+        // With an unreadable gym file we cannot know which photos its machines use: keep them all.
+        guard !gymUnreadable else { return }
+        let inUse = WorkoutFile.photosInUse(workouts).union(gym.photosInUse)
         let names = (try? FileManager.default.contentsOfDirectory(atPath: photoFolder.path)) ?? []
         for name in names where !inUse.contains(name) {
             try? FileManager.default.removeItem(at: photoFolder.appendingPathComponent(name))

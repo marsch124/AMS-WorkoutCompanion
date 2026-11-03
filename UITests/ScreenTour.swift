@@ -83,7 +83,37 @@ final class ScreenTour: XCTestCase {
         XCTAssertTrue(app.staticTexts["settings-version"].waitForExistence(timeout: 5))
         snap("08 Settings")
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.2"].waitForExistence(timeout: 5))
         snap("09 What's new")
+    }
+
+    /// The gym log, with made-up machines and visits (-gymdemo).
+    func testGymTour() {
+        app.launchArguments = ["-uitest", "-gymdemo"]
+        app.launch()
+        app.buttons["edit-Push-ups"].tap()
+        XCTAssertTrue(app.buttons["editor-save"].waitForExistence(timeout: 5))
+        snap("10 Save button")
+        app.buttons["editor-cancel"].tap()
+
+        app.buttons["open-gym"].tap()
+        XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+        snap("11 Gym")
+        app.buttons["machine-Chest press"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["gym-suggestion"].waitForExistence(timeout: 5))
+        snap("12 Machine")
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.staticTexts["gym-rest"].waitForExistence(timeout: 3))
+        snap("13 Rest")
+        app.buttons["gym-rest-skip"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["gym-finish"].tap()
+        XCTAssertTrue(app.staticTexts["gym-summary-sets"].waitForExistence(timeout: 5))
+        snap("14 Summary")
+        app.buttons["gym-summary-done"].tap()
+        app.buttons["machine-Chest press"].tap()
+        app.buttons["gym-edit-machine"].tap()
+        XCTAssertTrue(app.textFields["machine-name"].waitForExistence(timeout: 5))
+        snap("15 Machine form")
     }
 }

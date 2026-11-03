@@ -90,9 +90,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.1 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.2 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.2"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -111,5 +111,52 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertTrue(cancel.waitForExistence(timeout: 5))
         cancel.tap()
         XCTAssertTrue(app.buttons["workout-Push-ups"].waitForExistence(timeout: 5))
+    }
+
+    func testSaveWithoutANameSaysWhatIsMissing() {
+        app.buttons["add-workout"].tap()
+        app.buttons["new-reps"].tap()
+        let save = app.buttons["editor-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertTrue(save.isEnabled)
+        save.tap()
+        XCTAssertTrue(app.staticTexts["editor-name-needed"].waitForExistence(timeout: 3))
+    }
+
+    func testAtTheGymANewMachineTwoSetsAndFinish() {
+        app.buttons["open-gym"].tap()
+        app.buttons["gym-new-machine"].tap()
+        let name = app.textFields["machine-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        app.buttons["machine-save"].tap()
+        XCTAssertTrue(app.staticTexts["machine-name-needed"].waitForExistence(timeout: 3))
+        name.tap()
+        name.typeText("Chest press")
+        app.textFields["machine-setting"].tap()
+        app.textFields["machine-setting"].typeText("Seat 4")
+        app.buttons["machine-save"].tap()
+
+        // Straight on to the machine, with a new machine's 20 kg × 10.
+        XCTAssertTrue(app.staticTexts["gym-setting"].waitForExistence(timeout: 5))
+        waitFor(app.staticTexts["gym-next-set"], label: "Set 1")
+        app.buttons["gym-weight-plus"].tap()
+        app.buttons["gym-weight-plus"].tap()
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.staticTexts["gym-rest"].waitForExistence(timeout: 3))
+        waitFor(app.buttons["gym-set-1"], label: "Set 1, 25 kg × 10")
+
+        app.buttons["gym-rest-skip"].tap()
+        waitFor(app.staticTexts["gym-next-set"], label: "Set 2")
+        app.buttons["gym-reps-minus"].tap()
+        app.buttons["gym-set-done"].tap()
+        waitFor(app.buttons["gym-set-2"], label: "Set 2, 25 kg × 9")
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+        app.buttons["gym-finish"].tap()
+        waitFor(app.staticTexts["gym-summary-sets"], label: "2")
+        waitFor(app.staticTexts["gym-summary-machines"], label: "1")
+        app.buttons["gym-summary-done"].tap()
+        XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
     }
 }

@@ -133,7 +133,7 @@ final class WorkoutTests: XCTestCase {
 
 final class AppTextTests: XCTestCase {
     func testWhatsNewIsNewestFirstAndStartsWithThisVersion() {
-        XCTAssertEqual(AppText.releases.map(\.version), ["1.1", "1.0"])
+        XCTAssertEqual(AppText.releases.map(\.version), ["1.2", "1.1", "1.0"])
         XCTAssertTrue(AppText.releases.allSatisfy { !$0.items.isEmpty })
     }
 
@@ -142,6 +142,9 @@ final class AppTextTests: XCTestCase {
         for kind in WorkoutKind.allCases {
             XCTAssertTrue(titles.contains(kind.title.replacingOccurrences(of: "Exercise list", with: "Exercise lists")
                 .replacingOccurrences(of: "Interval timer", with: "Interval timers")), kind.title)
+        }
+        for part in ["At the gym", "Logging a set", "Getting stronger"] {
+            XCTAssertTrue(titles.contains(part), part)
         }
     }
 }

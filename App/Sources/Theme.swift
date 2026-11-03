@@ -142,3 +142,13 @@ struct FinishedBadge: View {
         .accessibilityIdentifier("run-finished")
     }
 }
+
+extension View {
+    /// Save (or Done) at the top right: a full-colour pill, never grey (AMS rule: the main button is full colour).
+    func saveButton(_ colour: Color = Theme.accent) -> some View {
+        self.buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
+            .tint(colour)
+            .fontWeight(.semibold)
+    }
+}

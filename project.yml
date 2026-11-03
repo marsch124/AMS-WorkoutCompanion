@@ -11,7 +11,7 @@ settings:
     DEVELOPMENT_TEAM: D24ENP83QQ
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.1"
+    MARKETING_VERSION: "1.2"
     CURRENT_PROJECT_VERSION: "1"
 packages:
   # The model — workouts, their phases and the clock, with no screen in it.
@@ -53,6 +53,7 @@ targets:
         CFBundleIconName: AppIcon
         LSApplicationCategoryType: public.app-category.healthcare-fitness
         ITSAppUsesNonExemptEncryption: false
+        NSCameraUsageDescription: A photo of each gym machine, so you recognise it and its setting next time.
         UILaunchScreen:
           UIColorName: ""
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]

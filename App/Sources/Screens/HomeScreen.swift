@@ -10,11 +10,13 @@ struct HomeScreen: View {
     @State private var adding = false
     @State private var deleting: Workout?
     @State private var showSettings = false
+    @State private var showGym = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 8) {
+                    GymCard { showGym = true }
                     ForEach(library.workouts) { w in
                         WorkoutCard(workout: w, start: { running = w }, edit: { editing = w })
                             .contextMenu {
@@ -32,6 +34,9 @@ struct HomeScreen: View {
             }
             .background(Theme.bg.ignoresSafeArea())
             .navigationTitle("Workouts")
+            .navigationDestination(isPresented: $showGym) { GymScreen() }
+            // The screen stays on (and sounds can play) while at the gym.
+            .onChange(of: showGym) { _, on in on ? Cues.shared.begin() : Cues.shared.end() }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showSettings = true } label: { ControlMarkView(.settings, size: 24, colour: Theme.accent) }

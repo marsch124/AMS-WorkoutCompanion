@@ -10,6 +10,7 @@ struct EditorScreen: View {
     let isNew: Bool
     let onDone: () -> Void
     @State private var askDelete = false
+    @State private var needsName = false
 
     init(workout: Workout, isNew: Bool, onDone: @escaping () -> Void) {
         _draft = State(initialValue: workout)
@@ -25,6 +26,13 @@ struct EditorScreen: View {
                 TextField(placeholder, text: $draft.name)
                     .font(.title3.weight(.semibold))
                     .accessibilityIdentifier("editor-name")
+                    .onChange(of: draft.name) { needsName = false }
+                if needsName {
+                    Text("Give it a name first.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.problem)
+                        .accessibilityIdentifier("editor-name-needed")
+                }
             }
 
             Section("Colour") {
@@ -99,11 +107,12 @@ struct EditorScreen: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
+                    // Never a grey, disabled Save: it says what is missing instead.
+                    guard canSave else { needsName = true; return }
                     library.save(draft)
                     onDone()
                 }
-                .fontWeight(.bold)
-                .disabled(!canSave)
+                .saveButton()
                 .accessibilityIdentifier("editor-save")
             }
         }
