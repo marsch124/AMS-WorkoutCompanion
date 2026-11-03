@@ -83,7 +83,7 @@ final class ScreenTour: XCTestCase {
         XCTAssertTrue(app.staticTexts["settings-version"].waitForExistence(timeout: 5))
         snap("08 Settings")
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.2"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.5"].waitForExistence(timeout: 5))
         snap("09 What's new")
     }
 

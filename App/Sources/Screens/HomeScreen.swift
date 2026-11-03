@@ -2,50 +2,93 @@ import AMSIcons
 import SwiftUI
 import WorkoutCore
 
-/// The list of workouts. Tap one to start it; the pencil edits it.
+/// The three tabs: Train, History, Settings — each keeps its place while another is shown.
+struct RootView: View {
+    enum Tab { case train, history, settings }
+    @State private var tab = Tab.train
+
+    var body: some View {
+        ZStack {
+            // Train stays alive underneath, so the gym keeps its place; History and Settings sit on top
+            // only while chosen — a hidden page with its own navigation above caught every tap (1.5 test).
+            HomeScreen()
+                .opacity(tab == .train ? 1 : 0)
+                .allowsHitTesting(tab == .train)
+                .accessibilityHidden(tab != .train)
+            if tab == .history { NavigationStack { HistoryScreen() } }
+            if tab == .settings { NavigationStack { SettingsScreen() } }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { bar }
+    }
+
+    private var bar: some View {
+        HStack(spacing: 0) {
+            item(.train, "Train", id: "open-train", colour: Theme.accent) { c in IconMark(.hand("kettlebell"), size: 24, colour: c) }
+            item(.history, "History", id: "open-history", colour: Past.tint) { c in IconMark(.hand("pulse"), size: 24, colour: c) }
+            item(.settings, "Settings", id: "open-settings", colour: Theme.accent) { c in ControlMarkView(.settings, size: 24, colour: c) }
+        }
+        .padding(.top, 6)
+        .background(Theme.card.ignoresSafeArea(edges: .bottom))
+        .overlay(alignment: .top) { Rectangle().fill(Theme.line).frame(height: 0.5) }
+    }
+
+    private func item<M: View>(_ t: Tab, _ title: String, id: String, colour: Color,
+                               @ViewBuilder mark: (Color) -> M) -> some View {
+        let on = tab == t
+        return Button { tab = t } label: {
+            VStack(spacing: 2) {
+                mark(on ? colour : Theme.muted)
+                Text(title).font(.caption2.weight(on ? .semibold : .regular))
+                    .foregroundStyle(on ? colour : Theme.muted)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityIdentifier(id)
+    }
+}
+
+/// Train: the gym as a wide tile, then the workouts in two columns. Tap one to start it; the pencil edits it.
 struct HomeScreen: View {
     @Environment(Library.self) private var library
     @State private var running: Workout?
     @State private var editing: Workout?
     @State private var adding = false
     @State private var deleting: Workout?
-    @State private var showSettings = false
     @State private var showGym = false
-    @State private var showHistory = false
+    private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 8) {
+                VStack(spacing: 10) {
                     GymCard { showGym = true }
-                    HistoryCard { showHistory = true }
-                    ForEach(library.workouts) { w in
-                        WorkoutCard(workout: w, start: { running = w }, edit: { editing = w })
-                            .contextMenu {
-                                Button("Edit") { editing = w }
-                                Button("Duplicate") { library.duplicate(w) }
-                                Button("Delete", role: .destructive) { deleting = w }
-                            }
-                    }
-                    if library.workouts.isEmpty {
-                        EmptyHome { adding = true }
+                    LazyVGrid(columns: columns, spacing: 10) {
+                        ForEach(library.workouts) { w in
+                            WorkoutCard(workout: w, start: { running = w }, edit: { editing = w })
+                                .contextMenu {
+                                    Button("Edit") { editing = w }
+                                    Button("Duplicate") { library.duplicate(w) }
+                                    Button("Delete", role: .destructive) { deleting = w }
+                                }
+                        }
+                        Button { adding = true } label: { NewWorkoutTile() }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("add-workout-tile")
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
             .background(Theme.bg.ignoresSafeArea())
-            .navigationTitle("Workouts")
+            .navigationTitle("Workout Companion")
             .navigationDestination(isPresented: $showGym) { GymScreen() }
-            .navigationDestination(isPresented: $showHistory) { HistoryScreen() }
             // The screen stays on (and sounds can play) while at the gym.
             .onChange(of: showGym) { _, on in on ? Cues.shared.begin() : Cues.shared.end() }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { showSettings = true } label: { ControlMarkView(.settings, size: 24, colour: Theme.accent) }
-                        .accessibilityLabel("Settings")
-                        .accessibilityIdentifier("open-settings")
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { adding = true } label: {
                         ControlMarkView(.addCircle, size: 26, colour: Theme.accent)
@@ -66,9 +109,6 @@ struct HomeScreen: View {
                 KindPicker { adding = false }
             }
             .environment(library)
-        }
-        .sheet(isPresented: $showSettings) {
-            NavigationStack { SettingsScreen { showSettings = false } }
         }
         .fullScreenCover(item: $running) { w in
             Group {
@@ -91,67 +131,70 @@ struct HomeScreen: View {
     }
 }
 
+/// A workout in the grid: full colour, its hand-drawn icon, name and summary, a play mark; the pencil edits.
 private struct WorkoutCard: View {
     let workout: Workout
     let start: () -> Void
     let edit: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            Button(action: start) {
-                HStack(spacing: 12) {
-                    WorkoutTile(workout: workout)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(workout.name.isEmpty ? "Untitled" : workout.name)
-                            .font(.headline)
-                            .foregroundStyle(Theme.ink)
-                            .lineLimit(2)
-                        Text(workout.summary)
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.muted)
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 8)
-                    ControlMarkView(.play, size: 18, colour: workout.inkOnFill)
-                        .frame(width: 38, height: 38)
-                        .background(workout.fill, in: Circle())
+        Button(action: start) {
+            VStack(alignment: .leading, spacing: 4) {
+                IconMark(.hand(workout.kind.iconKey), size: 30, colour: workout.inkOnFill)
+                    .accessibilityHidden(true)
+                Spacer(minLength: 6)
+                Text(workout.name.isEmpty ? "Untitled" : workout.name)
+                    .font(.headline)
+                    .foregroundStyle(workout.inkOnFill)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                HStack(alignment: .bottom, spacing: 6) {
+                    Text(workout.summary)
+                        .font(.caption)
+                        .foregroundStyle(workout.inkOnFill.opacity(0.85))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    ControlMarkView(.play, size: 13, colour: workout.fill)
+                        .frame(width: 28, height: 28)
+                        .background(workout.inkOnFill, in: Circle())
                 }
-                .padding(.vertical, 8)
-                .padding(.leading, 10)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Start \(workout.name), \(workout.summary)")
-            .accessibilityIdentifier("workout-\(workout.name)")
-
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 128, alignment: .topLeading)
+            .background(workout.fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Start \(workout.name), \(workout.summary)")
+        .accessibilityIdentifier("workout-\(workout.name)")
+        .overlay(alignment: .topTrailing) {
             Button(action: edit) {
-                ControlMarkView(.edit, size: 20, colour: Theme.muted)
-                    .frame(width: 44, height: 54)
+                ControlMarkView(.edit, size: 17, colour: workout.inkOnFill)
+                    .frame(width: 40, height: 40)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .padding(4)
             .accessibilityLabel("Edit \(workout.name)")
             .accessibilityIdentifier("edit-\(workout.name)")
         }
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.line, lineWidth: 1))
     }
 }
 
-private struct EmptyHome: View {
-    let add: () -> Void
-
+private struct NewWorkoutTile: View {
     var body: some View {
-        VStack(spacing: 16) {
-            IconMark(.hand("run"), size: 48, colour: Theme.muted)
-            Text("No workouts yet")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Theme.ink)
-            Button("New workout", action: add)
-                .buttonStyle(BigButtonStyle(fill: Theme.accent, ink: .white, height: 52))
-                .frame(maxWidth: 260)
+        VStack(spacing: 6) {
+            ControlMarkView(.addCircle, size: 30, colour: Theme.accent)
+            Text("New workout")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.accent)
         }
-        .padding(.top, 80)
+        .frame(maxWidth: .infinity, minHeight: 128)
+        .background(Theme.accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .stroke(Theme.accent, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])))
+        .accessibilityElement(children: .combine)
     }
 }
 

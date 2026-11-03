@@ -12,48 +12,6 @@ enum Past {
 
 }
 
-/// The card under "At the gym" that opens History.
-struct HistoryCard: View {
-    @Environment(Library.self) private var library
-    let open: () -> Void
-
-    private var summary: String {
-        let items = library.historyItems
-        guard !items.isEmpty else { return "Every workout you do is kept here" }
-        let t = History.totals(items, in: History.period(.weekOfYear, around: Date()))
-        return "This week: \(t.sessions) session\(t.sessions == 1 ? "" : "s") · \(t.minutes) min"
-    }
-
-    var body: some View {
-        Button(action: open) {
-            HStack(spacing: 12) {
-                IconTile(.hand("pulse"), colour: Past.swatch, fallbackTint: Theme.accent, letter: "H", size: 44)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("History")
-                        .font(.headline)
-                        .foregroundStyle(Theme.ink)
-                    Text(summary)
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.muted)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 8)
-                ControlMarkView(.chevron, size: 16, colour: Past.tint)
-                    .padding(.trailing, 6)
-            }
-            .padding(.vertical, 8)
-            .padding(.leading, 10)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Past.fill.opacity(0.5), lineWidth: 1))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("History, \(summary)")
-        .accessibilityIdentifier("open-history")
-    }
-}
-
 /// Every workout and gym visit, newest first, with this week and month in numbers.
 struct HistoryScreen: View {
     @Environment(Library.self) private var library
@@ -97,11 +55,12 @@ struct HistoryScreen: View {
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("History")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: HistoryItem.Source.self) { source in
-            switch source {
-            case .gym(let id): VisitScreen(visitID: id)
-            case .workout(let id): RecordScreen(recordID: id)
-            }
+    }
+
+    @ViewBuilder private func page(_ source: HistoryItem.Source) -> some View {
+        switch source {
+        case .gym(let id): VisitScreen(visitID: id)
+        case .workout(let id): RecordScreen(recordID: id)
         }
     }
 
@@ -110,13 +69,14 @@ struct HistoryScreen: View {
             HStack(spacing: 6) {
                 ForEach(groups, id: \.key) { g in
                     let on = filter == g.key
+                    let c = chipColour(g.key)
                     Button { filter = g.key } label: {
                         Text(g.name)
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(on ? Past.ink : Past.tint)
+                            .foregroundStyle(on ? c.inkColor : c.fillColor)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(on ? AnyShapeStyle(Past.fill) : AnyShapeStyle(Past.fill.opacity(0.1)), in: Capsule())
+                            .background(on ? AnyShapeStyle(c.fillColor) : AnyShapeStyle(c.fillColor.opacity(0.14)), in: Capsule())
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(on ? .isSelected : [])
@@ -124,6 +84,13 @@ struct HistoryScreen: View {
                 }
             }
         }
+    }
+
+    /// Each chip in its own colour: plum for All, indigo for the gym, the workout's own colour.
+    private func chipColour(_ key: String) -> IconColour {
+        if key == "all" { return Past.swatch }
+        if key == History.gymGroup { return Gym.swatch }
+        return all.first { $0.group == key }.flatMap { IconColour.of(key: $0.colour) } ?? Past.swatch
     }
 
     private var stats: some View {
@@ -136,10 +103,10 @@ struct HistoryScreen: View {
                 .font(.headline)
                 .foregroundStyle(Past.tint)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                tile("Sessions", "\(week.sessions)", id: "history-week-sessions")
-                tile("Minutes", "\(week.minutes)", id: "history-week-minutes")
-                if showKg { tile("Lifted", "\(GymSet.number(week.kg)) kg", id: "history-week-kg") }
-                tile("Weeks in a row", "\(streak)", id: "history-streak")
+                tile("Sessions", "\(week.sessions)", "plum", id: "history-week-sessions")
+                tile("Minutes", "\(week.minutes)", "green", id: "history-week-minutes")
+                if showKg { tile("Lifted", "\(GymSet.number(week.kg)) kg", "indigo", id: "history-week-kg") }
+                tile("Weeks in a row", "\(streak)", "orange", id: "history-streak")
             }
             Text("This month: \(month.sessions) session\(month.sessions == 1 ? "" : "s") · \(month.minutes) min"
                  + (showKg ? " · \(GymSet.number(month.kg)) kg" : ""))
@@ -149,19 +116,19 @@ struct HistoryScreen: View {
         }
     }
 
-    private func tile(_ title: String, _ value: String, id: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.caption).foregroundStyle(Theme.muted)
+    private func tile(_ title: String, _ value: String, _ colour: String, id: String) -> some View {
+        let c = IconColour.of(key: colour) ?? Past.swatch
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(c.inkColor.opacity(0.85))
             Text(value)
                 .font(.title2.weight(.bold))
                 .monospacedDigit()
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(c.inkColor)
                 .accessibilityIdentifier(id)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.line, lineWidth: 1))
+        .background(c.fillColor, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var chart: some View {
@@ -197,7 +164,8 @@ struct HistoryScreen: View {
                 .padding(.top, 4)
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
-                    NavigationLink(value: item.source) { row(item) }
+                    // The page goes with the row: a looked-up destination showed a warning triangle on the iPhone (1.4).
+                    NavigationLink { page(item.source) } label: { row(item) }
                         .buttonStyle(.plain)
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("\(item.heading), \(item.detail), \(item.date.formatted(date: .abbreviated, time: .omitted))")

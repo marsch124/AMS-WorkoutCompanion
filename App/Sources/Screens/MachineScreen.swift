@@ -22,7 +22,7 @@ struct MachineScreen: View {
     @State private var nextTimeOpen = false
     @State private var zoomInstructions = false
     @State private var restEnd: Date?
-    @State private var restLength: Double = Double(Gym.restSeconds)
+    @State private var restLength: Double = Double(GymLog.restSeconds)
     @State private var now = Date()
     @State private var editing = false
     @State private var changingSet: Int?
@@ -36,6 +36,7 @@ struct MachineScreen: View {
     private var visit: GymVisit { library.gym.visit(on: day, gym: gymID) ?? GymVisit(gymID: gymID, date: day) }
     private var entryToday: MachineEntry? { visit.entries.last { $0.machineID == machineID } }
     private var isTime: Bool { machine?.logs == .time }
+    private var step: Double { machine?.weightStep ?? GymLog.step }
     private var upNext: Machine? {
         library.gym.upNext(on: day, gym: gymID, excluding: machineID).flatMap { library.gym.machine($0) }
     }
@@ -99,7 +100,6 @@ struct MachineScreen: View {
 
                 if !today.isEmpty {
                     nextTimeRow
-                    doneButton
                 }
 
                 history
@@ -165,7 +165,7 @@ struct MachineScreen: View {
         }
         .sheet(isPresented: $nextTimeOpen) {
             NavigationStack {
-                NextTimeForm(isTime: isTime,
+                NextTimeForm(isTime: isTime, step: step,
                              set: entryToday?.nextTime ?? today.last ?? next.set,
                              note: entryToday?.note ?? "") { result in
                     nextTimeOpen = false
@@ -245,7 +245,7 @@ struct MachineScreen: View {
                 }
             }
             Stepper2(title: "kg", id: "gym-weight",
-                     minus: { kg = max(0, kg - GymLog.step) }, plus: { kg += GymLog.step }) {
+                     minus: { kg = max(0, kg - step) }, plus: { kg += step }) {
                 TextField("0", value: $kg, format: .number.precision(.fractionLength(0...2)))
                     .keyboardType(.decimalPad)
                     .focused($typing)
@@ -256,11 +256,14 @@ struct MachineScreen: View {
                     .keyboardType(.numberPad)
                     .focused($typing)
             }
-            Button(action: setDone) {
-                MarkLabel(title: "Set done", mark: .check, size: 24, colour: Gym.ink)
+            HStack(spacing: 8) {
+                Button(action: setDone) {
+                    MarkLabel(title: "Set done", mark: .check, size: 24, colour: Gym.ink)
+                }
+                .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
+                .accessibilityIdentifier("gym-set-done")
+                if !today.isEmpty { nextButton }
             }
-            .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
-            .accessibilityIdentifier("gym-set-done")
             if today.isEmpty {
                 Text(kg <= 0 ? "0 kg means body weight." : "Filled in from last time — change only what is different.")
                     .font(.caption)
@@ -332,25 +335,32 @@ struct MachineScreen: View {
                     .keyboardType(.decimalPad)
                     .focused($typing)
             }
-            Stepper2(title: "level", id: "gym-level",
-                     minus: { level = max(0, level - 1) }, plus: { level += 1 }) {
-                TextField("0", value: $level, format: .number.precision(.fractionLength(0...1)))
-                    .keyboardType(.decimalPad)
-                    .focused($typing)
+            if machine?.hasLevel != false {
+                Stepper2(title: "level", id: "gym-level",
+                         minus: { level = max(0, level - 1) }, plus: { level += 1 }) {
+                    TextField("0", value: $level, format: .number.precision(.fractionLength(0...1)))
+                        .keyboardType(.decimalPad)
+                        .focused($typing)
+                }
             }
-            Stepper2(title: "% incline", id: "gym-incline",
-                     minus: { incline = max(0, incline - 0.5) }, plus: { incline += 0.5 }) {
-                TextField("0", value: $incline, format: .number.precision(.fractionLength(0...1)))
-                    .keyboardType(.decimalPad)
-                    .focused($typing)
+            if machine?.hasIncline != false {
+                Stepper2(title: "% incline", id: "gym-incline",
+                         minus: { incline = max(0, incline - 0.5) }, plus: { incline += 0.5 }) {
+                    TextField("0", value: $incline, format: .number.precision(.fractionLength(0...1)))
+                        .keyboardType(.decimalPad)
+                        .focused($typing)
+                }
             }
-            Button(action: timeDone) {
-                MarkLabel(title: "Done", mark: .check, size: 24, colour: Gym.ink)
+            HStack(spacing: 8) {
+                Button(action: timeDone) {
+                    MarkLabel(title: "Done", mark: .check, size: 24, colour: Gym.ink)
+                }
+                .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
+                .accessibilityIdentifier("gym-set-done")
+                if !today.isEmpty { nextButton }
             }
-            .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
-            .accessibilityIdentifier("gym-set-done")
             if today.isEmpty {
-                Text("Level is the machine's level or speed; incline only when it has one.")
+                Text("Level and incline can be switched off for this machine with the pencil.")
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
             }
@@ -387,17 +397,25 @@ struct MachineScreen: View {
         .accessibilityIdentifier("gym-next-time")
     }
 
-    private var doneButton: some View {
-        Button { moveOn(upNext?.id) } label: {
-            VStack(spacing: 1) {
-                Text("Done with this machine").font(.headline)
+    /// Done with this machine — green, beside Set done: on to the next planned machine, or back to the machines.
+    private var nextButton: some View {
+        let green = IconColour.of(key: "green")!
+        return Button { moveOn(upNext?.id) } label: {
+            VStack(spacing: 0) {
+                HStack(spacing: 4) {
+                    Text("Next")
+                    ControlMarkView(.chevron, size: 14, colour: green.inkColor)
+                }
+                .font(.system(.title3, design: .rounded).weight(.bold))
                 if let upNext {
-                    Text("Next: \(upNext.name)").font(.caption).foregroundStyle(Theme.muted)
+                    Text(upNext.name).font(.caption2.weight(.semibold)).lineLimit(1)
                 }
             }
-            .foregroundStyle(Gym.tint)
+            .foregroundStyle(green.inkColor)
+            .padding(.horizontal, 6)
         }
-        .buttonStyle(SoftButtonStyle(height: 52))
+        .buttonStyle(BigButtonStyle(fill: green.fillColor, ink: green.inkColor, height: 58))
+        .frame(width: 118)
         .accessibilityLabel(upNext.map { "Done with this machine, next: \($0.name)" } ?? "Done with this machine")
         .accessibilityIdentifier("gym-machine-done")
     }
@@ -455,7 +473,9 @@ struct MachineScreen: View {
 
     private func timeDone() {
         typing = false
-        let set = GymSet(seconds: max(1, Int((minutes * 60).rounded())), level: level, incline: incline)
+        let set = GymSet(seconds: max(1, Int((minutes * 60).rounded())),
+                         level: machine?.hasLevel == false ? nil : level,
+                         incline: machine?.hasIncline == false ? nil : incline)
         library.changeGym { $0.add(set, machine: machineID, on: day) }
         Cues.shared.tap()
         Cues.shared.finished("Done")
@@ -468,8 +488,9 @@ struct MachineScreen: View {
         library.changeGym { $0.add(set, machine: machineID, on: day) }
         newBest = before.map { set.kg > $0 } ?? false
         Cues.shared.tap()
-        restLength = Double(Gym.restSeconds)
-        restEnd = Date().addingTimeInterval(restLength)
+        restLength = Double(machine?.rest ?? GymLog.restSeconds)
+        // A machine with no rest goes straight on to the next set.
+        restEnd = restLength > 0 ? Date().addingTimeInterval(restLength) : nil
         now = Date()
         Cues.shared.rest("Rest")
     }
@@ -573,6 +594,7 @@ private struct SetEditor: View {
 /// After the sets: what to do next time and how it felt. Nothing is kept until Save.
 private struct NextTimeForm: View {
     let isTime: Bool
+    let step: Double
     @State var set: GymSet
     @State var note: String
     @State private var planned = true
@@ -589,16 +611,20 @@ private struct NextTimeForm: View {
                         Stepper("Minutes: \(GymSet.duration(set.seconds ?? 0))",
                                 onIncrement: { set.seconds = (set.seconds ?? 0) + 60 },
                                 onDecrement: { set.seconds = max(60, (set.seconds ?? 0) - 60) })
-                        Stepper("Level: \(GymSet.number(set.level ?? 0))",
-                                onIncrement: { set.level = (set.level ?? 0) + 1 },
-                                onDecrement: { set.level = max(0, (set.level ?? 0) - 1) })
-                        Stepper("Incline: \(GymSet.number(set.incline ?? 0)) %",
-                                onIncrement: { set.incline = (set.incline ?? 0) + 0.5 },
-                                onDecrement: { set.incline = max(0, (set.incline ?? 0) - 0.5) })
+                        if set.level != nil {
+                            Stepper("Level: \(GymSet.number(set.level ?? 0))",
+                                    onIncrement: { set.level = (set.level ?? 0) + 1 },
+                                    onDecrement: { set.level = max(0, (set.level ?? 0) - 1) })
+                        }
+                        if set.incline != nil {
+                            Stepper("Incline: \(GymSet.number(set.incline ?? 0)) %",
+                                    onIncrement: { set.incline = (set.incline ?? 0) + 0.5 },
+                                    onDecrement: { set.incline = max(0, (set.incline ?? 0) - 0.5) })
+                        }
                     } else {
                         Stepper("Weight: \(GymSet.weight(set.kg))",
-                                onIncrement: { set.kg += GymLog.step },
-                                onDecrement: { set.kg = max(0, set.kg - GymLog.step) })
+                                onIncrement: { set.kg += step },
+                                onDecrement: { set.kg = max(0, set.kg - step) })
                             .accessibilityIdentifier("next-time-kg")
                         Stepper("Reps: \(set.reps)", value: $set.reps, in: 1...500)
                             .accessibilityIdentifier("next-time-reps")
@@ -698,6 +724,51 @@ struct MachineForm: View {
                 Text("What you log")
             } footer: {
                 Text(draft.logs == .time ? "Minutes, level and incline — for a treadmill, rowing machine or bike." : "Weight and reps per set.")
+            }
+            if draft.logs == .time {
+                Section {
+                    Toggle("Has a level", isOn: Binding(get: { draft.hasLevel }, set: { draft.noLevel = $0 ? nil : true }))
+                        .tint(Gym.fill)
+                        .accessibilityIdentifier("machine-has-level")
+                    Toggle("Has an incline", isOn: Binding(get: { draft.hasIncline }, set: { draft.noIncline = $0 ? nil : true }))
+                        .tint(Gym.fill)
+                        .accessibilityIdentifier("machine-has-incline")
+                } header: {
+                    Text("On this machine")
+                } footer: {
+                    Text("A treadmill often has no level; a bike or rowing machine no incline.")
+                }
+            }
+            if draft.logs == .weights {
+                Section {
+                    Stepper(value: Binding(get: { draft.rest }, set: { draft.restSeconds = $0 }), in: 0...300, step: 15) {
+                        HStack {
+                            Text("Rest")
+                            Spacer()
+                            Text(draft.rest == 0 ? "None" : Clock.text(draft.rest)).foregroundStyle(Gym.tint).monospacedDigit()
+                        }
+                    }
+                    .accessibilityIdentifier("machine-rest")
+                    Picker("Weight step", selection: Binding(get: { draft.weightStep }, set: { draft.step = $0 })) {
+                        Text("1 kg").tag(1.0)
+                        Text("2.5 kg").tag(2.5)
+                        Text("5 kg").tag(5.0)
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("machine-step")
+                    Stepper(value: Binding(get: { draft.repsForMore }, set: { draft.topReps = $0 }), in: 3...50) {
+                        HStack {
+                            Text("More weight at")
+                            Spacer()
+                            Text("\(draft.repsForMore) reps").foregroundStyle(Gym.tint).monospacedDigit()
+                        }
+                    }
+                    .accessibilityIdentifier("machine-top-reps")
+                } header: {
+                    Text("On this machine")
+                } footer: {
+                    Text("Rest after each set; how much − and + change the weight; and when every set reaches this many reps, the machine suggests one step more next time.")
+                }
             }
             Section {
                 if draft.instructions != nil {

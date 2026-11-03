@@ -9,8 +9,6 @@ enum Gym {
     static var ink: Color { swatch.inkColor }
     /// Headings, words and marks on the page: indigo by day, a lighter indigo by night.
     static let tint = Color.pair("#4f46e5", "#9d97ff")
-    /// Rest between sets, before +15 s.
-    static let restSeconds = 90
     /// A machine marked Busy: orange, so it stands out from the indigo of the rest.
     static let busy = IconColour.of(key: "orange")!
     static let busyTint = Color.pair("#c2410c", "#fdba74")
@@ -37,25 +35,25 @@ struct GymCard: View {
     var body: some View {
         Button(action: open) {
             HStack(spacing: 12) {
-                IconTile(.hand("strength"), colour: Gym.swatch, fallbackTint: Theme.accent, letter: "G", size: 44)
+                IconMark(.hand("strength"), size: 34, colour: Gym.ink)
+                    .frame(width: 44, height: 44)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("At the gym")
-                        .font(.headline)
-                        .foregroundStyle(Theme.ink)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(Gym.ink)
                     Text(summary)
                         .font(.subheadline)
-                        .foregroundStyle(Theme.muted)
+                        .foregroundStyle(Gym.ink.opacity(0.85))
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
-                ControlMarkView(.chevron, size: 16, colour: Gym.tint)
+                ControlMarkView(.chevron, size: 16, colour: Gym.ink)
                     .padding(.trailing, 6)
             }
-            .padding(.vertical, 8)
-            .padding(.leading, 10)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Gym.fill.opacity(0.5), lineWidth: 1))
+            .padding(.vertical, 18)
+            .padding(.leading, 12)
+            .background(Gym.fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -75,6 +73,7 @@ struct GymScreen: View {
     @State private var planning = false
     @State private var naming: GymNaming?
     @State private var gymName = ""
+    @State private var pickingDay = false
 
     private var gymID: UUID? { library.gym.currentGym?.id }
     private var visit: GymVisit? { library.gym.visit(on: day, gym: gymID) }
@@ -89,9 +88,21 @@ struct GymScreen: View {
                 HStack {
                     gymMenu
                     Spacer()
-                    DatePicker("Date", selection: $day, in: ...Date(), displayedComponents: .date)
-                        .labelsHidden()
-                        .accessibilityIdentifier("gym-date")
+                }
+                if !isToday {
+                    HStack {
+                        Text("Logging for \(day.formatted(.dateTime.weekday(.wide).day().month(.wide)))")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Gym.busyTint)
+                        Spacer()
+                        Button("Back to today") { day = Date() }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Gym.tint)
+                            .accessibilityIdentifier("gym-today")
+                    }
+                    .padding(10)
+                    .background(Gym.busy.fillColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .accessibilityIdentifier("gym-earlier-day")
                 }
                 Text(machines.isEmpty
                      ? "At each machine: take a photo, give it a name, then log your sets."
@@ -202,6 +213,15 @@ struct GymScreen: View {
             }
             .environment(library)
         }
+        .sheet(isPresented: $pickingDay) {
+            NavigationStack {
+                DayPicker(day: day) { picked in
+                    pickingDay = false
+                    if let picked { day = picked }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: $planning) {
             NavigationStack {
                 PlanSheet(machines: machines, order: plan?.order ?? []) { order in
@@ -242,6 +262,8 @@ struct GymScreen: View {
                 naming = .new
             }
             .accessibilityIdentifier("gym-place-new")
+            Button("Log an earlier day…") { pickingDay = true }
+                .accessibilityIdentifier("gym-pick-day")
             Button("Rename this gym…") {
                 gymName = library.gym.currentGym?.name ?? ""
                 naming = .rename
@@ -434,6 +456,35 @@ struct GymScreen: View {
 }
 
 private enum GymNaming { case new, rename }
+
+/// For a session you forgot to log: pick the day. Nothing changes until Done.
+private struct DayPicker: View {
+    @State var day: Date
+    let done: (Date?) -> Void
+
+    var body: some View {
+        Form {
+            DatePicker("Day", selection: $day, in: ...Date(), displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .tint(Gym.fill)
+                .accessibilityIdentifier("gym-date")
+        }
+        .navigationTitle("Log an earlier day")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { done(nil) }
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("gym-date-cancel")
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { done(day) }
+                    .saveButton(Gym.fill)
+                    .accessibilityIdentifier("gym-date-done")
+            }
+        }
+    }
+}
 
 /// Plan today: tap the machines in the order you want them. Nothing is kept until Save.
 private struct PlanSheet: View {

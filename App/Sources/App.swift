@@ -7,7 +7,7 @@ struct AMSWorkoutCompanionApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HomeScreen()
+            RootView()
                 .environment(library)
                 .tint(Theme.accent)
         }

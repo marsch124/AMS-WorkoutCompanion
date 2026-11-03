@@ -213,4 +213,48 @@ final class GymPlanHistoryTests: XCTestCase {
         let log = GymLog(machines: [Machine(name: "Row", photo: "m.jpg", instructions: "i.jpg")])
         XCTAssertEqual(log.photosInUse, ["m.jpg", "i.jpg"])
     }
+
+    // MARK: 1.5 — rest, weight step and the reps rule per machine
+
+    func testAMachineWithoutSettingsKeepsTheOldRules() {
+        let m = Machine(name: "Row")
+        XCTAssertEqual(m.rest, 90)
+        XCTAssertEqual(m.weightStep, 2.5)
+        XCTAssertEqual(m.repsForMore, 12)
+    }
+
+    func testAFiveKiloMachineSuggestsFiveMoreAtItsOwnReps() throws {
+        let leg = Machine(name: "Leg press", restSeconds: 150, step: 5, topReps: 10)
+        var log = GymLog(machines: [leg])
+        for _ in 0..<3 { log.add(GymSet(kg: 40, reps: 10), machine: leg.id, on: day(1), calendar: cal) }
+        let next = log.next(leg.id, in: GymVisit(date: day(3)))
+        XCTAssertEqual(next.set, GymSet(kg: 45, reps: 8))
+        XCTAssertEqual(next.reason, "Try 45 kg — every set last time reached 10 reps")
+        let back = try GymFile.decode(GymFile.encode(log)).machines[0]
+        XCTAssertEqual(back.rest, 150)
+        XCTAssertEqual(back.weightStep, 5)
+        XCTAssertEqual(back.repsForMore, 10)
+    }
+
+    func testNineRepsOnATenRepMachineIsNoSuggestion() {
+        let leg = Machine(name: "Leg press", step: 5, topReps: 10)
+        var log = GymLog(machines: [leg])
+        log.add(GymSet(kg: 40, reps: 9), machine: leg.id, on: day(1), calendar: cal)
+        XCTAssertNil(log.next(leg.id, in: GymVisit(date: day(3))).reason)
+    }
+
+    func testATreadmillWithoutALevelLogsTimeAndInclineOnly() throws {
+        let tread = Machine(name: "Treadmill", logs: .time, hasLevel: false)
+        XCTAssertFalse(tread.hasLevel)
+        XCTAssertTrue(tread.hasIncline)
+        var log = GymLog(machines: [tread])
+        XCTAssertEqual(log.next(tread.id, in: GymVisit(date: day(3))).set, GymSet(seconds: 1200, level: nil, incline: 0))
+        let run = GymSet(seconds: 1500, level: nil, incline: 3)
+        XCTAssertEqual(run.text, "25 min · incline 3 %")
+        log.add(run, machine: tread.id, on: day(3), calendar: cal)
+        XCTAssertEqual(try GymFile.decode(GymFile.encode(log)).machines[0].hasLevel, false)
+        // A bike: a level, no incline.
+        let bike = Machine(name: "Bike", logs: .time, hasIncline: false)
+        XCTAssertEqual(GymLog(machines: [bike]).next(bike.id, in: GymVisit(date: day(3))).set, GymSet(seconds: 1200, level: 5, incline: nil))
+    }
 }

@@ -3,7 +3,8 @@ import WorkoutCore
 
 /// Settings: How it works, What's new and the version.
 struct SettingsScreen: View {
-    let onDone: () -> Void
+    /// Nil in the Settings tab, which needs no Done.
+    var onDone: (() -> Void)? = nil
 
     private var version: String {
         let info = Bundle.main.infoDictionary
@@ -38,10 +39,12 @@ struct SettingsScreen: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Done", action: onDone)
-                    .fontWeight(.bold)
-                    .accessibilityIdentifier("settings-done")
+            if let onDone {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", action: onDone)
+                        .fontWeight(.bold)
+                        .accessibilityIdentifier("settings-done")
+                }
             }
         }
     }

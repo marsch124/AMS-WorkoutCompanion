@@ -31,9 +31,30 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
     public var logs: MachineLogs
     /// A photo of the machine's instruction plate, file name in the Photos folder (since 1.4).
     public var instructions: String?
+    /// Since 1.5, each machine may set its own rest, weight step and reps rule; nil keeps the usual.
+    public var restSeconds: Int?
+    public var step: Double?
+    public var topReps: Int?
+    /// Time machines: a treadmill may have no level, a bike no incline (since 1.5; nil = has it).
+    public var noLevel: Bool?
+    public var noIncline: Bool?
+
+    public var hasLevel: Bool { noLevel != true }
+    public var hasIncline: Bool { noIncline != true }
+
+    public var rest: Int { restSeconds ?? GymLog.restSeconds }
+    public var weightStep: Double { step ?? GymLog.step }
+    public var repsForMore: Int { topReps ?? GymLog.topReps }
 
     public init(id: UUID = UUID(), gymID: UUID? = nil, name: String = "", photo: String? = nil, setting: String = "",
-                logs: MachineLogs = .weights, instructions: String? = nil) {
+                logs: MachineLogs = .weights, instructions: String? = nil,
+                restSeconds: Int? = nil, step: Double? = nil, topReps: Int? = nil,
+                hasLevel: Bool = true, hasIncline: Bool = true) {
+        self.noLevel = hasLevel ? nil : true
+        self.noIncline = hasIncline ? nil : true
+        self.restSeconds = restSeconds
+        self.step = step
+        self.topReps = topReps
         self.id = id
         self.gymID = gymID
         self.name = name
@@ -43,7 +64,7 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
         self.instructions = instructions
     }
 
-    enum CodingKeys: String, CodingKey { case id, gymID, name, photo, setting, logs, instructions }
+    enum CodingKeys: String, CodingKey { case id, gymID, name, photo, setting, logs, instructions, restSeconds, step, topReps, noLevel, noIncline }
 
     /// Files from before 1.4 have no gym, no `logs` and no instructions.
     public init(from decoder: Decoder) throws {
@@ -55,6 +76,11 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
         setting = try c.decodeIfPresent(String.self, forKey: .setting) ?? ""
         logs = try c.decodeIfPresent(MachineLogs.self, forKey: .logs) ?? .weights
         instructions = try c.decodeIfPresent(String.self, forKey: .instructions)
+        restSeconds = try c.decodeIfPresent(Int.self, forKey: .restSeconds)
+        step = try c.decodeIfPresent(Double.self, forKey: .step)
+        topReps = try c.decodeIfPresent(Int.self, forKey: .topReps)
+        noLevel = try c.decodeIfPresent(Bool.self, forKey: .noLevel)
+        noIncline = try c.decodeIfPresent(Bool.self, forKey: .noIncline)
     }
 }
 
@@ -225,8 +251,10 @@ public struct NextSet: Equatable, Sendable {
 public struct GymLog: Codable, Equatable, Sendable {
     /// When every set last time reached this many reps, the next time suggests more weight.
     public static let topReps = 12
-    /// The step of the weight buttons and of a suggestion.
+    /// The step of the weight buttons and of a suggestion, unless the machine has its own.
     public static let step = 2.5
+    /// Rest between sets, before +15 s, unless the machine has its own.
+    public static let restSeconds = 90
     /// A new machine's first set, before there is anything to go by.
     public static let starter = GymSet(kg: 20, reps: 10)
 
@@ -373,17 +401,19 @@ public struct GymLog: Codable, Equatable, Sendable {
         }
         let isTime = machine(machineID)?.logs == .time
         guard let lastEntry = last(machineID, excluding: visit.id)?.entry, let first = lastEntry.sets.first else {
-            return NextSet(set: isTime ? GymSet.starterTime : GymLog.starter, reason: nil)
+            guard isTime, let m = machine(machineID) else { return NextSet(set: GymLog.starter, reason: nil) }
+            return NextSet(set: GymSet(seconds: 20 * 60, level: m.hasLevel ? 5 : nil, incline: m.hasIncline ? 0 : nil), reason: nil)
         }
         if let planned = lastEntry.nextTime {
             return NextSet(set: planned, reason: "Your plan from last time: \(planned.text)")
         }
         let previous = lastEntry.sets
         if isTime || first.isTime { return NextSet(set: first, reason: nil) }
-        if previous.allSatisfy({ $0.reps >= GymLog.topReps }) {
-            let up = first.kg + GymLog.step
-            return NextSet(set: GymSet(kg: up, reps: max(1, GymLog.topReps - 2)),
-                           reason: "Try \(GymSet.weight(up)) — every set last time reached \(GymLog.topReps) reps")
+        let top = machine(machineID)?.repsForMore ?? GymLog.topReps
+        if previous.allSatisfy({ $0.reps >= top }) {
+            let up = first.kg + (machine(machineID)?.weightStep ?? GymLog.step)
+            return NextSet(set: GymSet(kg: up, reps: max(1, top - 2)),
+                           reason: "Try \(GymSet.weight(up)) — every set last time reached \(top) reps")
         }
         return NextSet(set: first, reason: nil)
     }
