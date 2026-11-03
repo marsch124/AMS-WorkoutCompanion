@@ -46,7 +46,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         waitFor(phase, label: "WORK", timeout: 20)
         app.buttons["run-pause"].tap()
         app.buttons["run-close"].tap()
-        app.buttons["End workout"].tap()
+        app.buttons["run-end-confirm"].firstMatch.tap()
         XCTAssertTrue(app.buttons["workout-Intervals"].waitForExistence(timeout: 5))
     }
 
@@ -103,5 +103,13 @@ final class WorkoutCompanionUITests: XCTestCase {
         cancel.tap()
         XCTAssertTrue(app.buttons["workout-Push-ups"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["workout-"].exists)
+    }
+
+    func testTheNewWorkoutSheetCanBeCancelled() {
+        app.buttons["add-workout"].tap()
+        let cancel = app.buttons["new-cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        cancel.tap()
+        XCTAssertTrue(app.buttons["workout-Push-ups"].waitForExistence(timeout: 5))
     }
 }

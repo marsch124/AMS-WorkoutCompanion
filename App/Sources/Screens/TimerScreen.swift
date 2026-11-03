@@ -50,6 +50,7 @@ struct TimerScreen: View {
         }
         .confirmationDialog("End this workout?", isPresented: $askClose, titleVisibility: .visible) {
             Button("End workout", role: .destructive, action: onClose)
+                .accessibilityIdentifier("run-end-confirm")
         }
     }
 

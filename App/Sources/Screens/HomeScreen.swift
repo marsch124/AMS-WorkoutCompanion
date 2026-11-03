@@ -185,7 +185,10 @@ struct KindPicker: View {
         .navigationTitle("New workout")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: done) }
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel", action: done)
+                    .accessibilityIdentifier("new-cancel")
+            }
         }
         .navigationDestination(for: WorkoutKind.self) { kind in
             EditorScreen(workout: Workout(kind: kind), isNew: true, onDone: done)
