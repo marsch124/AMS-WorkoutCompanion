@@ -33,7 +33,7 @@ final class GymTests: XCTestCase {
         XCTAssertEqual(log.visits[0].entries.count, 2)
         XCTAssertEqual(log.visits[0].entries[0].sets.map(\.reps), [12, 11])
         XCTAssertEqual(log.visits[0].setCount, 3)
-        let expectedKg: Double = 30 * 12 + 40 * 10 + 30 * 11
+        let expectedKg = 1090.0 // 30 × 12 + 40 × 10 + 30 × 11 (one number: the GitHub compiler gives up on the sum)
         XCTAssertEqual(log.visits[0].totalKg, expectedKg)
     }
 
