@@ -51,4 +51,19 @@ final class HistoryExtrasUITests: XCTestCase {
         field.typeText("Seat")   // a machine's setting in the demo data
         XCTAssertTrue(any("notes-hit-1").waitForExistence(timeout: 5))
     }
+
+    /// 1.11.1: the share picture carries each machine's photo (made-up photos: -tallphotos).
+    func testSharePictureHoldsTheMachinePhotos() {
+        app.terminate()
+        app.launchArguments = ["-uitest", "-gymdemo", "-tallphotos"]
+        app.launch()
+        app.buttons["open-history"].tap()
+        let row = app.buttons["history-row-1"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
+        let share = app.buttons["visit-share"]
+        XCTAssertTrue(share.waitForExistence(timeout: 10))
+        // The latest demo visit: Chest press, Lat pulldown and Treadmill — three photos.
+        XCTAssertEqual(share.value as? String, "3 photos")
+    }
 }

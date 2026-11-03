@@ -1,11 +1,14 @@
 import AMSIcons
 import SwiftUI
+import UIKit
 import WorkoutCore
 
 /// A neat picture of one visit to send or save (since 1.11). Fixed light look and width, so it reads the same everywhere.
 struct VisitShareCard: View {
     let visit: GymVisit
     let gym: GymLog
+    /// Each machine's photo, small, by machine (since 1.11.1). A machine without one shows its drawn icon.
+    var photos: [UUID: UIImage] = [:]
 
     private let ink = Color(red: 0.11, green: 0.11, blue: 0.14)
     private let muted = Color(red: 0.42, green: 0.42, blue: 0.48)
@@ -31,6 +34,8 @@ struct VisitShareCard: View {
             }
             ForEach(visit.entries) { e in
                 let m = gym.machine(e.machineID)
+                HStack(alignment: .top, spacing: 10) {
+                thumb(m)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(m?.name ?? "Machine").font(.subheadline.weight(.bold)).foregroundStyle(ink)
@@ -48,6 +53,7 @@ struct VisitShareCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             Text("AMS Workout Companion").font(.caption2.weight(.semibold)).foregroundStyle(muted)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -56,6 +62,22 @@ struct VisitShareCard: View {
         .frame(width: 390, alignment: .leading)
         .background(Color.white)
         .environment(\.colorScheme, .light)
+    }
+
+    /// The machine's photo, cut to a small square; else its hand-drawn icon on a light indigo square.
+    private func thumb(_ m: Machine?) -> some View {
+        Color.clear
+            .frame(width: 52, height: 52)
+            .overlay {
+                if let m, let photo = photos[m.id] {
+                    Image(uiImage: photo).resizable().scaledToFill()
+                } else {
+                    IconMark(.hand(m?.icon ?? "strength"), size: 26, colour: indigo)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(indigo.opacity(0.1))
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func tile(_ title: String, _ value: String, _ c: Color) -> some View {
@@ -69,10 +91,39 @@ struct VisitShareCard: View {
     }
 
     /// The picture, drawn at three times the size.
-    @MainActor static func render(_ visit: GymVisit, gym: GymLog) -> Image? {
-        let r = ImageRenderer(content: VisitShareCard(visit: visit, gym: gym))
+    /// `photo` finds a machine's photo file; each is scaled down to 156 px first, so a long visit stays quick.
+    /// Also says how many photos went into the picture.
+    @MainActor static func render(_ visit: GymVisit, gym: GymLog, photo: (String?) -> UIImage?) -> (image: Image, photos: Int)? {
+        let photos = thumbs(visit, gym: gym, photo: photo)
+        guard let ui = draw(visit, gym: gym, photos: photos) else { return nil }
+        return (Image(uiImage: ui), photos.count)
+    }
+
+    @MainActor static func renderUIImage(_ visit: GymVisit, gym: GymLog, photo: (String?) -> UIImage?) -> UIImage? {
+        draw(visit, gym: gym, photos: thumbs(visit, gym: gym, photo: photo))
+    }
+
+    private static func thumbs(_ visit: GymVisit, gym: GymLog, photo: (String?) -> UIImage?) -> [UUID: UIImage] {
+        var photos: [UUID: UIImage] = [:]
+        for id in Set(visit.entries.map(\.machineID)) {
+            if let full = photo(gym.machine(id)?.photo) { photos[id] = small(full) }
+        }
+        return photos
+    }
+
+    @MainActor private static func draw(_ visit: GymVisit, gym: GymLog, photos: [UUID: UIImage]) -> UIImage? {
+        let r = ImageRenderer(content: VisitShareCard(visit: visit, gym: gym, photos: photos))
         r.scale = 3
-        guard let ui = r.uiImage else { return nil }
-        return Image(uiImage: ui)
+        return r.uiImage
+    }
+
+    private static func small(_ image: UIImage) -> UIImage {
+        let side: CGFloat = 156
+        let k = side / min(image.size.width, image.size.height)
+        guard k < 1 else { return image }
+        let size = CGSize(width: image.size.width * k, height: image.size.height * k)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
     }
 }

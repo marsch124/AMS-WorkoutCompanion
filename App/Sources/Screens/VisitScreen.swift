@@ -9,6 +9,8 @@ struct VisitScreen: View {
     @State private var editing = false
     @State private var changing: ChangingSet?
     @State private var picture: Image?
+    /// How many machine photos the share picture holds — read by a test.
+    @State private var sharePhotos = 0
 
     private struct ChangingSet: Identifiable {
         let entryID: UUID
@@ -68,6 +70,7 @@ struct VisitScreen: View {
                         ShareMark().stroke(Gym.tint, style: StrokeStyle(lineWidth: 1.9, lineCap: .round, lineJoin: .round)).frame(width: 22, height: 22)
                     }
                     .accessibilityLabel("Share this visit")
+                    .accessibilityValue("\(sharePhotos) photos")
                     .accessibilityIdentifier("visit-share")
                 }
             }
@@ -109,7 +112,13 @@ struct VisitScreen: View {
 
     private func renderPicture() {
         guard let visit = library.gym.visits.first(where: { $0.id == visitID }) else { return }
-        picture = VisitShareCard.render(visit, gym: library.gym)
+        let drawn = VisitShareCard.render(visit, gym: library.gym) { library.image($0) }
+        picture = drawn?.image
+        sharePhotos = drawn?.photos ?? 0
+        // Test runs keep a copy of the picture, to look at it (never on his iPhone: -uitest only).
+        if ProcessInfo.processInfo.arguments.contains("-uitest"), let ui = VisitShareCard.renderUIImage(visit, gym: library.gym, photo: { library.image($0) }) {
+            try? ui.pngData()?.write(to: FileManager.default.temporaryDirectory.appendingPathComponent("uitest/share.png"))
+        }
     }
 
     private func header(_ visit: GymVisit) -> some View {
