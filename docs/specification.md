@@ -1,6 +1,6 @@
 # AMS WorkoutCompanion — specification
 
-Version 1.2. iPhone only, portrait, iOS 17+, light and dark. The name under the app icon is "Workouts" (not "Companion": Apple refuses it, error 90129).
+Version 1.3. iPhone only, portrait, iOS 17+, light and dark. The name under the app icon is "Workouts" (not "Companion": Apple refuses it, error 90129).
 
 ## Workouts (home)
 - One card per workout: its tile (hand-drawn icon from AMS-Icons on the workout's colour), name, one-line summary, a play button in the workout's colour, a pencil.
@@ -12,6 +12,7 @@ Version 1.2. iPhone only, portrait, iOS 17+, light and dark. The name under the 
 ## At the gym (since 1.2)
 - A card "At the gym" at the top of Workouts (hand-drawn "strength" icon, indigo — the gym log's colour for its headings, buttons and marks). Its line: "Today: n machines · n sets", else "n machines", else "Photo, weight and reps per machine". The screen stays on while at the gym.
 - Gym screen: "Today" and a date (compact picker, no future days; default today — sets go to the visit on that day). Two columns of machine tiles in the order they were made: photo (or the strength mark), name, and "n sets done" (indigo, with a tick and an indigo border) or "Last: 30 kg" or "New". A dashed "New machine" tile. Finish (full indigo) once the day has a set. "Earlier visits", newest first: date, "n machines · n sets" → the visit: each machine's sets and "n sets · n kg lifted in all".
+- Busy (since 1.3): every machine tile has a small "Busy" pill at the top left of its photo (hand-drawn stopwatch; orange outline). Tap it: the pill turns full orange, the tile gets an orange border and the line "Busy — come back later", and the machine moves to a row "Come back to" (orange heading) above the others, in the order marked; the rest are then headed "Other machines". Tap the pill again: the mark goes. Tapping a busy machine opens it and takes the mark away; a set done on it does too. Finish clears every mark of that day; marking a machine drops marks from other days. Deleting a machine removes its mark. Marks are kept in gym.json, so they survive closing the app.
 - New machine: the camera opens first (the photo library when there is no camera; UI tests skip it), then the machine form: photo (Take photo / Take photo again, Choose from Photos), Name, How it is set up (shown on the machine). Cancel and Save; Save without a name says "Give it a name first." After Save the machine opens straight away.
 - Machine screen: photo (tap: full screen), setting in indigo, "Last time, 27 Oct: 30 kg × 12, 12, 10" or "First time on this machine.", the suggestion, today's sets (tap one: change weight/reps or Remove set, with Cancel and Save), then "Set n" with weight (− / + 2.5 kg, type with a decimal pad; 0 = body weight) and reps (− / + 1, ≥ 1), and Set done. Pencil: edit or delete the machine (asks; deletes its sets too).
 - The next set's numbers: the set just done on this machine today; else last time's first set — with 2.5 kg more and 10 reps when every set last time reached 12 reps ("Try 32.5 kg — every set last time reached 12 reps"); else 20 kg × 10.
@@ -45,10 +46,10 @@ Version 1.2. iPhone only, portrait, iOS 17+, light and dark. The name under the 
 - Plays with the silent switch on and mixes with music. The screen stays on during a workout. US English voice.
 
 ## Settings
-- How it works, What's new (every version, newest first), Version "1.2 (build)".
+- How it works, What's new (every version, newest first), Version "1.3 (build)".
 
 ## Data
-- `Documents/workouts.json` (`{"version":1,"workouts":[…]}`) and `Documents/gym.json` (`{"version":1,"machines":[…],"visits":[…]}`, dates ISO 8601), photos in `Documents/Photos/`. Photos no workout and no machine uses are removed on save. A file that cannot be read is kept aside, never overwritten; while gym.json is unreadable no photo is removed. The gym log keeps every visit; the other workouts keep no history. No iCloud, nothing leaves the iPhone.
+- `Documents/workouts.json` (`{"version":1,"workouts":[…]}`) and `Documents/gym.json` (`{"version":1,"machines":[…],"visits":[…],"busy":[{"machineID","day"}]}`, dates ISO 8601; `busy` since 1.3, a file without it reads as no marks), photos in `Documents/Photos/`. Photos no workout and no machine uses are removed on save. A file that cannot be read is kept aside, never overwritten; while gym.json is unreadable no photo is removed. The gym log keeps every visit; the other workouts keep no history. No iCloud, nothing leaves the iPhone.
 - The camera asks once: "A photo of each gym machine, so you recognise it and its setting next time."
 
 ## Look

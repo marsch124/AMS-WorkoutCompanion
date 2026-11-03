@@ -11,6 +11,9 @@ enum Gym {
     static let tint = Color.pair("#4f46e5", "#9d97ff")
     /// Rest between sets, before +15 s.
     static let restSeconds = 90
+    /// A machine marked Busy: orange, so it stands out from the indigo of the rest.
+    static let busy = IconColour.of(key: "orange")!
+    static let busyTint = Color.pair("#c2410c", "#fdba74")
 }
 
 /// A machine on the gym screen, to open it.
@@ -93,14 +96,25 @@ struct GymScreen: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
 
-                LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(library.gym.machines) { m in
-                        Button { opened = MachineRef(id: m.id) } label: {
-                            MachineTile(machine: m, status: status(of: m), done: doneToday(m))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("machine-\(m.name)")
+                let busy = library.gym.busy(on: day).compactMap { library.gym.machine($0) }
+                if !busy.isEmpty {
+                    Text("Come back to")
+                        .font(.headline)
+                        .foregroundStyle(Gym.busyTint)
+                        .accessibilityIdentifier("gym-come-back")
+                    LazyVGrid(columns: columns, spacing: 8) {
+                        ForEach(busy) { tile($0, busy: true) }
                     }
+                    if busy.count < library.gym.machines.count {
+                        Text("Other machines")
+                            .font(.headline)
+                            .foregroundStyle(Gym.tint)
+                            .padding(.top, 4)
+                    }
+                }
+
+                LazyVGrid(columns: columns, spacing: 8) {
+                    ForEach(library.gym.machines.filter { m in !busy.contains { $0.id == m.id } }) { tile($0, busy: false) }
                     Button(action: addMachine) { NewMachineTile() }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("gym-new-machine")
@@ -173,6 +187,30 @@ struct GymScreen: View {
         }
     }
 
+    /// A machine's tile, with its own Busy button on the photo.
+    private func tile(_ m: Machine, busy: Bool) -> some View {
+        Button {
+            // At the machine, it is free: the Busy mark has done its job.
+            if busy { library.changeGym { $0.setBusy(m.id, false, on: day) } }
+            opened = MachineRef(id: m.id)
+        } label: {
+            MachineTile(machine: m, status: status(of: m), done: doneToday(m), busy: busy)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("machine-\(m.name)")
+        .overlay(alignment: .topLeading) {
+            Button {
+                library.changeGym { $0.setBusy(m.id, !busy, on: day) }
+            } label: {
+                BusyPill(on: busy)
+            }
+            .buttonStyle(.plain)
+            .padding(10)
+            .accessibilityLabel(busy ? "\(m.name) is busy" : "Mark \(m.name) busy")
+            .accessibilityIdentifier("busy-\(m.name)")
+        }
+    }
+
     private func addMachine() {
         // The camera first, as at the machine; UI tests and a Mac without a camera go straight to the name.
         if CameraPicker.available && !Cues.shared.quiet {
@@ -200,7 +238,7 @@ struct GymScreen: View {
     private func finish(_ visit: GymVisit) {
         var v = visit
         v.finished = Date()
-        library.changeGym { $0.put(v) }
+        library.changeGym { $0.finish(visit: visit.id, at: v.finished!) }
         Cues.shared.finished("Well done")
         summary = v
     }
@@ -212,6 +250,9 @@ private struct MachineTile: View {
     let machine: Machine
     let status: String
     let done: Bool
+    let busy: Bool
+
+    private var border: Color { busy ? Gym.busy.fillColor : done ? Gym.fill : Theme.line }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -228,15 +269,34 @@ private struct MachineTile: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
-            Text(status)
+            Text(busy ? "Busy — come back later" : status)
                 .font(.caption)
-                .foregroundStyle(done ? Gym.tint : Theme.muted)
+                .foregroundStyle(busy ? Gym.busyTint : done ? Gym.tint : Theme.muted)
                 .lineLimit(1)
         }
         .padding(6)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(done ? Gym.fill : Theme.line, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(border, lineWidth: busy ? 1.5 : 1))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// "Busy" on a machine's photo: full orange when marked, a light outline when not.
+private struct BusyPill: View {
+    let on: Bool
+
+    var body: some View {
+        HStack(spacing: 4) {
+            IconMark(.hand("stopwatch"), size: 14, colour: on ? Gym.busy.inkColor : Gym.busyTint)
+            Text("Busy")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(on ? Gym.busy.inkColor : Gym.busyTint)
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 26)
+        .background(on ? AnyShapeStyle(Gym.busy.fillColor) : AnyShapeStyle(Theme.card.opacity(0.92)), in: Capsule())
+        .overlay(Capsule().stroke(Gym.busy.fillColor, lineWidth: on ? 0 : 1))
+        .contentShape(Capsule())
     }
 }
 

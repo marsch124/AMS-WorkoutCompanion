@@ -90,9 +90,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.2 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.3 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.2"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.3"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -158,5 +158,32 @@ final class WorkoutCompanionUITests: XCTestCase {
         waitFor(app.staticTexts["gym-summary-machines"], label: "1")
         app.buttons["gym-summary-done"].tap()
         XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+    }
+
+    func testABusyMachineMovesToComeBackToAndClearsWhenOpened() {
+        app.terminate()
+        app.launchArguments = ["-uitest", "-gymdemo"]
+        app.launch()
+        app.buttons["open-gym"].tap()
+        let busy = app.buttons["busy-Leg press"]
+        XCTAssertTrue(busy.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["gym-come-back"].exists)
+
+        // Busy, then free again with a second tap.
+        busy.tap()
+        XCTAssertTrue(app.staticTexts["gym-come-back"].waitForExistence(timeout: 3))
+        waitFor(busy, label: "Leg press is busy")
+        busy.tap()
+        waitFor(busy, label: "Mark Leg press busy")
+        XCTAssertFalse(app.staticTexts["gym-come-back"].exists)
+
+        // Busy again; opening the machine when it is free takes the mark away.
+        busy.tap()
+        XCTAssertTrue(app.staticTexts["gym-come-back"].waitForExistence(timeout: 3))
+        app.buttons["machine-Leg press"].tap()
+        XCTAssertTrue(app.staticTexts["gym-next-set"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        waitFor(app.buttons["busy-Leg press"], label: "Mark Leg press busy")
+        XCTAssertFalse(app.staticTexts["gym-come-back"].exists)
     }
 }

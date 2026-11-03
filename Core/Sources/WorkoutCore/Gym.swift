@@ -94,6 +94,17 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+/// A machine someone else is on: come back to it later that day.
+public struct BusyMark: Codable, Hashable, Sendable {
+    public var machineID: UUID
+    public var day: Date
+
+    public init(machineID: UUID, day: Date) {
+        self.machineID = machineID
+        self.day = day
+    }
+}
+
 /// What the gym screen offers for the next set.
 public struct NextSet: Equatable, Sendable {
     public var set: GymSet
@@ -112,10 +123,13 @@ public struct GymLog: Codable, Equatable, Sendable {
 
     public var machines: [Machine]
     public var visits: [GymVisit]
+    /// Machines marked Busy, in the order they were marked.
+    public var busyMarks: [BusyMark]
 
-    public init(machines: [Machine] = [], visits: [GymVisit] = []) {
+    public init(machines: [Machine] = [], visits: [GymVisit] = [], busyMarks: [BusyMark] = []) {
         self.machines = machines
         self.visits = visits
+        self.busyMarks = busyMarks
     }
 
     public func machine(_ id: UUID) -> Machine? { machines.first { $0.id == id } }
@@ -184,7 +198,33 @@ public struct GymLog: Codable, Equatable, Sendable {
         }
     }
 
+    /// The machines marked Busy on this day, in the order they were marked.
+    public func busy(on day: Date, calendar: Calendar = .current) -> [UUID] {
+        busyMarks.filter { calendar.isDate($0.day, inSameDayAs: day) }.map(\.machineID)
+    }
+
+    public func isBusy(_ machineID: UUID, on day: Date, calendar: Calendar = .current) -> Bool {
+        busy(on: day, calendar: calendar).contains(machineID)
+    }
+
     // MARK: Changes
+
+    /// Marks a machine Busy on a day, or takes the mark away. Marks from other days are dropped,
+    /// so one forgotten at the gym never turns up next time.
+    public mutating func setBusy(_ machineID: UUID, _ busy: Bool, on day: Date, calendar: Calendar = .current) {
+        busyMarks.removeAll { !calendar.isDate($0.day, inSameDayAs: day) }
+        let marked = isBusy(machineID, on: day, calendar: calendar)
+        if busy && !marked { busyMarks.append(BusyMark(machineID: machineID, day: day)) }
+        if !busy { busyMarks.removeAll { $0.machineID == machineID } }
+    }
+
+    /// Finish: the visit's end time, and every Busy mark of that day goes.
+    public mutating func finish(visit visitID: UUID, at now: Date = Date(), calendar: Calendar = .current) {
+        guard var v = visits.first(where: { $0.id == visitID }) else { return }
+        v.finished = now
+        put(v)
+        busyMarks.removeAll { calendar.isDate($0.day, inSameDayAs: v.date) }
+    }
 
     /// Adds a set on a machine to the visit on `day`, making the visit and the entry when needed.
     /// A machine used again later in the same visit carries on in its entry.
@@ -198,6 +238,7 @@ public struct GymLog: Codable, Equatable, Sendable {
             v.entries.append(MachineEntry(machineID: machineID, sets: [set]))
         }
         put(v)
+        setBusy(machineID, false, on: day, calendar: calendar)
     }
 
     /// Replaces or removes (`nil`) one set of a machine in a visit; an entry left empty goes.
@@ -226,30 +267,32 @@ public struct GymLog: Codable, Equatable, Sendable {
         machines.removeAll { $0.id == id }
         for i in visits.indices { visits[i].entries.removeAll { $0.machineID == id } }
         visits.removeAll { $0.entries.isEmpty }
+        busyMarks.removeAll { $0.machineID == id }
     }
 
     public var photosInUse: Set<String> { Set(machines.compactMap(\.photo)) }
 }
 
-/// `gym.json`: `{"version":1,"machines":[…],"visits":[…]}`.
+/// `gym.json`: `{"version":1,"machines":[…],"visits":[…],"busy":[…]}` (`busy` since 1.3; older files have none).
 public enum GymFile {
     struct Envelope: Codable {
         var version: Int
         var machines: [Machine]
         var visits: [GymVisit]
+        var busy: [BusyMark]?
     }
 
     public static func encode(_ log: GymLog) throws -> Data {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         enc.dateEncodingStrategy = .iso8601
-        return try enc.encode(Envelope(version: 1, machines: log.machines, visits: log.visits))
+        return try enc.encode(Envelope(version: 1, machines: log.machines, visits: log.visits, busy: log.busyMarks))
     }
 
     public static func decode(_ data: Data) throws -> GymLog {
         let dec = JSONDecoder()
         dec.dateDecodingStrategy = .iso8601
         let e = try dec.decode(Envelope.self, from: data)
-        return GymLog(machines: e.machines, visits: e.visits)
+        return GymLog(machines: e.machines, visits: e.visits, busyMarks: e.busy ?? [])
     }
 }

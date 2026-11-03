@@ -126,4 +126,60 @@ final class GymTests: XCTestCase {
         XCTAssertEqual(back.visits.first?.entries, log.visits.first?.entries)
         XCTAssertEqual(back.photosInUse, ["a.jpg"])
     }
+
+    // MARK: Busy
+
+    func testABusyMachineIsListedForThatDayInTheOrderMarked() {
+        var log = GymLog(machines: [press, leg])
+        log.setBusy(leg.id, true, on: day(3), calendar: cal)
+        log.setBusy(press.id, true, on: day(3, 19), calendar: cal)
+        XCTAssertEqual(log.busy(on: day(3), calendar: cal), [leg.id, press.id])
+        XCTAssertTrue(log.isBusy(leg.id, on: day(3), calendar: cal))
+        // Another day knows nothing of it.
+        XCTAssertEqual(log.busy(on: day(4), calendar: cal), [])
+        log.setBusy(leg.id, false, on: day(3), calendar: cal)
+        XCTAssertEqual(log.busy(on: day(3), calendar: cal), [press.id])
+    }
+
+    func testMarkingTwiceKeepsOneMark() {
+        var log = GymLog(machines: [press])
+        log.setBusy(press.id, true, on: day(3), calendar: cal)
+        log.setBusy(press.id, true, on: day(3, 20), calendar: cal)
+        XCTAssertEqual(log.busyMarks.count, 1)
+    }
+
+    func testASetOnABusyMachineClearsItsMark() {
+        var log = GymLog(machines: [press, leg])
+        log.setBusy(press.id, true, on: day(3), calendar: cal)
+        log.setBusy(leg.id, true, on: day(3), calendar: cal)
+        log.add(GymSet(kg: 30, reps: 10), machine: press.id, on: day(3), calendar: cal)
+        XCTAssertEqual(log.busy(on: day(3), calendar: cal), [leg.id])
+    }
+
+    func testFinishClearsEveryBusyMarkAndOldDaysGo() {
+        var log = GymLog(machines: [press, leg])
+        log.setBusy(leg.id, true, on: day(1), calendar: cal)
+        log.add(GymSet(kg: 30, reps: 10), machine: press.id, on: day(3), calendar: cal)
+        log.setBusy(leg.id, true, on: day(3), calendar: cal)
+        // Marking on day 3 drops the forgotten mark from day 1.
+        XCTAssertEqual(log.busyMarks.count, 1)
+        log.finish(visit: log.visits[0].id, at: day(3, 20), calendar: cal)
+        XCTAssertEqual(log.busy(on: day(3), calendar: cal), [])
+        XCTAssertEqual(log.visits[0].finished, day(3, 20))
+    }
+
+    func testDeletingABusyMachineRemovesItsMark() {
+        var log = GymLog(machines: [press])
+        log.setBusy(press.id, true, on: day(3), calendar: cal)
+        log.delete(machine: press.id)
+        XCTAssertTrue(log.busyMarks.isEmpty)
+    }
+
+    func testBusyMarksAreSavedAndAnOldFileStillReads() throws {
+        var log = GymLog(machines: [press])
+        log.setBusy(press.id, true, on: day(3), calendar: cal)
+        XCTAssertEqual(try GymFile.decode(GymFile.encode(log)).busyMarks, log.busyMarks)
+        let old = Data(#"{"version":1,"machines":[],"visits":[]}"#.utf8)
+        XCTAssertEqual(try GymFile.decode(old).busyMarks, [])
+    }
 }

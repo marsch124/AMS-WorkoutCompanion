@@ -7,7 +7,7 @@ An iPhone companion for workouts that change from day to day. Three kinds:
 | **Sets & reps** | push-ups 5 × 20 | "Set 2 / 5 · 20 reps", a big **Done**, then a rest ring with +15 s and Skip |
 | **Exercise list** | the doctor's exercises | a card per exercise — photo, amount, note — ticked off one by one |
 | **Interval timer** | 8 × 40 s work / 20 s rest | a countdown ring, Pause, Skip |
-| **At the gym** (1.2) | machines in any order | a photo tile per machine; last time's weight and reps filled in, Set done, a rest ring, history and new bests |
+| **At the gym** (1.2) | machines in any order | a photo tile per machine; last time's weight and reps filled in, Set done, a rest ring, history and new bests; **Busy** (1.3) puts a taken machine in "Come back to" |
 
 Every workout has its own colour and hand-drawn icon from the shared AMS icon hub
 ([AMS-Icons](https://github.com/marsch124/AMS-Icons)). Settings has How it works, What's new

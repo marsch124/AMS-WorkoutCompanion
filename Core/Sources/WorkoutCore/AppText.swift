@@ -10,6 +10,12 @@ public struct Release: Sendable, Equatable {
 /// The words of Settings: What's new (every version, newest first) and How it works.
 public enum AppText {
     public static let releases: [Release] = [
+        Release(version: "1.3", date: "3 November 2026", items: [
+            "New: Busy. When someone is on a machine, tap Busy on its photo. The machine turns orange and moves up to a new row, \"Come back to\", at the top of the gym screen — so you remember it once you have done the others.",
+            "New: when the machine is free, just tap it. Opening it, or doing a set on it, takes the Busy mark away by itself. A second tap on Busy also takes it away.",
+            "New: Finish clears every Busy mark of the day, and a mark left from another day never comes back.",
+            "Changed: the machines that are not busy are listed under \"Other machines\" while something is busy; otherwise the gym screen looks as before.",
+        ]),
         Release(version: "1.2", date: "3 November 2026", items: [
             "New: At the gym — the card at the top of Workouts. For a gym where you use machines in whatever order they come free.",
             "New: at a new machine, the camera opens; then you give it a name and, if you like, how it is set up (\"Seat 4, handles 2\"). The date is today by itself; the date at the top changes it.",
@@ -46,6 +52,7 @@ public enum AppText {
         ("Interval timers", "Rounds of work and rest against the clock, after a 5-second Get ready. Pause stops the clock, Skip goes straight to the next part."),
         ("Sounds and words", "At the start of every set, round and rest the iPhone beeps, vibrates and says what comes next. The last three seconds of a countdown tick. The screen stays on while a workout runs, and the sound plays even with the ring/silent switch on."),
         ("At the gym", "The card at the top of Workouts. At each machine: tap New machine, take a photo, give it a name and, if you like, how it is set up — \"Seat 4, handles 2\". Next time, tap the machine's photo; use the machines in any order, whichever is free. The date is today; the date at the top changes it for an earlier day."),
+        ("Busy machines", "Someone on a machine? Tap Busy on its photo. It turns orange and moves to \"Come back to\" at the top, so you do the other machines first and do not forget it. When it is free, tap the machine — the Busy mark goes by itself. Tap Busy again to take the mark away without opening it. Finish clears every Busy mark."),
         ("Logging a set", "On a machine you see what you did last time, and the weight and reps are already filled in from it. Change what is different with − and + (2.5 kg, 1 rep) or tap the number to type it; 0 kg means body weight. Set done saves the set and starts a 1:30 rest — +15 s for more, Skip to go on. Tap a set you did to change or remove it."),
         ("Getting stronger", "When every set last time reached 12 reps, the machine suggests 2.5 kg more. A weight heavier than you ever did on that machine shows New best. Each machine shows its history and a small chart of your heaviest weight per visit. Finish shows the whole visit: machines, sets, time, kilograms lifted and the new bests. The pencil on a machine changes its photo, name or setting, or deletes it with all its sets."),
         ("Making a workout", "Give it a name, pick a colour and choose its type. The numbers change with − and +. For an exercise list, Add exercise adds one; its ••• menu moves it up or down or removes it. Add photo takes a picture from your Photos. Nothing is kept until you tap Save; Cancel leaves everything as it was. Save needs a name — without one it tells you so."),
