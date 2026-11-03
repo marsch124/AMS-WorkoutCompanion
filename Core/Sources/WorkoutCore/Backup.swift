@@ -89,6 +89,15 @@ public struct Backup: Codable, Equatable, Sendable {
         return !calendar.isDate(last, inSameDayAs: now)
     }
 
+    /// The Train tab reminds after 14 days without a backup — counted from the oldest data when
+    /// there never was one — and keeps quiet for 3 days after "Later" (since 1.8).
+    public static func reminderDue(lastBackup: Date?, oldestData: Date?, later: Date?, now: Date) -> Bool {
+        let day: TimeInterval = 24 * 3600
+        guard let since = lastBackup ?? oldestData, now.timeIntervalSince(since) >= 14 * day else { return false }
+        if let later, now.timeIntervalSince(later) < 3 * day { return false }
+        return true
+    }
+
     /// The weekly copies to remove so only the newest `keep` stay.
     public static func toRemove(_ made: [(name: String, date: Date)], keep: Int = 4) -> [String] {
         made.sorted { $0.date > $1.date }.dropFirst(keep).map(\.name)

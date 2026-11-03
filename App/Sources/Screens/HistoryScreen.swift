@@ -16,6 +16,8 @@ enum Past {
 struct HistoryScreen: View {
     @Environment(Library.self) private var library
     @State private var filter = "all"
+    @State private var weekShows = "sessions"
+    @State private var pickedWeek: Date?
 
     private var all: [HistoryItem] { library.historyItems }
     private var items: [HistoryItem] { filter == "all" ? all : all.filter { $0.group == filter } }
@@ -132,15 +134,25 @@ struct HistoryScreen: View {
     }
 
     private var chart: some View {
-        let weeks = History.weekly(items, weeks: 8, now: Date())
+        let weeks = History.weekly(items, weeks: 12, now: Date())
+        let thisWeek = weeks.last?.start
+        let showMinutes = weekShows == "minutes"
+        let picked = weeks.first { $0.start == pickedWeek }?.start
         return VStack(alignment: .leading, spacing: 6) {
-            Text("Minutes per week")
+            Text(showMinutes ? "Minutes per week" : "Sessions per week")
                 .font(.headline)
                 .foregroundStyle(Past.tint)
                 .padding(.top, 4)
+            Picker("Show", selection: $weekShows) {
+                Text("Sessions").tag("sessions")
+                Text("Minutes").tag("minutes")
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("history-week-switch")
             Chart(weeks, id: \.start) { w in
-                BarMark(x: .value("Week", w.start, unit: .weekOfYear), y: .value("Minutes", w.minutes))
-                    .foregroundStyle(Past.fill)
+                BarMark(x: .value("Week", w.start, unit: .weekOfYear),
+                        y: .value(showMinutes ? "Minutes" : "Sessions", showMinutes ? w.minutes : w.sessions))
+                    .foregroundStyle(Past.fill.opacity(w.start == thisWeek || w.start == picked ? 1 : 0.4))
                     .cornerRadius(3)
             }
             .chartXAxis {
@@ -148,12 +160,51 @@ struct HistoryScreen: View {
                     AxisValueLabel(format: .dateTime.day().month(.abbreviated))
                 }
             }
+            .chartOverlay { proxy in
+                GeometryReader { geo in
+                    Rectangle().fill(.clear).contentShape(Rectangle())
+                        .onTapGesture { location in
+                            guard let plot = proxy.plotFrame else { return }
+                            let x = location.x - geo[plot].origin.x
+                            if let date: Date = proxy.value(atX: x),
+                               let hit = weeks.first(where: { $0.start <= date && date < ($0.start.addingTimeInterval(7 * 86_400)) }) {
+                                pickedWeek = hit.start == pickedWeek ? nil : hit.start
+                            }
+                        }
+                }
+            }
             .frame(height: 110)
             .padding(10)
             .background(Theme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.line, lineWidth: 1))
             .accessibilityIdentifier("history-chart")
+            if let start = picked { weekDetail(start) }
         }
+    }
+
+    private func weekDetail(_ start: Date) -> some View {
+        let found = History.sessions(items, weekStarting: start)
+        return VStack(alignment: .leading, spacing: 4) {
+            Text("Week of \(start.formatted(.dateTime.day().month(.abbreviated)))")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Past.tint)
+            if found.isEmpty {
+                Text("Nothing that week.").font(.subheadline).foregroundStyle(Theme.muted)
+            }
+            ForEach(found) { item in
+                HStack {
+                    Text(item.heading).font(.subheadline).foregroundStyle(Theme.ink).lineLimit(1)
+                    Spacer()
+                    Text(item.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
+                        .font(.caption).foregroundStyle(Theme.muted)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Past.fill.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("history-week-detail")
     }
 
     private var list: some View {

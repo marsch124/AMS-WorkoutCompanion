@@ -33,7 +33,8 @@ final class GymTests: XCTestCase {
         XCTAssertEqual(log.visits[0].entries.count, 2)
         XCTAssertEqual(log.visits[0].entries[0].sets.map(\.reps), [12, 11])
         XCTAssertEqual(log.visits[0].setCount, 3)
-        XCTAssertEqual(log.visits[0].totalKg, 30 * 12 + 40 * 10 + 30 * 11)
+        let expectedKg: Double = 30 * 12 + 40 * 10 + 30 * 11
+        XCTAssertEqual(log.visits[0].totalKg, expectedKg)
     }
 
     func testANewMachineStartsAt20KgTimes10() {

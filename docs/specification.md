@@ -141,3 +141,22 @@ Version 1.6. iPhone only, portrait, iOS 17+, light and dark. The name under the 
 - Due once per calendar day (`Backup.dailyDue`): checked at launch and when the app goes to the background. The file is the same as Back up now ("Workouts backup YYYY-MM-DD HHMM.json"). Only files named "Workouts backup *.json" in that folder are counted; the newest 7 stay.
 - Shown: folder (`backup-auto-folder`), last time (`backup-auto-last`), a red line on failure; "Choose another folder…" (`backup-auto-change`), "Stop automatic backup" (`backup-auto-stop`, leaves the files).
 - One file picker on the page serves Restore and the folder (two pickers on one page do not open in SwiftUI).
+
+## Rest alarm (since 1.8)
+- `RestAlarm.set(end, words)` (Cues.swift): one pending local notification "rest-over" ("Rest over", body e.g. "Set 3 on Leg press", default sound, time-sensitive). Replaced on every new rest, +15 s or pause/resume; removed on skip, when the rest ends in the app, and when the screen closes. Permission asked the first time a rest starts. Silent in UI tests.
+- Gym machine screen: follows `restEnd`. Sets & reps / Intervals: armed for rest, get ready and off phases, with the next set or round.
+
+## Undo (since 1.8)
+- `Library.keepForUndo(label)` keeps workouts, gym log and history as they were just before a delete: workout (home menu, editor), machine/exercise, a set, a History session (`changeGym(undo:)`, `delete`, `deleteRecord`).
+- Root overlay `UndoBar` (`undo-bar`, `undo-button`) for 10 seconds; Undo restores and saves all three files. Unused-photo cleanup waits until the bar is gone.
+
+## Backup reminder (since 1.8)
+- `Backup.reminderDue(lastBackup:oldestData:later:now:)`: 14 days since the last backup (Back up now or automatic, `lastBackup` setting), or since the oldest gym visit / session when there never was one; quiet 3 days after Later. Train top card `backup-reminder` with `backup-reminder-open` (Backups) and `backup-reminder-later`. UI tests: `-backupdue`; their settings live in a separate store emptied at each launch.
+
+## Week picture and Check my data (since 1.8)
+- History: 12 weeks; `history-week-switch` Sessions | Minutes; this week full colour; tapping a bar lists that week (`history-week-detail`, `History.sessions(_:weekStarting:)`).
+- Settings → "Check my data" (`settings-health`): `HealthCheck.run(files:photoNames:otherFileNames:)` — each file readable, counts, photos referenced but missing, unreadable files kept aside (problems), "Before restore" folders (counted). `health-ok` or `health-problem-<n>`; read-only.
+
+## Quality (since 1.8)
+- `LargeDataTests`: 2 years of visits (312 visits, 2 gyms, 16 machines), 300 sessions, 30 workouts, 200 photos × 300 KB; file round-trip, History, Backup (≈83 MB, < 1 s locally) and machine look-ups within limits.
+- GitHub Tests: the runner's compiler gave up on one long sum in `GymTests`; written as a typed constant.

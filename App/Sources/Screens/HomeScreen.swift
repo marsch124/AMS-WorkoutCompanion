@@ -4,6 +4,7 @@ import WorkoutCore
 
 /// The three tabs: Train, History, Settings — each keeps its place while another is shown.
 struct RootView: View {
+    @Environment(Library.self) private var library
     enum Tab { case train, history, settings }
     @State private var tab = Tab.train
 
@@ -19,6 +20,15 @@ struct RootView: View {
             if tab == .settings { NavigationStack { SettingsScreen() } }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }
+        .overlay(alignment: .bottom) {
+            if let point = library.undoPoint {
+                UndoBar(point: point)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 64)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(duration: 0.3), value: library.undoPoint?.id)
     }
 
     private var bar: some View {
@@ -65,6 +75,7 @@ struct HomeScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 10) {
+                    if library.backupReminderDue { BackupReminder() }
                     GymCard { showGym = true }
                     LazyVGrid(columns: columns, spacing: 10) {
                         ForEach(library.workouts) { w in
@@ -244,5 +255,70 @@ struct KindPicker: View {
         .navigationDestination(for: WorkoutKind.self) { kind in
             EditorScreen(workout: Workout(kind: kind), isNew: true, onDone: done)
         }
+    }
+}
+
+/// "Chest press deleted — Undo", for 10 seconds after any delete (since 1.8).
+private struct UndoBar: View {
+    @Environment(Library.self) private var library
+    let point: Library.UndoPoint
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(point.label)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .accessibilityIdentifier("undo-bar")
+            Spacer(minLength: 8)
+            Button("Undo") { library.undo() }
+                .font(.subheadline.weight(.bold))
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .tint(Theme.accent)
+                .accessibilityIdentifier("undo-button")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .padding(.vertical, 8)
+        .background(Color(white: 0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.18), lineWidth: 1))
+        .task(id: point.id) {
+            try? await Task.sleep(for: .seconds(10))
+            if !Task.isCancelled { library.forgetUndo(point.id) }
+        }
+    }
+}
+
+/// After 14 days without a backup: a short note at the top of Train (since 1.8).
+private struct BackupReminder: View {
+    @Environment(Library.self) private var library
+    private static let colour = IconColour.of(key: "navy")!
+
+    var body: some View {
+        HStack(spacing: 10) {
+            IconMark(.hand("box"), size: 22, colour: Self.colour.fillColor)
+            Text(library.lastBackup == nil ? "No backup yet." : "No backup for 2 weeks.")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+                .accessibilityIdentifier("backup-reminder")
+            Spacer(minLength: 4)
+            Button("Later") { library.backupReminderLater() }
+                .font(.subheadline)
+                .foregroundStyle(Theme.muted)
+                .accessibilityIdentifier("backup-reminder-later")
+            NavigationLink { BackupScreen() } label: {
+                Text("Back up")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Self.colour.inkColor)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Self.colour.fillColor, in: Capsule())
+            }
+            .accessibilityIdentifier("backup-reminder-open")
+        }
+        .padding(10)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Self.colour.fillColor.opacity(0.5), lineWidth: 1))
     }
 }

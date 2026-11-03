@@ -1,5 +1,6 @@
 import AVFoundation
 import UIKit
+import UserNotifications
 
 /// Sound, vibration and spoken words during a workout, and the screen kept awake.
 /// UI tests start the app with -uitest, which keeps it silent.
@@ -78,5 +79,41 @@ final class Cues {
         guard !quiet, let p = players[name] else { return }
         p.currentTime = 0
         p.play()
+    }
+}
+
+/// The end of a rest as a phone notification, so it buzzes and shows on a locked iPhone or while
+/// another app is open (since 1.8). With the app in front the app's own sound plays instead.
+/// Asks for permission the first time a rest starts; UI tests stay silent.
+@MainActor
+enum RestAlarm {
+    private static let id = "rest-over"
+    private static var asked = false
+
+    /// One alarm at a time: a new rest, +15 s or a skip replaces or removes the last one.
+    static func set(_ end: Date?, _ words: String) {
+        let centre = UNUserNotificationCenter.current()
+        centre.removePendingNotificationRequests(withIdentifiers: [id])
+        centre.removeDeliveredNotifications(withIdentifiers: [id])
+        guard let end, !Cues.shared.quiet else { return }
+        let seconds = end.timeIntervalSinceNow
+        guard seconds > 1 else { return }
+        let schedule = {
+            let content = UNMutableNotificationContent()
+            content.title = "Rest over"
+            content.body = words
+            content.sound = .default
+            content.interruptionLevel = .timeSensitive
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
+            centre.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
+        }
+        if asked {
+            schedule()
+        } else {
+            asked = true
+            centre.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                if granted { Task { @MainActor in schedule() } }
+            }
+        }
     }
 }

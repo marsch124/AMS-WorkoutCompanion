@@ -152,8 +152,15 @@ public enum History {
         return streak
     }
 
+    /// The sessions of the week that starts at `weekStarting`, newest first (since 1.8: tap a bar).
+    public static func sessions(_ items: [HistoryItem], weekStarting start: Date,
+                                calendar: Calendar = .current) -> [HistoryItem] {
+        let week = period(.weekOfYear, around: start, calendar: calendar)
+        return items.filter { week.contains($0.date) }.sorted { $0.date > $1.date }
+    }
+
     /// Minutes and sessions per week, the last `weeks` weeks, oldest first — for the bar chart.
-    public static func weekly(_ items: [HistoryItem], weeks: Int = 8, now: Date,
+    public static func weekly(_ items: [HistoryItem], weeks: Int = 12, now: Date,
                               calendar: Calendar = .current) -> [(start: Date, minutes: Int, sessions: Int)] {
         let this = period(.weekOfYear, around: now, calendar: calendar)
         return (0..<weeks).reversed().compactMap { back in

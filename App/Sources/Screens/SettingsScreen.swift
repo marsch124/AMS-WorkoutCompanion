@@ -24,6 +24,8 @@ struct SettingsScreen: View {
             Section {
                 NavigationLink("Backups") { BackupScreen() }
                     .accessibilityIdentifier("settings-backups")
+                NavigationLink("Check my data") { HealthCheckScreen() }
+                    .accessibilityIdentifier("settings-health")
             }
             Section {
                 HStack {

@@ -43,7 +43,10 @@ struct TimerScreen: View {
             session.start(at: t)
             announce()
         }
-        .onDisappear { Cues.shared.end() }
+        .onDisappear {
+            Cues.shared.end()
+            RestAlarm.set(nil, "")
+        }
         .onReceive(clock) { t in
             now = t
             if session.tick(at: t) {
@@ -152,7 +155,7 @@ struct TimerScreen: View {
             .accessibilityIdentifier("run-done")
         case .rest?:
             HStack(spacing: 12) {
-                Button("+15 s") { session.addTime(15) }
+                Button("+15 s") { session.addTime(15); armAlarm() }
                     .buttonStyle(SoftButtonStyle())
                     .accessibilityIdentifier("run-add")
                 Button { next() } label: { MarkLabel(title: "Skip rest", mark: .skip, colour: workout.inkOnFill) }
@@ -163,6 +166,7 @@ struct TimerScreen: View {
             HStack(spacing: 12) {
                 Button {
                     if session.isPaused { session.resume(at: Date()) } else { session.pause(at: Date()) }
+                    armAlarm()
                 } label: {
                     MarkLabel(title: session.isPaused ? "Resume" : "Pause",
                               mark: session.isPaused ? .play : .pause, colour: Theme.ink)
@@ -212,7 +216,26 @@ struct TimerScreen: View {
         }
     }
 
+    /// During a rest, get ready or an off round: the phone's alarm for its end (since 1.8).
+    private func armAlarm() {
+        let t = Date()
+        guard !session.isPaused, let phase = session.current, let left = session.remaining(at: t) else {
+            RestAlarm.set(nil, "")
+            return
+        }
+        let next = session.phases.dropFirst(session.index + 1).first
+        switch (phase, next) {
+        case (.rest, .set(let n, let of, let reps)?), (.getReady, .set(let n, let of, let reps)?):
+            RestAlarm.set(t.addingTimeInterval(left), "\(workout.name): set \(n) of \(of), \(reps) reps")
+        case (.off, .work(_, let r, let of)?), (.getReady, .work(_, let r, let of)?):
+            RestAlarm.set(t.addingTimeInterval(left), "\(workout.name): round \(r) of \(of)")
+        default:
+            RestAlarm.set(nil, "")
+        }
+    }
+
     private func announce() {
+        armAlarm()
         let cues = Cues.shared
         switch session.current {
         case nil:

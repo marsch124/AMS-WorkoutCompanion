@@ -126,6 +126,11 @@ struct MachineScreen: View {
             }
         }
         .onAppear(perform: prefill)
+        // A locked iPhone still buzzes when the rest is over (since 1.8).
+        .onChange(of: restEnd) { _, end in
+            RestAlarm.set(end, "Set \(today.count + 1) on \(machine?.name ?? "the machine")")
+        }
+        .onDisappear { RestAlarm.set(nil, "") }
         .onReceive(clock) { t in
             now = t
             if let end = restEnd {
@@ -154,7 +159,7 @@ struct MachineScreen: View {
                     }
                     changingSet = nil
                 } remove: {
-                    library.changeGym { $0.change(visit: visit.id, machine: machineID, set: s.index, to: nil) }
+                    library.changeGym(undo: "Set \(s.index + 1) removed") { $0.change(visit: visit.id, machine: machineID, set: s.index, to: nil) }
                     changingSet = nil
                 }
             }
@@ -869,7 +874,7 @@ struct MachineForm: View {
         }
         .confirmationDialog("Delete \(draft.name) and all its sets?", isPresented: $askDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
-                library.changeGym { $0.delete(machine: draft.id) }
+                library.changeGym(undo: "\(draft.name) deleted") { $0.delete(machine: draft.id) }
                 done(nil)
             }
         }

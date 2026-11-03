@@ -191,4 +191,23 @@ final class ScreenTour: XCTestCase {
         XCTAssertTrue(app.buttons["backup-auto-on"].waitForExistence(timeout: 5))
         snap("24 Backups automatic")
     }
+
+    /// 1.8: the backup reminder, the Undo bar, the week picture and Check my data.
+    func testNewIn18Tour() {
+        app.launchArguments += ["-gymdemo", "-backupdue"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["backup-reminder"].waitForExistence(timeout: 10))
+        app.buttons["workout-Intervals"].press(forDuration: 1.2)
+        app.buttons["Delete"].firstMatch.tap()
+        app.buttons["Delete"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["undo-bar"].waitForExistence(timeout: 5))
+        snap("25 Reminder and Undo")
+        app.buttons["open-history"].tap()
+        XCTAssertTrue(app.segmentedControls["history-week-switch"].waitForExistence(timeout: 5))
+        snap("26 Week picture")
+        app.buttons["open-settings"].tap()
+        app.buttons["settings-health"].tap()
+        XCTAssertTrue(app.staticTexts["health-ok"].waitForExistence(timeout: 5))
+        snap("27 Check my data")
+    }
 }

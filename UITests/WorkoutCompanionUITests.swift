@@ -98,9 +98,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.7 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.8 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.7"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.8"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -352,6 +352,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["machine-Leg press"].tap()
         app.buttons["gym-edit-machine"].tap()
         let step = app.segmentedControls["machine-step"]
+        // Since 1.6 the form is longer (an Icon row): scroll down to the machine's settings.
+        XCTAssertTrue(app.textFields["machine-name"].waitForExistence(timeout: 5))
+        for _ in 0..<3 where !step.isHittable { app.swipeUp() }
         XCTAssertTrue(step.waitForExistence(timeout: 5))
         step.buttons.element(boundBy: 2).tap()
         let rest = app.steppers["machine-rest"]
@@ -509,5 +512,58 @@ final class WorkoutCompanionUITests: XCTestCase {
         // The iPhone's own folder picker opens.
         XCTAssertTrue(app.navigationBars.buttons["Cancel"].waitForExistence(timeout: 8)
                       || app.buttons["Cancel"].waitForExistence(timeout: 2))
+    }
+
+    // MARK: 1.8
+
+    func testDeletingAWorkoutCanBeUndone() {
+        let push = app.buttons["workout-Push-ups"]
+        XCTAssertTrue(push.waitForExistence(timeout: 5))
+        push.press(forDuration: 1.2)
+        app.buttons["Delete"].firstMatch.tap()
+        app.buttons["Delete"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["undo-bar"].waitForExistence(timeout: 5))
+        XCTAssertFalse(push.exists)
+        app.buttons["undo-button"].tap()
+        XCTAssertTrue(push.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["undo-bar"].exists)
+    }
+
+    func testRemovingASetCanBeUndone() {
+        launchGymDemo()
+        app.buttons["machine-Leg press"].tap()
+        app.buttons["gym-set-done"].tap()
+        app.buttons["gym-rest-skip"].tap()
+        app.buttons["gym-set-1"].tap()
+        app.buttons["set-edit-remove"].tap()
+        XCTAssertTrue(app.staticTexts["undo-bar"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["gym-set-1"].exists)
+        app.buttons["undo-button"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 5))
+    }
+
+    func testTheBackupReminderOpensBackupsAndLaterHidesIt() {
+        app.terminate()
+        app.launchArguments = ["-uitest", "-backupdue"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["backup-reminder"].waitForExistence(timeout: 5))
+        app.buttons["backup-reminder-open"].tap()
+        XCTAssertTrue(app.buttons["backup-now"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["backup-reminder-later"].tap()
+        XCTAssertFalse(app.staticTexts["backup-reminder"].waitForExistence(timeout: 2))
+    }
+
+    func testTheWeekPictureSwitchesAndTheDataCheckIsAllGood() {
+        launchGymDemo()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["open-history"].tap()
+        let sw = app.segmentedControls["history-week-switch"]
+        XCTAssertTrue(sw.waitForExistence(timeout: 5))
+        sw.buttons.element(boundBy: 1).tap()
+        XCTAssertTrue(sw.buttons.element(boundBy: 1).isSelected)
+        app.buttons["open-settings"].tap()
+        app.buttons["settings-health"].tap()
+        XCTAssertTrue(app.staticTexts["health-ok"].waitForExistence(timeout: 5))
     }
 }

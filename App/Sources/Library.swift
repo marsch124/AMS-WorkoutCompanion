@@ -117,8 +117,44 @@ final class Library {
     }
 
     func delete(_ workout: Workout) {
+        keepForUndo("\(workout.name) deleted")
         workouts.removeAll { $0.id == workout.id }
         persist()
+    }
+
+    // MARK: Undo (since 1.8)
+
+    /// Everything as it was just before a delete; "Undo" puts it back for 10 seconds.
+    struct UndoPoint: Identifiable {
+        let id = UUID()
+        let label: String
+        let workouts: [Workout]
+        let gym: GymLog
+        let history: [SessionRecord]
+    }
+    private(set) var undoPoint: UndoPoint?
+
+    /// Called just before a delete. Photos are not cleaned up while Undo can still bring them back.
+    func keepForUndo(_ label: String) {
+        undoPoint = UndoPoint(label: label, workouts: workouts, gym: gym, history: history)
+    }
+
+    func undo() {
+        guard let p = undoPoint else { return }
+        undoPoint = nil
+        workouts = p.workouts
+        gym = p.gym
+        history = p.history
+        persist()
+        persistGym()
+        persistHistory()
+    }
+
+    /// The Undo bar went away: from now on the delete stands and unused photos may go.
+    func forgetUndo(_ id: UUID) {
+        guard undoPoint?.id == id else { return }
+        undoPoint = nil
+        removeUnusedPhotos()
     }
 
     func move(from: IndexSet, to: Int) {
@@ -131,7 +167,8 @@ final class Library {
     /// Every change to the gym log goes through here and is written at once.
     /// The change works on a copy, so a closure that reads `gym` (a screen's visit or gym) while
     /// changing it cannot crash on overlapping access (the 1.4 plan-save crash).
-    func changeGym(_ change: (inout GymLog) -> Void) {
+    func changeGym(undo label: String? = nil, _ change: (inout GymLog) -> Void) {
+        if let label { keepForUndo(label) }
         var log = gym
         change(&log)
         gym = log
@@ -155,6 +192,7 @@ final class Library {
     }
 
     func deleteRecord(_ id: UUID) {
+        if let r = history.first(where: { $0.id == id }) { keepForUndo("\(r.name) deleted from History") }
         history.removeAll { $0.id == id }
         persistHistory()
     }
@@ -225,6 +263,7 @@ final class Library {
         let b = makeBackup()
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(Backup.fileName(b.made))
         guard let data = try? Backup.encode(b), (try? data.write(to: url, options: .atomic)) != nil else { return nil }
+        noteBackup(b.made)
         return url
     }
 
@@ -251,12 +290,49 @@ final class Library {
         }.sorted { $0.made > $1.made }
     }
 
+    // MARK: Backup reminder (since 1.8)
+
+    private static let lastBackupKey = "lastBackup"
+    private static let reminderLaterKey = "backupReminderLater"
+    /// Changed to redraw the Train tab after Later or a backup.
+    private(set) var reminderTick = 0
+
+    /// The last backup kept outside the app: Back up now, or an automatic one.
+    var lastBackup: Date? { defaults.object(forKey: Self.lastBackupKey) as? Date }
+
+    private func noteBackup(_ date: Date = Date()) {
+        defaults.set(date, forKey: Self.lastBackupKey)
+        reminderTick += 1
+    }
+
+    /// True when there is something to lose and no backup for 14 days (UI tests: -backupdue).
+    var backupReminderDue: Bool {
+        _ = reminderTick
+        if ProcessInfo.processInfo.arguments.contains("-backupdue") && lastBackup == nil
+            && defaults.object(forKey: Self.reminderLaterKey) == nil { return true }
+        let oldest = (gym.visits.map(\.date) + history.map(\.started)).min()
+        return Backup.reminderDue(lastBackup: lastBackup, oldestData: oldest,
+                                  later: defaults.object(forKey: Self.reminderLaterKey) as? Date, now: Date())
+    }
+
+    /// "Later": quiet for 3 days.
+    func backupReminderLater() {
+        defaults.set(Date(), forKey: Self.reminderLaterKey)
+        reminderTick += 1
+    }
+
     // MARK: Automatic backup (since 1.7)
 
     /// The folder chosen once (iCloud Drive or anywhere in Files); a bookmark keeps the permission.
     private static let autoKey = "autoBackupFolder"
     private static let autoLastKey = "autoBackupLast"
-    private var defaults: UserDefaults { .standard }
+    private var defaults: UserDefaults { Self.store }
+    /// The app's small settings; UI tests get a fresh, empty set each launch.
+    private static let store: UserDefaults = {
+        guard ProcessInfo.processInfo.arguments.contains("-uitest"), let d = UserDefaults(suiteName: "uitest") else { return .standard }
+        d.removePersistentDomain(forName: "uitest")
+        return d
+    }()
 
     /// The chosen folder's name, or nil when automatic backup is off.
     var autoFolderName: String? { autoFolder()?.lastPathComponent }
@@ -304,6 +380,7 @@ final class Library {
         }
         autoProblem = nil
         defaults.set(now, forKey: Self.autoLastKey)
+        noteBackup(now)
         let fm = FileManager.default
         let ours = ((try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: [.creationDateKey])) ?? [])
             .filter { $0.lastPathComponent.hasPrefix("Workouts backup ") && $0.pathExtension == "json" }
@@ -363,7 +440,8 @@ final class Library {
     /// Photos no workout or machine uses any more (replaced, removed, deleted) go.
     private func removeUnusedPhotos() {
         // With an unreadable gym file we cannot know which photos its machines use: keep them all.
-        guard !gymUnreadable else { return }
+        // While Undo is offered, a deleted machine's or workout's photo must stay.
+        guard !gymUnreadable, undoPoint == nil else { return }
         let inUse = WorkoutFile.photosInUse(workouts).union(gym.photosInUse)
         let names = (try? FileManager.default.contentsOfDirectory(atPath: photoFolder.path)) ?? []
         for name in names where !inUse.contains(name) {
