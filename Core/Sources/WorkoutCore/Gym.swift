@@ -11,6 +11,12 @@ public struct GymPlace: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+/// What a machine logs: weight and reps, or time (treadmill, rowing machine) with level and incline.
+public enum MachineLogs: String, Codable, CaseIterable, Sendable {
+    case weights
+    case time
+}
+
 /// A machine or exercise at the gym, with its photo and how it is set up.
 public struct Machine: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
@@ -21,28 +27,79 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
     public var photo: String?
     /// How the machine is set up — "Seat 4, handles 2".
     public var setting: String
+    /// Weight × reps (before 1.4 always), or time.
+    public var logs: MachineLogs
+    /// A photo of the machine's instruction plate, file name in the Photos folder (since 1.4).
+    public var instructions: String?
 
-    public init(id: UUID = UUID(), gymID: UUID? = nil, name: String = "", photo: String? = nil, setting: String = "") {
+    public init(id: UUID = UUID(), gymID: UUID? = nil, name: String = "", photo: String? = nil, setting: String = "",
+                logs: MachineLogs = .weights, instructions: String? = nil) {
         self.id = id
         self.gymID = gymID
         self.name = name
         self.photo = photo
         self.setting = setting
+        self.logs = logs
+        self.instructions = instructions
+    }
+
+    enum CodingKeys: String, CodingKey { case id, gymID, name, photo, setting, logs, instructions }
+
+    /// Files from before 1.4 have no gym, no `logs` and no instructions.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        gymID = try c.decodeIfPresent(UUID.self, forKey: .gymID)
+        name = try c.decode(String.self, forKey: .name)
+        photo = try c.decodeIfPresent(String.self, forKey: .photo)
+        setting = try c.decodeIfPresent(String.self, forKey: .setting) ?? ""
+        logs = try c.decodeIfPresent(MachineLogs.self, forKey: .logs) ?? .weights
+        instructions = try c.decodeIfPresent(String.self, forKey: .instructions)
     }
 }
 
-/// One set: the weight in kilograms (0 = body weight) and the reps.
+/// One set: the weight in kilograms (0 = body weight) and the reps —
+/// or, on a time machine, the time with its level and incline.
 public struct GymSet: Codable, Hashable, Sendable {
     public var kg: Double
     public var reps: Int
+    public var seconds: Int?
+    public var level: Double?
+    /// Per cent.
+    public var incline: Double?
 
     public init(kg: Double, reps: Int) {
         self.kg = kg
         self.reps = reps
     }
 
-    /// "30 kg × 12", "Body weight × 12".
-    public var text: String { "\(GymSet.weight(kg)) × \(reps)" }
+    /// A time set: no weight, no reps.
+    public init(seconds: Int, level: Double?, incline: Double?) {
+        self.kg = 0
+        self.reps = 0
+        self.seconds = seconds
+        self.level = level
+        self.incline = incline
+    }
+
+    public var isTime: Bool { seconds != nil }
+
+    /// A new time machine's first go: 20 minutes, level 5, no incline.
+    public static let starterTime = GymSet(seconds: 20 * 60, level: 5, incline: 0)
+
+    /// "30 kg × 12", "Body weight × 12", "25 min · level 8 · incline 2.5 %".
+    public var text: String {
+        guard let seconds else { return "\(GymSet.weight(kg)) × \(reps)" }
+        var parts = [GymSet.duration(seconds) + " min"]
+        if let level { parts.append("level \(GymSet.number(level))") }
+        if let incline, incline != 0 { parts.append("incline \(GymSet.number(incline)) %") }
+        return parts.joined(separator: " · ")
+    }
+
+    /// 1500 → "25", 90 → "1:30".
+    public static func duration(_ seconds: Int) -> String {
+        seconds % 60 == 0 ? "\(seconds / 60)" : String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
 
     /// "30 kg", "32.5 kg", "Body weight".
     public static func weight(_ kg: Double) -> String {
@@ -64,6 +121,10 @@ public struct MachineEntry: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
     public var machineID: UUID
     public var sets: [GymSet]
+    /// What to do next time, chosen after the sets (since 1.4).
+    public var nextTime: GymSet?
+    /// How it felt.
+    public var note: String?
 
     public init(id: UUID = UUID(), machineID: UUID, sets: [GymSet] = []) {
         self.id = id
@@ -74,6 +135,7 @@ public struct MachineEntry: Codable, Identifiable, Hashable, Sendable {
     /// "30 kg × 12, 12, 10" when the weight stays the same; "30 × 12, 32.5 × 10" when it changes.
     public var text: String {
         guard let first = sets.first else { return "" }
+        if sets.contains(where: \.isTime) { return sets.map(\.text).joined(separator: ", ") }
         if sets.allSatisfy({ $0.kg == first.kg }) {
             return "\(GymSet.weight(first.kg)) × " + sets.map { String($0.reps) }.joined(separator: ", ")
         }
@@ -107,6 +169,11 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
     }
 
     public var setCount: Int { entries.reduce(0) { $0 + $1.sets.count } }
+
+    /// Minutes logged on time machines.
+    public var minutesOnMachines: Int {
+        entries.flatMap(\.sets).reduce(0) { $0 + ($1.seconds ?? 0) } / 60
+    }
 
     /// Minutes from the first set to Finish, when both are known.
     public var minutes: Int? {
@@ -304,9 +371,15 @@ public struct GymLog: Codable, Equatable, Sendable {
         if let done = visit.entries.last(where: { $0.machineID == machineID })?.sets.last {
             return NextSet(set: done, reason: nil)
         }
-        guard let previous = last(machineID, excluding: visit.id)?.entry.sets, let first = previous.first else {
-            return NextSet(set: GymLog.starter, reason: nil)
+        let isTime = machine(machineID)?.logs == .time
+        guard let lastEntry = last(machineID, excluding: visit.id)?.entry, let first = lastEntry.sets.first else {
+            return NextSet(set: isTime ? GymSet.starterTime : GymLog.starter, reason: nil)
         }
+        if let planned = lastEntry.nextTime {
+            return NextSet(set: planned, reason: "Your plan from last time: \(planned.text)")
+        }
+        let previous = lastEntry.sets
+        if isTime || first.isTime { return NextSet(set: first, reason: nil) }
         if previous.allSatisfy({ $0.reps >= GymLog.topReps }) {
             let up = first.kg + GymLog.step
             return NextSet(set: GymSet(kg: up, reps: max(1, GymLog.topReps - 2)),
@@ -362,6 +435,16 @@ public struct GymLog: Codable, Equatable, Sendable {
         put(v)
         busyMarks.removeAll { calendar.isDate($0.day, inSameDayAs: v.date) }
         if plan(on: v.date, gym: v.gymID, calendar: calendar) != nil { plan = nil }
+    }
+
+    /// After the sets on a machine: what to do next time and how it felt; nil and empty words take them away.
+    public mutating func nextTime(visit visitID: UUID, machine machineID: UUID, set: GymSet?, note: String) {
+        guard var v = visits.first(where: { $0.id == visitID }),
+              let e = v.entries.lastIndex(where: { $0.machineID == machineID }) else { return }
+        let n = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        v.entries[e].nextTime = set
+        v.entries[e].note = n.isEmpty ? nil : n
+        put(v)
     }
 
     /// The heading and notes of a visit; empty words are kept as none.
@@ -420,7 +503,7 @@ public struct GymLog: Codable, Equatable, Sendable {
         removeFromPlan(id)
     }
 
-    public var photosInUse: Set<String> { Set(machines.compactMap(\.photo)) }
+    public var photosInUse: Set<String> { Set(machines.compactMap(\.photo) + machines.compactMap(\.instructions)) }
 }
 
 /// `gym.json`: `{"version":1,"machines":[…],"visits":[…],"busy":[…],"gyms":[…],"currentGym":…,"plan":…}`

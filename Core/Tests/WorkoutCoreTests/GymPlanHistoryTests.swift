@@ -161,4 +161,56 @@ final class GymPlanHistoryTests: XCTestCase {
         let bars = History.weekly(list, weeks: 4, now: day(3), calendar: cal)
         XCTAssertEqual(bars.map(\.sessions), [0, 1, 1, 1])
     }
+
+    // MARK: Time machines, next time, instructions
+
+    func testATimeMachineLogsTimeLevelAndIncline() throws {
+        let tread = Machine(name: "Treadmill", logs: .time)
+        var log = GymLog(machines: [tread])
+        // A new time machine starts at 20 minutes, level 5, no incline.
+        XCTAssertEqual(log.next(tread.id, in: GymVisit(date: day(3))).set, GymSet.starterTime)
+        let run = GymSet(seconds: 25 * 60, level: 8, incline: 2.5)
+        log.add(run, machine: tread.id, on: day(3), calendar: cal)
+        XCTAssertEqual(run.text, "25 min · level 8 · incline 2.5 %")
+        XCTAssertEqual(GymSet(seconds: 90, level: nil, incline: nil).text, "1:30 min")
+        XCTAssertEqual(log.visits[0].entries[0].text, "25 min · level 8 · incline 2.5 %")
+        // Time is no weight: no kilograms, no "new best".
+        XCTAssertEqual(log.visits[0].totalKg, 0)
+        XCTAssertNil(log.best(tread.id))
+        XCTAssertEqual(log.visits[0].minutesOnMachines, 25)
+        // Next time starts from last time's numbers.
+        XCTAssertEqual(log.next(tread.id, in: GymVisit(date: day(5))).set, run)
+        let back = try GymFile.decode(GymFile.encode(log))
+        XCTAssertEqual(back.machines[0].logs, .time)
+        XCTAssertEqual(back.visits[0].entries[0].sets, [run])
+    }
+
+    func testAnOldMachineLogsWeights() throws {
+        let old = Data(#"{"version":1,"machines":[{"id":"6A1D2E9C-1111-4C3B-9A51-0D5C7D2B9E01","name":"Row","setting":""}],"visits":[]}"#.utf8)
+        XCTAssertEqual(try GymFile.decode(old).machines[0].logs, .weights)
+    }
+
+    func testThePlanForNextTimeAndTheNoteShowNextTime() {
+        let row = Machine(name: "Seated row")
+        var log = GymLog(machines: [row])
+        log.add(GymSet(kg: 39, reps: 20), machine: row.id, on: day(3), calendar: cal)
+        let v = log.visits[0].id
+        log.nextTime(visit: v, machine: row.id, set: GymSet(kg: 45, reps: 15), note: " Easy, go up. ")
+        let entry = log.visits[0].entries[0]
+        XCTAssertEqual(entry.nextTime, GymSet(kg: 45, reps: 15))
+        XCTAssertEqual(entry.note, "Easy, go up.")
+        let next = log.next(row.id, in: GymVisit(date: day(6)))
+        XCTAssertEqual(next.set, GymSet(kg: 45, reps: 15))
+        XCTAssertEqual(next.reason, "Your plan from last time: 45 kg × 15")
+        XCTAssertEqual(log.last(row.id)?.entry.note, "Easy, go up.")
+        // Clearing both takes them away.
+        log.nextTime(visit: v, machine: row.id, set: nil, note: "")
+        XCTAssertNil(log.visits[0].entries[0].nextTime)
+        XCTAssertNil(log.visits[0].entries[0].note)
+    }
+
+    func testTheInstructionsPhotoIsKept() {
+        let log = GymLog(machines: [Machine(name: "Row", photo: "m.jpg", instructions: "i.jpg")])
+        XCTAssertEqual(log.photosInUse, ["m.jpg", "i.jpg"])
+    }
 }

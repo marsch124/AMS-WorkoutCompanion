@@ -92,9 +92,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.3 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.4 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.3"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.4"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -215,6 +215,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["gym-set-done"].tap()
         waitFor(app.buttons["gym-rest-skip"], label: "Skip rest")
         app.buttons["gym-rest-skip"].tap()
+        // Changing a set done (crashed before 1.4: read while changing).
+        app.buttons["gym-set-1"].tap()
+        app.buttons["set-edit-save"].tap()
         // Done with this machine goes straight on to the next planned one.
         waitFor(app.buttons["gym-machine-done"], label: "Done with this machine, next: Chest press")
         app.buttons["gym-machine-done"].tap()
@@ -230,10 +233,11 @@ final class WorkoutCompanionUITests: XCTestCase {
         waitFor(app.buttons["gym-place-menu"], label: "Gym: My gym")
         app.buttons["gym-place-menu"].tap()
         app.buttons["gym-place-new"].tap()
-        let name = app.textFields["gym-place-name"]
+        // Alert text fields do not take an identifier; find it inside the alert.
+        let name = app.alerts.firstMatch.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 3))
         name.typeText("Hotel gym")
-        app.buttons["gym-place-save"].tap()
+        app.alerts.firstMatch.buttons["Save"].firstMatch.tap()
         waitFor(app.buttons["gym-place-menu"], label: "Gym: Hotel gym")
         XCTAssertFalse(app.buttons["machine-Chest press"].exists)
 
@@ -258,9 +262,11 @@ final class WorkoutCompanionUITests: XCTestCase {
 
         // A Sets & reps workout ended early is kept too.
         app.buttons["workout-Push-ups"].tap()
+        waitFor(app.descendants(matching: .any)["run-set"], label: "Set 1 of 5")
         app.buttons["run-done"].tap()
+        waitFor(app.staticTexts["run-phase"], label: "REST")
         app.buttons["run-close"].tap()
-        app.buttons["run-end-confirm"].tap()
+        app.buttons["run-end-confirm"].firstMatch.tap()
 
         app.buttons["open-history"].tap()
         let first = app.buttons["history-row-1"]
@@ -271,5 +277,33 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["history-filter-gym"].tap()
         XCTAssertTrue(app.buttons["history-row-1"].label.hasPrefix("Chest day"))
         XCTAssertFalse(app.buttons["history-row-2"].exists && app.buttons["history-row-2"].label.hasPrefix("Push-ups"))
+    }
+
+    func testATimeMachineAndAPlanForNextTime() {
+        launchGymDemo()
+        // Last time's note shows on the machine.
+        app.buttons["machine-Lat pulldown"].tap()
+        XCTAssertTrue(app.staticTexts["gym-last-note"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["gym-suggestion"].label.contains("Your plan from last time"))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        app.buttons["machine-Treadmill"].tap()
+        XCTAssertTrue(app.staticTexts["gym-last"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["gym-last"].label.contains("25 min · level 8 · incline 2 %"), app.staticTexts["gym-last"].label)
+        XCTAssertTrue(app.buttons["gym-minutes-plus"].exists)
+        XCTAssertTrue(app.buttons["gym-incline-plus"].exists)
+        app.buttons["gym-minutes-plus"].tap()
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["gym-set-1"].label.contains("26 min"), app.buttons["gym-set-1"].label)
+
+        app.buttons["gym-next-time"].tap()
+        let note = app.textFields["next-time-note"]
+        XCTAssertTrue(note.waitForExistence(timeout: 3))
+        note.tap()
+        note.typeText("Felt easy")
+        app.buttons["next-time-save"].tap()
+        XCTAssertTrue(app.buttons["gym-next-time"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["gym-next-time"].label.contains("Felt easy"), app.buttons["gym-next-time"].label)
     }
 }

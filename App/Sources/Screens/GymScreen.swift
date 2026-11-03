@@ -27,8 +27,7 @@ struct GymCard: View {
     let open: () -> Void
 
     private var summary: String {
-        let today = library.gym.visit(on: Date())
-        if let today, today.setCount > 0 {
+        if let today = library.gym.visits.first(where: { Calendar.current.isDateInToday($0.date) && $0.setCount > 0 }) {
             return "Today: \(today.entries.count) machine\(today.entries.count == 1 ? "" : "s") · \(today.setCount) set\(today.setCount == 1 ? "" : "s")"
         }
         let n = library.gym.machines.count
@@ -65,7 +64,7 @@ struct GymCard: View {
     }
 }
 
-/// The gym: today's date, a photo tile per machine in any order, and Finish.
+/// The gym: which gym, today's date, an optional plan, a photo tile per machine in any order, and Finish.
 struct GymScreen: View {
     @Environment(Library.self) private var library
     @State private var day = Date()
@@ -73,8 +72,14 @@ struct GymScreen: View {
     @State private var newMachine: Machine?
     @State private var opened: MachineRef?
     @State private var summary: GymVisit?
+    @State private var planning = false
+    @State private var naming: GymNaming?
+    @State private var gymName = ""
 
-    private var visit: GymVisit? { library.gym.visit(on: day) }
+    private var gymID: UUID? { library.gym.currentGym?.id }
+    private var visit: GymVisit? { library.gym.visit(on: day, gym: gymID) }
+    private var machines: [Machine] { library.gym.machines(in: gymID) }
+    private var plan: DayPlan? { library.gym.plan(on: day, gym: gymID) }
     private var isToday: Bool { Calendar.current.isDateInToday(day) }
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
@@ -82,21 +87,21 @@ struct GymScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text(isToday ? "Today" : "Date")
-                        .font(.headline)
-                        .foregroundStyle(Gym.tint)
+                    gymMenu
                     Spacer()
                     DatePicker("Date", selection: $day, in: ...Date(), displayedComponents: .date)
                         .labelsHidden()
                         .accessibilityIdentifier("gym-date")
                 }
-                Text(library.gym.machines.isEmpty
+                Text(machines.isEmpty
                      ? "At each machine: take a photo, give it a name, then log your sets."
-                     : "Tap whichever machine is free.")
+                     : plan == nil ? "Tap whichever machine is free — or plan today's order." : "Follow the plan, or tap any machine that is free.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
 
-                let busy = library.gym.busy(on: day).compactMap { library.gym.machine($0) }
+                planSection
+
+                let busy = library.gym.busy(on: day).compactMap { library.gym.machine($0) }.filter { $0.gymID == gymID }
                 if !busy.isEmpty {
                     Text("Come back to")
                         .font(.headline)
@@ -105,16 +110,16 @@ struct GymScreen: View {
                     LazyVGrid(columns: columns, spacing: 8) {
                         ForEach(busy) { tile($0, busy: true) }
                     }
-                    if busy.count < library.gym.machines.count {
-                        Text("Other machines")
-                            .font(.headline)
-                            .foregroundStyle(Gym.tint)
-                            .padding(.top, 4)
-                    }
+                }
+                if !busy.isEmpty || plan != nil, busy.count < machines.count {
+                    Text(busy.isEmpty ? "All machines" : "Other machines")
+                        .font(.headline)
+                        .foregroundStyle(Gym.tint)
+                        .padding(.top, 4)
                 }
 
                 LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(library.gym.machines.filter { m in !busy.contains { $0.id == m.id } }) { tile($0, busy: false) }
+                    ForEach(machines.filter { m in !busy.contains { $0.id == m.id } }) { tile($0, busy: false) }
                     Button(action: addMachine) { NewMachineTile() }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("gym-new-machine")
@@ -122,14 +127,15 @@ struct GymScreen: View {
 
                 if let visit, visit.setCount > 0 {
                     Button { finish(visit) } label: {
-                        MarkLabel(title: "Finish", mark: .check, size: 22, colour: Gym.ink)
+                        MarkLabel(title: "Finish this session", mark: .check, size: 22, colour: Gym.ink)
                     }
                     .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 52))
                     .padding(.top, 6)
+                    .accessibilityLabel("Finish this session")
                     .accessibilityIdentifier("gym-finish")
                 }
 
-                let earlier = library.gym.visitsNewestFirst.filter { $0.id != visit?.id }
+                let earlier = library.gym.visits(in: gymID).filter { $0.id != visit?.id }
                 if !earlier.isEmpty {
                     Text("Earlier visits")
                         .font(.headline)
@@ -155,8 +161,19 @@ struct GymScreen: View {
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("At the gym")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if library.gym.gyms.isEmpty { library.changeGym { $0.ensureGym() } }
+        }
         .navigationDestination(item: $opened) { ref in
-            MachineScreen(machineID: ref.id, day: day)
+            MachineScreen(machineID: ref.id, day: day, gymID: gymID) { next in
+                if let next {
+                    library.changeGym { $0.setBusy(next, false, on: day) }
+                    opened = MachineRef(id: next)
+                } else {
+                    opened = nil
+                }
+            }
+            .id(ref.id)
         }
         .navigationDestination(for: GymVisit.self) { v in
             VisitScreen(visitID: v.id)
@@ -165,7 +182,7 @@ struct GymScreen: View {
             CameraPicker { data in
                 camera = false
                 guard let data else { return }
-                newMachine = Machine(photo: library.storePhoto(data))
+                newMachine = Machine(gymID: gymID, photo: library.storePhoto(data))
             }
             .ignoresSafeArea()
         }
@@ -185,14 +202,186 @@ struct GymScreen: View {
             }
             .environment(library)
         }
+        .sheet(isPresented: $planning) {
+            NavigationStack {
+                PlanSheet(machines: machines, order: plan?.order ?? []) { order in
+                    planning = false
+                    if let order { library.changeGym { $0.setPlan(order, on: day, gym: gymID) } }
+                }
+            }
+        }
+        .alert(naming == .new ? "New gym" : "Rename gym", isPresented: Binding(
+            get: { naming != nil }, set: { if !$0 { naming = nil } }
+        )) {
+            TextField("For example: City gym", text: $gymName)
+                .accessibilityIdentifier("gym-place-name")
+            Button("Cancel", role: .cancel) { naming = nil }
+                .accessibilityIdentifier("gym-place-cancel")
+            Button("Save") { saveGymName() }
+                .accessibilityIdentifier("gym-place-save")
+        } message: {
+            Text(naming == .new ? "Each gym has its own machines." : "")
+        }
+    }
+
+    // MARK: Which gym
+
+    private var gymMenu: some View {
+        Menu {
+            ForEach(library.gym.gyms) { g in
+                Button {
+                    library.changeGym { $0.currentGymID = g.id }
+                } label: {
+                    Text(g.id == gymID ? "\(g.name) — here now" : g.name)
+                }
+                .accessibilityIdentifier("gym-place-\(g.name)")
+            }
+            Divider()
+            Button("New gym…") {
+                gymName = ""
+                naming = .new
+            }
+            .accessibilityIdentifier("gym-place-new")
+            Button("Rename this gym…") {
+                gymName = library.gym.currentGym?.name ?? ""
+                naming = .rename
+            }
+            .accessibilityIdentifier("gym-place-rename")
+        } label: {
+            HStack(spacing: 6) {
+                Text(library.gym.currentGym?.name ?? GymLog.firstGymName)
+                    .font(.headline)
+                    .foregroundStyle(Gym.tint)
+                    .lineLimit(1)
+                ControlMarkView(.chevron, size: 12, colour: Gym.tint)
+                    .rotationEffect(.degrees(90))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Gym.fill.opacity(0.12), in: Capsule())
+        }
+        .accessibilityLabel("Gym: \(library.gym.currentGym?.name ?? GymLog.firstGymName)")
+        .accessibilityIdentifier("gym-place-menu")
+    }
+
+    private func saveGymName() {
+        let name = gymName.trimmingCharacters(in: .whitespacesAndNewlines)
+        defer { naming = nil }
+        guard !name.isEmpty else { return }
+        if naming == .new {
+            library.changeGym { $0.addGym(name) }
+        } else if let id = gymID {
+            library.changeGym { $0.renameGym(id, to: name) }
+        }
+    }
+
+    // MARK: Today's plan
+
+    @ViewBuilder private var planSection: some View {
+        if let plan {
+            let next = library.gym.upNext(on: day, gym: gymID)
+            HStack {
+                Text("Today's plan")
+                    .font(.headline)
+                    .foregroundStyle(Gym.tint)
+                Spacer()
+                Button("Change") { planning = true }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Gym.tint)
+                    .accessibilityIdentifier("gym-plan")
+            }
+            VStack(spacing: 0) {
+                ForEach(Array(plan.order.enumerated()), id: \.element) { i, id in
+                    if let m = library.gym.machine(id) {
+                        planRow(i, m, plan: plan, isNext: id == next)
+                        if i < plan.order.count - 1 { Divider().padding(.leading, 48) }
+                    }
+                }
+            }
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Gym.fill.opacity(0.5), lineWidth: 1))
+            Text("Touch and hold a machine: later, skip today or swap.")
+                .font(.caption)
+                .foregroundStyle(Theme.muted)
+        } else if !machines.isEmpty {
+            Button { planning = true } label: {
+                MarkLabel(title: "Plan today", mark: .list, size: 18, colour: Gym.tint)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Gym.tint)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .overlay(Capsule().stroke(Gym.fill, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("gym-plan")
+        }
+    }
+
+    private func planRow(_ i: Int, _ m: Machine, plan: DayPlan, isNext: Bool) -> some View {
+        let done = library.gym.isDone(m.id, on: day, gym: gymID)
+        let skipped = plan.skipped.contains(m.id)
+        let busy = library.gym.isBusy(m.id, on: day)
+        let status = done ? "done" : skipped ? "skipped today" : busy ? "busy" : isNext ? "up next" : nil
+        return Button { open(m.id) } label: {
+            HStack(spacing: 10) {
+                Text("\(i + 1)")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(isNext ? Gym.ink : Gym.tint)
+                    .frame(width: 26, height: 26)
+                    .background(isNext ? Gym.fill : Gym.fill.opacity(0.12), in: Circle())
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(m.name)
+                        .font(.body.weight(isNext ? .semibold : .regular))
+                        .foregroundStyle(skipped ? Theme.muted : Theme.ink)
+                        .strikethrough(skipped)
+                    if let status {
+                        Text(status.prefix(1).uppercased() + status.dropFirst())
+                            .font(.caption)
+                            .foregroundStyle(busy && !done ? Gym.busyTint : done ? Theme.muted : Gym.tint)
+                    }
+                }
+                Spacer()
+                if done {
+                    ControlMarkView(.check, size: 16, colour: Gym.tint)
+                } else {
+                    ControlMarkView(.chevron, size: 14, colour: Theme.muted)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(isNext ? Gym.fill.opacity(0.08) : .clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Later") { library.changeGym { $0.later(m.id) } }
+            Button(skipped ? "Back in today's plan" : "Skip today") { library.changeGym { $0.skip(m.id, !skipped) } }
+            let others = machines.filter { !plan.order.contains($0.id) }
+            if !others.isEmpty {
+                Menu("Swap for") {
+                    ForEach(others) { o in
+                        Button(o.name) { library.changeGym { $0.swap(m.id, for: o.id) } }
+                    }
+                }
+            }
+            Button("Remove from plan", role: .destructive) { library.changeGym { $0.removeFromPlan(m.id) } }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(i + 1), \(m.name)\(status.map { ", \($0)" } ?? "")")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("plan-row-\(i + 1)")
+    }
+
+    private func open(_ id: UUID) {
+        if library.gym.isBusy(id, on: day) { library.changeGym { $0.setBusy(id, false, on: day) } }
+        opened = MachineRef(id: id)
     }
 
     /// A machine's tile, with its own Busy button on the photo.
     private func tile(_ m: Machine, busy: Bool) -> some View {
         Button {
             // At the machine, it is free: the Busy mark has done its job.
-            if busy { library.changeGym { $0.setBusy(m.id, false, on: day) } }
-            opened = MachineRef(id: m.id)
+            open(m.id)
         } label: {
             MachineTile(machine: m, status: status(of: m), done: doneToday(m), busy: busy)
         }
@@ -216,7 +405,7 @@ struct GymScreen: View {
         if CameraPicker.available && !Cues.shared.quiet {
             camera = true
         } else {
-            newMachine = Machine()
+            newMachine = Machine(gymID: gymID)
         }
     }
 
@@ -227,20 +416,80 @@ struct GymScreen: View {
     private func status(of m: Machine) -> String {
         if let visit {
             let sets = visit.entries.filter { $0.machineID == m.id }.reduce(0) { $0 + $1.sets.count }
-            if sets > 0 { return "\(sets) set\(sets == 1 ? "" : "s") done" }
+            if sets > 0 { return m.logs == .time ? "Done today" : "\(sets) set\(sets == 1 ? "" : "s") done" }
         }
         if let last = library.gym.last(m.id, excluding: visit?.id) {
+            if m.logs == .time, let first = last.entry.sets.first { return "Last: \(first.text)" }
             return "Last: \(GymSet.weight(last.entry.heaviest))"
         }
         return "New"
     }
 
     private func finish(_ visit: GymVisit) {
-        var v = visit
-        v.finished = Date()
-        library.changeGym { $0.finish(visit: visit.id, at: v.finished!) }
+        let now = Date()
+        library.changeGym { $0.finish(visit: visit.id, at: now) }
         Cues.shared.finished("Well done")
-        summary = v
+        summary = library.gym.visits.first { $0.id == visit.id }
+    }
+}
+
+private enum GymNaming { case new, rename }
+
+/// Plan today: tap the machines in the order you want them. Nothing is kept until Save.
+private struct PlanSheet: View {
+    let machines: [Machine]
+    @State var order: [UUID]
+    let done: ([UUID]?) -> Void
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(machines) { m in
+                    let n = order.firstIndex(of: m.id).map { $0 + 1 }
+                    Button {
+                        if let i = order.firstIndex(of: m.id) { order.remove(at: i) } else { order.append(m.id) }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(n.map(String.init) ?? "")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Gym.ink)
+                                .frame(width: 26, height: 26)
+                                .background(n == nil ? AnyShapeStyle(Color.clear) : AnyShapeStyle(Gym.fill), in: Circle())
+                                .overlay(Circle().stroke(Gym.fill, lineWidth: n == nil ? 1.5 : 0))
+                            MachinePhoto(name: m.photo, height: 36)
+                                .frame(width: 36)
+                            Text(m.name).foregroundStyle(Theme.ink)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("plan-machine-\(m.name)")
+                }
+            } footer: {
+                Text("Tap the machines in the order you want them; tap again to take one out. You can still use any machine at the gym.")
+            }
+            if !order.isEmpty {
+                Section {
+                    Button("Clear the plan", role: .destructive) { order = [] }
+                        .accessibilityIdentifier("plan-clear")
+                }
+            }
+        }
+        .navigationTitle("Plan today")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { done(nil) }
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("plan-cancel")
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") { done(order) }
+                    .saveButton(Gym.fill)
+                    .accessibilityIdentifier("plan-save")
+            }
+        }
     }
 }
 
@@ -347,10 +596,11 @@ private struct VisitRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(visit.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year()))
+                Text(visit.title ?? visit.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year()))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Theme.ink)
-                Text("\(visit.entries.count) machine\(visit.entries.count == 1 ? "" : "s") · \(visit.setCount) set\(visit.setCount == 1 ? "" : "s")")
+                Text((visit.title == nil ? "" : visit.date.formatted(.dateTime.day().month(.abbreviated)) + " · ")
+                     + "\(visit.entries.count) machine\(visit.entries.count == 1 ? "" : "s") · \(visit.setCount) set\(visit.setCount == 1 ? "" : "s")")
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
             }
@@ -363,18 +613,37 @@ private struct VisitRow: View {
     }
 }
 
-/// One earlier visit: every machine with its sets.
+extension GymVisit {
+    /// "Tuesday at City gym" — the suggestion when there is no title yet.
+    func suggestedTitle(in log: GymLog) -> String {
+        let place = log.gyms.first { $0.id == gymID }?.name ?? "the gym"
+        return "\(date.formatted(.dateTime.weekday(.wide))) at \(place)"
+    }
+}
+
+/// One earlier visit: its title and notes, and every machine with its sets.
 struct VisitScreen: View {
     @Environment(Library.self) private var library
     let visitID: UUID
+    @State private var editing = false
 
     var body: some View {
         let visit = library.gym.visits.first { $0.id == visitID }
         List {
             if let visit {
+                if visit.title != nil || visit.notes != nil {
+                    Section {
+                        if let t = visit.title {
+                            Text(t).font(.headline).foregroundStyle(Gym.tint).accessibilityIdentifier("visit-title")
+                        }
+                        if let n = visit.notes {
+                            Text(n).font(.subheadline).accessibilityIdentifier("visit-notes")
+                        }
+                    }
+                }
                 Section {
                     ForEach(visit.entries) { e in
-                        HStack(spacing: 10) {
+                        HStack(alignment: .top, spacing: 10) {
                             MachinePhoto(name: library.gym.machine(e.machineID)?.photo, height: 40)
                                 .frame(width: 40)
                             VStack(alignment: .leading, spacing: 2) {
@@ -383,24 +652,51 @@ struct VisitScreen: View {
                                 Text(e.text)
                                     .font(.subheadline)
                                     .foregroundStyle(Theme.muted)
+                                if let next = e.nextTime {
+                                    Text("Next time: \(next.text)").font(.caption).foregroundStyle(Gym.tint)
+                                }
+                                if let note = e.note {
+                                    Text(note).font(.caption).foregroundStyle(Theme.ink)
+                                }
                             }
                         }
                     }
                 } footer: {
-                    Text("\(visit.setCount) sets · \(GymSet.number(visit.totalKg)) kg lifted in all")
+                    Text("\(visit.setCount) sets · \(GymSet.number(visit.totalKg)) kg lifted in all"
+                         + (visit.minutes.map { " · \($0) min" } ?? ""))
                 }
             }
         }
         .navigationTitle(visit?.date.formatted(date: .abbreviated, time: .omitted) ?? "Visit")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { editing = true } label: { ControlMarkView(.edit, size: 22, colour: Gym.tint) }
+                    .accessibilityLabel("Title and notes")
+                    .accessibilityIdentifier("visit-edit")
+            }
+        }
+        .sheet(isPresented: $editing) {
+            if let visit {
+                NavigationStack {
+                    NotesForm(placeholder: visit.suggestedTitle(in: library.gym), title: visit.title ?? "",
+                              notes: visit.notes ?? "", colour: Gym.fill) { result in
+                        editing = false
+                        if let result { library.changeGym { $0.describe(visit: visitID, title: result.title, notes: result.notes) } }
+                    }
+                }
+            }
+        }
     }
 }
 
-/// After Finish: what this visit came to.
+/// After Finish: what this session came to, and a title and notes for it.
 struct SummaryScreen: View {
     @Environment(Library.self) private var library
     let visitID: UUID
     let done: () -> Void
+    @State private var title = ""
+    @State private var notes = ""
 
     var body: some View {
         let visit = library.gym.visits.first { $0.id == visitID }
@@ -418,11 +714,23 @@ struct SummaryScreen: View {
             }
             if let visit {
                 Section {
+                    TextField(visit.suggestedTitle(in: library.gym), text: $title)
+                        .font(.headline)
+                        .accessibilityIdentifier("gym-summary-title")
+                    TextField("Notes — how it went, what to remember", text: $notes, axis: .vertical)
+                        .lineLimit(2...6)
+                        .accessibilityIdentifier("gym-summary-notes")
+                } header: {
+                    Text("Title and notes")
+                }
+                Section {
                     row("Machines", "\(visit.entries.count)", id: "gym-summary-machines")
                     row("Sets", "\(visit.setCount)", id: "gym-summary-sets")
-                    if let start = visit.started {
-                        let minutes = max(1, Int((visit.finished ?? Date()).timeIntervalSince(start) / 60))
+                    if let minutes = visit.minutes {
                         row("Time", "\(minutes) min", id: "gym-summary-time")
+                    }
+                    if visit.minutesOnMachines > 0 {
+                        row("On time machines", "\(visit.minutesOnMachines) min", id: "gym-summary-cardio")
                     }
                     row("Lifted in all", "\(GymSet.number(visit.totalKg)) kg", id: "gym-summary-total")
                 }
@@ -441,13 +749,20 @@ struct SummaryScreen: View {
                 }
             }
         }
-        .navigationTitle("Workout done")
+        .navigationTitle("Session done")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            title = visit?.title ?? ""
+            notes = visit?.notes ?? ""
+        }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Done", action: done)
-                    .saveButton()
-                    .accessibilityIdentifier("gym-summary-done")
+                Button("Done") {
+                    library.changeGym { $0.describe(visit: visitID, title: title, notes: notes) }
+                    done()
+                }
+                .saveButton(Gym.fill)
+                .accessibilityIdentifier("gym-summary-done")
             }
         }
     }
@@ -468,7 +783,8 @@ extension GymLog {
         let press = Machine(name: "Chest press", setting: "Seat 4, handles 2")
         let leg = Machine(name: "Leg press", setting: "Back rest 3")
         let lat = Machine(name: "Lat pulldown", setting: "Knee pad 5")
-        var log = GymLog(machines: [press, leg, lat])
+        let tread = Machine(name: "Treadmill", logs: .time)
+        var log = GymLog(machines: [press, leg, lat, tread])
         let plan: [(Int, UUID, Double, [Int])] = [
             (-14, press.id, 25, [12, 11, 10]), (-14, leg.id, 50, [12, 12, 12]),
             (-10, press.id, 27.5, [12, 10, 10]), (-10, lat.id, 30, [10, 10, 9]),
@@ -479,6 +795,13 @@ extension GymLog {
             let day = cal.date(byAdding: .day, value: days, to: now)!
             for r in reps { log.add(GymSet(kg: kg, reps: r), machine: id, on: day, now: day) }
         }
+        let last = cal.date(byAdding: .day, value: -3, to: now)!
+        log.add(GymSet(seconds: 25 * 60, level: 8, incline: 2), machine: tread.id, on: last, now: last)
+        for v in log.visits { log.finish(visit: v.id, at: v.date.addingTimeInterval(50 * 60)) }
+        if let v = log.visit(on: last) {
+            log.nextTime(visit: v.id, machine: lat.id, set: GymSet(kg: 32.5, reps: 10), note: "Last set was heavy — stay at 32.5.")
+        }
+        log.ensureGym()
         return log
     }
 }

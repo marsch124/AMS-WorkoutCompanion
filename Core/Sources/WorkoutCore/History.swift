@@ -78,6 +78,8 @@ public struct HistoryItem: Identifiable, Hashable, Sendable {
     public var colour: String
     /// What the filter chips group by: "gym" or the workout's id.
     public var group: String
+    /// The hand-drawn icon key: the gym's, or the workout kind's.
+    public var icon: String = "strength"
     public var title: String?
     public var notes: String?
     public var detail: String
@@ -112,7 +114,7 @@ public enum History {
         }
         let done = records.map { r in
             HistoryItem(source: .workout(r.id), date: r.started, name: r.name, colour: r.colour,
-                        group: r.workoutID?.uuidString ?? r.name, title: r.title, notes: r.notes,
+                        group: r.workoutID?.uuidString ?? r.name, icon: r.kind.iconKey, title: r.title, notes: r.notes,
                         detail: r.completed ? r.detail : r.detail + " · ended early",
                         minutes: r.minutes, kg: 0, completed: r.completed)
         }

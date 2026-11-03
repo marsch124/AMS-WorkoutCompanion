@@ -116,8 +116,12 @@ final class Library {
     // MARK: Gym
 
     /// Every change to the gym log goes through here and is written at once.
+    /// The change works on a copy, so a closure that reads `gym` (a screen's visit or gym) while
+    /// changing it cannot crash on overlapping access (the 1.4 plan-save crash).
     func changeGym(_ change: (inout GymLog) -> Void) {
-        change(&gym)
+        var log = gym
+        change(&log)
+        gym = log
         persistGym()
     }
 

@@ -10,9 +10,17 @@ struct MachineScreen: View {
     @Environment(Library.self) private var library
     let machineID: UUID
     let day: Date
+    let gymID: UUID?
+    /// Done with this machine: the next planned machine, or nil for back to the gym screen.
+    let moveOn: (UUID?) -> Void
 
     @State private var kg: Double = GymLog.starter.kg
     @State private var reps: Int = GymLog.starter.reps
+    @State private var minutes: Double = 20
+    @State private var level: Double = 5
+    @State private var incline: Double = 0
+    @State private var nextTimeOpen = false
+    @State private var zoomInstructions = false
     @State private var restEnd: Date?
     @State private var restLength: Double = Double(Gym.restSeconds)
     @State private var now = Date()
@@ -25,7 +33,14 @@ struct MachineScreen: View {
     private let clock = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     private var machine: Machine? { library.gym.machine(machineID) }
-    private var visit: GymVisit { library.gym.visit(on: day) ?? GymVisit(date: day) }
+    private var visit: GymVisit { library.gym.visit(on: day, gym: gymID) ?? GymVisit(gymID: gymID, date: day) }
+    private var entryToday: MachineEntry? { visit.entries.last { $0.machineID == machineID } }
+    private var isTime: Bool { machine?.logs == .time }
+    private var upNext: Machine? {
+        library.gym.upNext(on: day, gym: gymID, excluding: machineID).flatMap { library.gym.machine($0) }
+    }
+    /// Last time's number of sets: once reached, the rest offers the next machine.
+    private var target: Int? { library.gym.last(machineID, excluding: visit.id)?.entry.sets.count }
     private var today: [GymSet] { visit.entries.last { $0.machineID == machineID }?.sets ?? [] }
     private var next: NextSet { library.gym.next(machineID, in: visit) }
 
@@ -39,11 +54,24 @@ struct MachineScreen: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("gym-photo")
 
-                    if !machine.setting.isEmpty {
-                        Text(machine.setting)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Gym.tint)
-                            .accessibilityIdentifier("gym-setting")
+                    HStack(alignment: .top) {
+                        if !machine.setting.isEmpty {
+                            Text(machine.setting)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Gym.tint)
+                                .accessibilityIdentifier("gym-setting")
+                        }
+                        Spacer()
+                        if machine.instructions != nil {
+                            Button { zoomInstructions = true } label: {
+                                HStack(spacing: 6) {
+                                    MachinePhoto(name: machine.instructions, height: 34).frame(width: 34)
+                                    Text("Instructions").font(.subheadline.weight(.semibold)).foregroundStyle(Gym.tint)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("gym-instructions")
+                        }
                     }
                 }
                 lastTime
@@ -63,8 +91,15 @@ struct MachineScreen: View {
 
                 if let restEnd {
                     rest(until: restEnd)
+                } else if isTime {
+                    timeEntry
                 } else {
                     entry
+                }
+
+                if !today.isEmpty {
+                    nextTimeRow
+                    doneButton
                 }
 
                 history
@@ -125,16 +160,40 @@ struct MachineScreen: View {
         .fullScreenCover(isPresented: $zoom) {
             ZoomedMachine(name: machine?.photo) { zoom = false }
         }
+        .fullScreenCover(isPresented: $zoomInstructions) {
+            ZoomedMachine(name: machine?.instructions) { zoomInstructions = false }
+        }
+        .sheet(isPresented: $nextTimeOpen) {
+            NavigationStack {
+                NextTimeForm(isTime: isTime,
+                             set: entryToday?.nextTime ?? today.last ?? next.set,
+                             note: entryToday?.note ?? "") { result in
+                    nextTimeOpen = false
+                    if let result {
+                        library.changeGym { $0.nextTime(visit: visit.id, machine: machineID, set: result.set, note: result.note) }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
     }
 
     // MARK: Parts
 
     @ViewBuilder private var lastTime: some View {
         if let last = library.gym.last(machineID, excluding: visit.id) {
-            Text("Last time, \(last.visit.date.formatted(.dateTime.day().month(.abbreviated))): \(last.entry.text)")
-                .font(.subheadline)
-                .foregroundStyle(Theme.muted)
-                .accessibilityIdentifier("gym-last")
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Last time, \(last.visit.date.formatted(.dateTime.day().month(.abbreviated))): \(last.entry.text)")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.muted)
+                    .accessibilityIdentifier("gym-last")
+                if let note = last.entry.note {
+                    Text("“\(note)”")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.ink)
+                        .accessibilityIdentifier("gym-last-note")
+                }
+            }
         } else {
             Text("First time on this machine.")
                 .font(.subheadline)
@@ -231,6 +290,15 @@ struct MachineScreen: View {
             Text("Next: set \(today.count + 1) · \(GymSet(kg: kg, reps: reps).text)")
                 .font(.subheadline)
                 .foregroundStyle(Theme.muted)
+            if let target, today.count >= target {
+                // As many sets as last time: offer to move on.
+                Button { moveOn(upNext?.id) } label: {
+                    MarkLabel(title: upNext.map { "Next machine: \($0.name)" } ?? "Done with this machine",
+                              mark: .chevron, size: 16, colour: Gym.ink)
+                }
+                .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 48))
+                .accessibilityIdentifier("gym-next-machine")
+            }
             HStack(spacing: 10) {
                 Button("+15 s") {
                     restEnd = end.addingTimeInterval(15)
@@ -239,7 +307,7 @@ struct MachineScreen: View {
                 .buttonStyle(SoftButtonStyle(height: 48))
                 .accessibilityIdentifier("gym-rest-more")
                 Button { restEnd = nil } label: {
-                    MarkLabel(title: "Skip", mark: .skip, colour: Gym.ink)
+                    MarkLabel(title: "Skip rest", mark: .skip, colour: Gym.ink)
                 }
                 .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 48))
                 .accessibilityIdentifier("gym-rest-skip")
@@ -248,6 +316,90 @@ struct MachineScreen: View {
         .frame(maxWidth: .infinity)
         .padding(12)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// Time, level and incline — for a treadmill, a rowing machine, a bike.
+    private var timeEntry: some View {
+        VStack(spacing: 10) {
+            Text(today.isEmpty ? "Time" : "Again")
+                .font(.headline)
+                .foregroundStyle(Gym.tint)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("gym-next-set")
+            Stepper2(title: "min", id: "gym-minutes",
+                     minus: { minutes = max(1, minutes - 1) }, plus: { minutes += 1 }) {
+                TextField("0", value: $minutes, format: .number.precision(.fractionLength(0...1)))
+                    .keyboardType(.decimalPad)
+                    .focused($typing)
+            }
+            Stepper2(title: "level", id: "gym-level",
+                     minus: { level = max(0, level - 1) }, plus: { level += 1 }) {
+                TextField("0", value: $level, format: .number.precision(.fractionLength(0...1)))
+                    .keyboardType(.decimalPad)
+                    .focused($typing)
+            }
+            Stepper2(title: "% incline", id: "gym-incline",
+                     minus: { incline = max(0, incline - 0.5) }, plus: { incline += 0.5 }) {
+                TextField("0", value: $incline, format: .number.precision(.fractionLength(0...1)))
+                    .keyboardType(.decimalPad)
+                    .focused($typing)
+            }
+            Button(action: timeDone) {
+                MarkLabel(title: "Done", mark: .check, size: 24, colour: Gym.ink)
+            }
+            .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
+            .accessibilityIdentifier("gym-set-done")
+            if today.isEmpty {
+                Text("Level is the machine's level or speed; incline only when it has one.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+            }
+        }
+        .padding(12)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Gym.fill.opacity(0.5), lineWidth: 1))
+    }
+
+    /// How it felt, and what to do next time — shown here the next time as "Last time".
+    private var nextTimeRow: some View {
+        Button { nextTimeOpen = true } label: {
+            HStack(spacing: 10) {
+                IconMark(.hand("notebook"), size: 22, colour: Gym.tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    if let planned = entryToday?.nextTime {
+                        Text("Next time: \(planned.text)").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
+                    } else {
+                        Text("How did it feel? Next time…").font(.subheadline.weight(.semibold)).foregroundStyle(Gym.tint)
+                    }
+                    if let note = entryToday?.note {
+                        Text(note).font(.caption).foregroundStyle(Theme.muted).lineLimit(2)
+                    }
+                }
+                Spacer()
+                ControlMarkView(.edit, size: 16, colour: Gym.tint)
+            }
+            .padding(10)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.line, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("gym-next-time")
+    }
+
+    private var doneButton: some View {
+        Button { moveOn(upNext?.id) } label: {
+            VStack(spacing: 1) {
+                Text("Done with this machine").font(.headline)
+                if let upNext {
+                    Text("Next: \(upNext.name)").font(.caption).foregroundStyle(Theme.muted)
+                }
+            }
+            .foregroundStyle(Gym.tint)
+        }
+        .buttonStyle(SoftButtonStyle(height: 52))
+        .accessibilityLabel(upNext.map { "Done with this machine, next: \($0.name)" } ?? "Done with this machine")
+        .accessibilityIdentifier("gym-machine-done")
     }
 
     @ViewBuilder private var history: some View {
@@ -291,8 +443,22 @@ struct MachineScreen: View {
 
     private func prefill() {
         let n = next.set
-        kg = n.kg
-        reps = n.reps
+        if let seconds = n.seconds {
+            minutes = Double(seconds) / 60
+            level = n.level ?? 0
+            incline = n.incline ?? 0
+        } else {
+            kg = n.kg
+            reps = n.reps
+        }
+    }
+
+    private func timeDone() {
+        typing = false
+        let set = GymSet(seconds: max(1, Int((minutes * 60).rounded())), level: level, incline: incline)
+        library.changeGym { $0.add(set, machine: machineID, on: day) }
+        Cues.shared.tap()
+        Cues.shared.finished("Done")
     }
 
     private func setDone() {
@@ -404,6 +570,66 @@ private struct SetEditor: View {
     }
 }
 
+/// After the sets: what to do next time and how it felt. Nothing is kept until Save.
+private struct NextTimeForm: View {
+    let isTime: Bool
+    @State var set: GymSet
+    @State var note: String
+    @State private var planned = true
+    let done: ((set: GymSet?, note: String)?) -> Void
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("A plan for next time", isOn: $planned)
+                    .tint(Gym.fill)
+                    .accessibilityIdentifier("next-time-on")
+                if planned {
+                    if isTime {
+                        Stepper("Minutes: \(GymSet.duration(set.seconds ?? 0))",
+                                onIncrement: { set.seconds = (set.seconds ?? 0) + 60 },
+                                onDecrement: { set.seconds = max(60, (set.seconds ?? 0) - 60) })
+                        Stepper("Level: \(GymSet.number(set.level ?? 0))",
+                                onIncrement: { set.level = (set.level ?? 0) + 1 },
+                                onDecrement: { set.level = max(0, (set.level ?? 0) - 1) })
+                        Stepper("Incline: \(GymSet.number(set.incline ?? 0)) %",
+                                onIncrement: { set.incline = (set.incline ?? 0) + 0.5 },
+                                onDecrement: { set.incline = max(0, (set.incline ?? 0) - 0.5) })
+                    } else {
+                        Stepper("Weight: \(GymSet.weight(set.kg))",
+                                onIncrement: { set.kg += GymLog.step },
+                                onDecrement: { set.kg = max(0, set.kg - GymLog.step) })
+                            .accessibilityIdentifier("next-time-kg")
+                        Stepper("Reps: \(set.reps)", value: $set.reps, in: 1...500)
+                            .accessibilityIdentifier("next-time-reps")
+                    }
+                }
+            } footer: {
+                Text("Next time this machine starts with these numbers.")
+            }
+            Section("How did it feel?") {
+                TextField("For example: easy — go up next time", text: $note, axis: .vertical)
+                    .lineLimit(2...6)
+                    .accessibilityIdentifier("next-time-note")
+            }
+        }
+        .navigationTitle("Next time")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { done(nil) }
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("next-time-cancel")
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") { done((planned ? set : nil, note)) }
+                    .saveButton(Gym.fill)
+                    .accessibilityIdentifier("next-time-save")
+            }
+        }
+    }
+}
+
 /// New machine or change one: photo, name, setting. Nothing is kept until Save.
 struct MachineForm: View {
     @Environment(Library.self) private var library
@@ -414,6 +640,8 @@ struct MachineForm: View {
     @State private var camera = false
     @State private var pick: PhotosPickerItem?
     @State private var askDelete = false
+    @State private var instructionsCamera = false
+    @State private var instructionsPick: PhotosPickerItem?
 
     init(machine: Machine, isNew: Bool, done: @escaping (Machine?) -> Void) {
         _draft = State(initialValue: machine)
@@ -459,6 +687,43 @@ struct MachineForm: View {
             } footer: {
                 Text("Shown each time you use the machine.")
             }
+            Section {
+                Picker("Logs", selection: $draft.logs) {
+                    Text("Weight × reps").tag(MachineLogs.weights)
+                    Text("Time").tag(MachineLogs.time)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("machine-logs")
+            } header: {
+                Text("What you log")
+            } footer: {
+                Text(draft.logs == .time ? "Minutes, level and incline — for a treadmill, rowing machine or bike." : "Weight and reps per set.")
+            }
+            Section {
+                if draft.instructions != nil {
+                    MachinePhoto(name: draft.instructions, height: 160)
+                        .listRowInsets(EdgeInsets())
+                }
+                if CameraPicker.available {
+                    Button { instructionsCamera = true } label: {
+                        MarkLabel(title: draft.instructions == nil ? "Take photo of the instructions" : "Take it again",
+                                  mark: .photo, colour: Gym.tint)
+                    }
+                    .accessibilityIdentifier("machine-instructions-camera")
+                }
+                PhotosPicker(selection: $instructionsPick, matching: .images) {
+                    MarkLabel(title: "Choose from Photos", mark: .photo, colour: Gym.tint)
+                }
+                .accessibilityIdentifier("machine-instructions-photos")
+                if draft.instructions != nil {
+                    Button("Remove instructions photo", role: .destructive) { draft.instructions = nil }
+                        .accessibilityIdentifier("machine-instructions-remove")
+                }
+            } header: {
+                Text("Instructions")
+            } footer: {
+                Text("The plate on the machine that shows how to use it.")
+            }
             if !isNew {
                 Section {
                     Button("Delete machine", role: .destructive) { askDelete = true }
@@ -491,6 +756,21 @@ struct MachineForm: View {
             CameraPicker { data in
                 camera = false
                 if let data, let name = library.storePhoto(data) { draft.photo = name }
+            }
+            .ignoresSafeArea()
+        }
+        .onChange(of: instructionsPick) { _, item in
+            Task {
+                if let data = try? await item?.loadTransferable(type: Data.self),
+                   let name = library.storePhoto(data) {
+                    draft.instructions = name
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $instructionsCamera) {
+            CameraPicker { data in
+                instructionsCamera = false
+                if let data, let name = library.storePhoto(data) { draft.instructions = name }
             }
             .ignoresSafeArea()
         }
