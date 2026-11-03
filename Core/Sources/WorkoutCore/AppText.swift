@@ -10,6 +10,11 @@ public struct Release: Sendable, Equatable {
 /// The words of Settings: What's new (every version, newest first) and How it works.
 public enum AppText {
     public static let releases: [Release] = [
+        Release(version: "1.9.1", date: "3 November 2026", items: [
+            "Fixed: the Train / History / Settings bar no longer covers the bottom of a page. \"Exercise done\" on a machine was hidden underneath it, and so was the last session in History.",
+            "Changed: a gym visit in History is now colourful: the day and gym on an indigo card with tiles for time, sets, kilograms lifted and machines; a New best line; and a card per machine with its muscle group in colour, each set as a small chip, the plan for next time and your note.",
+            "Changed: while you type, the keyboard takes the place of the bar at the bottom.",
+        ]),
         Release(version: "1.9", date: "3 November 2026", items: [
             "New: statistics in History. A \"This week | This month\" switch over colourful tiles: sessions, minutes, exercises (one per machine per visit), sets and kilograms lifted.",
             "New: muscle groups. Each machine or exercise can have one — chest, back, shoulders, arms, legs, core or cardio — chosen in its edit page under \"Muscle group\". History shows sets per muscle group as coloured bars. Time machines without a group count as cardio; others show as \"Not chosen\" with a hint.",

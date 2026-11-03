@@ -8,18 +8,28 @@ struct RootView: View {
     enum Tab { case train, history, settings }
     @State private var tab = Tab.train
 
+    @State private var typing = false
+
     var body: some View {
-        ZStack {
-            // Train stays alive underneath, so the gym keeps its place; History and Settings sit on top
-            // only while chosen — a hidden page with its own navigation above caught every tap (1.5 test).
-            HomeScreen()
-                .opacity(tab == .train ? 1 : 0)
-                .allowsHitTesting(tab == .train)
-                .accessibilityHidden(tab != .train)
-            if tab == .history { NavigationStack { HistoryScreen() } }
-            if tab == .settings { NavigationStack { SettingsScreen() } }
+        // The pages end above the tab bar (1.9.1): as a safe-area inset the bar covered the bottom of
+        // pushed pages — "Exercise done" and the last History session sat underneath it on his iPhone.
+        VStack(spacing: 0) {
+            ZStack {
+                // Train stays alive underneath, so the gym keeps its place; History and Settings sit on top
+                // only while chosen — a hidden page with its own navigation above caught every tap (1.5 test).
+                HomeScreen()
+                    .opacity(tab == .train ? 1 : 0)
+                    .allowsHitTesting(tab == .train)
+                    .accessibilityHidden(tab != .train)
+                if tab == .history { NavigationStack { HistoryScreen() } }
+                if tab == .settings { NavigationStack { SettingsScreen() } }
+            }
+            .frame(maxHeight: .infinity)
+            // While typing, the keyboard takes the bar's place.
+            if !typing { bar }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { bar }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in typing = true }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in typing = false }
         .overlay(alignment: .bottom) {
             if let point = library.undoPoint {
                 UndoBar(point: point)

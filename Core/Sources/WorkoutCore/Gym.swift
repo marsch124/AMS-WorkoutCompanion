@@ -24,6 +24,19 @@ public enum Muscle: String, Codable, CaseIterable, Sendable {
     case chest, back, shoulders, arms, legs, core, cardio
 
     public var title: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
+
+    /// Its colour in History and on a visit (an AMS-Icons colour key), the same everywhere.
+    public var colourKey: String {
+        switch self {
+        case .chest: "red"
+        case .back: "blue"
+        case .shoulders: "orange"
+        case .arms: "pink"
+        case .legs: "green"
+        case .core: "olive"
+        case .cardio: "violet"
+        }
+    }
 }
 
 /// A machine or exercise at the gym, with its photo and how it is set up.

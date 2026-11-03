@@ -7,13 +7,14 @@ final class ReplayUITests: XCTestCase {
         try XCTSkipIf(path.isEmpty, "Only when replaying")
         let app = XCUIApplication()
         app.launchArguments = ["-uitest", "-gymfile", path]
+        if let photos = ProcessInfo.processInfo.environment["REPLAY_PHOTOS"] { app.launchArguments += ["-photosdir", photos] }
         app.launch()
         app.buttons["open-gym"].tap()
         let plan = app.buttons["gym-plan"]
         XCTAssertTrue(plan.waitForExistence(timeout: 5))
         plan.tap()
-        Thread.sleep(forTimeInterval: 1)
-        add(XCTAttachment(screenshot: app.screenshot()))
+        Thread.sleep(forTimeInterval: 1.5)
+        let sheet = XCTAttachment(screenshot: app.screenshot()); sheet.lifetime = .keepAlways; add(sheet)
         for n in ["Dumbbell", "Hantel", "Vitruvian"] {
             let b = app.buttons["plan-machine-\(n)"]
             XCTAssertTrue(b.waitForExistence(timeout: 3), n)

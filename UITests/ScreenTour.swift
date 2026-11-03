@@ -245,4 +245,21 @@ final class ScreenTour: XCTestCase {
         app.swipeUp()
         snap("33 Badges")
     }
+
+    /// 1.9.1: Exercise done above the tab bar, and the colourful gym visit.
+    func testNewIn191Tour() {
+        app.launchArguments += ["-gymdemo"]
+        app.launch()
+        app.buttons["open-gym"].tap()
+        app.buttons["machine-Lat pulldown"].tap()
+        XCTAssertTrue(app.buttons["machine-done-pill"].waitForExistence(timeout: 5))
+        snap("34 Exercise done visible")
+        app.buttons["machine-done-pill"].tap()
+        app.buttons["open-history"].tap()
+        let row = app.buttons["history-row-1"]
+        for _ in 0..<6 where !row.isHittable { app.swipeUp() }
+        row.tap()
+        XCTAssertTrue(app.staticTexts["visit-sets"].waitForExistence(timeout: 5))
+        snap("35 Gym visit")
+    }
 }

@@ -709,46 +709,47 @@ struct VisitScreen: View {
     let visitID: UUID
     @State private var editing = false
 
+    // A colourful page (1.9.1, his "This history page is boring"): the visit in tiles, then a card per machine.
     var body: some View {
         let visit = library.gym.visits.first { $0.id == visitID }
-        List {
+        ScrollView {
             if let visit {
-                if visit.title != nil || visit.notes != nil {
-                    Section {
-                        if let t = visit.title {
-                            Text(t).font(.headline).foregroundStyle(Gym.tint).accessibilityIdentifier("visit-title")
+                VStack(alignment: .leading, spacing: 10) {
+                    header(visit)
+                    let bests = library.gym.newBests(in: visit)
+                    if !bests.isEmpty {
+                        HStack(spacing: 8) {
+                            IconMark(.hand("trophy"), size: 22, colour: Gym.tint)
+                            Text("New best: " + bests.compactMap { library.gym.machine($0)?.name }.joined(separator: ", "))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.ink)
                         }
-                        if let n = visit.notes {
-                            Text(n).font(.subheadline).accessibilityIdentifier("visit-notes")
-                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Gym.fill.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("visit-bests")
                     }
-                }
-                Section {
-                    ForEach(visit.entries) { e in
-                        HStack(alignment: .top, spacing: 10) {
-                            MachinePhoto(name: library.gym.machine(e.machineID)?.photo, height: 40, icon: library.gym.machine(e.machineID)?.icon)
-                                .frame(width: 40)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(library.gym.machine(e.machineID)?.name ?? "Machine")
-                                    .font(.body.weight(.semibold))
-                                Text(library.gym.text(e))
-                                    .font(.subheadline)
-                                    .foregroundStyle(Theme.muted)
-                                if let next = e.nextTime {
-                                    Text("Next time: \(library.gym.text(next, machine: e.machineID))").font(.caption).foregroundStyle(Gym.tint)
-                                }
-                                if let note = e.note {
-                                    Text(note).font(.caption).foregroundStyle(Theme.ink)
-                                }
+                    if visit.title != nil || visit.notes != nil {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let t = visit.title {
+                                Text(t).font(.headline).foregroundStyle(Gym.tint).accessibilityIdentifier("visit-title")
+                            }
+                            if let n = visit.notes {
+                                Text(n).font(.subheadline).foregroundStyle(Theme.ink).accessibilityIdentifier("visit-notes")
                             }
                         }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                } footer: {
-                    Text("\(visit.setCount) sets · \(GymSet.number(visit.totalKg)) kg lifted in all"
-                         + (visit.minutes.map { " · \($0) min" } ?? ""))
+                    ForEach(visit.entries) { e in machineCard(e) }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
         }
+        .background(Theme.bg.ignoresSafeArea())
         .navigationTitle(visit?.date.formatted(date: .abbreviated, time: .omitted) ?? "Visit")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -769,6 +770,142 @@ struct VisitScreen: View {
                 }
             }
         }
+    }
+
+    private func header(_ visit: GymVisit) -> some View {
+        let place = library.gym.gyms.first { $0.id == visit.gymID }?.name ?? "At the gym"
+        return VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(visit.date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(Gym.ink)
+                Text(place).font(.subheadline.weight(.semibold)).foregroundStyle(Gym.ink.opacity(0.85))
+            }
+            HStack(spacing: 8) {
+                tile("Time", visit.minutes.map { "\($0) min" } ?? "–", "green", id: "visit-time")
+                tile("Sets", "\(visit.setCount)", "orange", id: "visit-sets")
+            }
+            HStack(spacing: 8) {
+                tile("Lifted", "\(GymSet.number(visit.totalKg)) kg", "plum", id: "visit-kg")
+                tile("Machines", "\(visit.entries.count)", "blue", id: "visit-machines")
+            }
+        }
+        .padding(12)
+        .background(Gym.fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func tile(_ title: String, _ value: String, _ colour: String, id: String) -> some View {
+        let c = IconColour.of(key: colour) ?? Gym.busy
+        return VStack(alignment: .leading, spacing: 0) {
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(c.inkColor.opacity(0.85))
+            Text(value).font(.title3.weight(.bold)).monospacedDigit().foregroundStyle(c.inkColor)
+                .accessibilityIdentifier(id)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(c.fillColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func machineCard(_ e: MachineEntry) -> some View {
+        let m = library.gym.machine(e.machineID)
+        let muscle = m?.muscle ?? (m?.logs == .time ? .cardio : nil)
+        let accent = muscle.flatMap { IconColour.of(key: $0.colourKey) }?.fillColor ?? Gym.fill
+        return HStack(alignment: .top, spacing: 10) {
+            MachinePhoto(name: m?.photo, height: 56, icon: m?.icon)
+                .frame(width: 56)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text(m?.name ?? "Machine").font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
+                    if let muscle {
+                        Text(muscle.title)
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(accent)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .overlay(Capsule().stroke(accent, lineWidth: 1))
+                    }
+                }
+                // Each set as a small chip: "32,5 × 12".
+                FlowChips(items: e.sets.map { set in
+                    set.isTime || m?.logs == .reps ? library.gym.text(set, machine: e.machineID)
+                        : "\(set.kg <= 0 ? "BW" : GymSet.number(set.kg)) × \(set.reps)"
+                }, colour: accent)
+                if let next = e.nextTime {
+                    Text("Next time: \(library.gym.text(next, machine: e.machineID))")
+                        .font(.caption.weight(.semibold)).foregroundStyle(Gym.tint)
+                }
+                if let note = e.note {
+                    Text("“\(note)”").font(.caption).foregroundStyle(Theme.ink)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2).fill(accent).frame(width: 4).padding(.vertical, 10)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("visit-machine-\(m?.name ?? "")")
+    }
+}
+
+/// Small capsules that wrap onto the next line.
+private struct FlowChips: View {
+    let items: [String]
+    let colour: Color
+
+    var body: some View {
+        ChipLayout(spacing: 5) {
+            ForEach(Array(items.enumerated()), id: \.offset) { _, t in
+                Text(t)
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(colour.opacity(0.16), in: Capsule())
+            }
+        }
+    }
+}
+
+private struct ChipLayout: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        rows(proposal.width ?? 300, subviews).last.map { CGSize(width: proposal.width ?? 300, height: $0.y + $0.h) } ?? .zero
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (i, p) in place(bounds.width, subviews).enumerated() {
+            subviews[i].place(at: CGPoint(x: bounds.minX + p.x, y: bounds.minY + p.y), proposal: .unspecified)
+        }
+    }
+
+    private func place(_ width: CGFloat, _ subviews: Subviews) -> [CGPoint] {
+        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0, out: [CGPoint] = []
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > 0 && x + s.width > width { x = 0; y += rowH + spacing; rowH = 0 }
+            out.append(CGPoint(x: x, y: y))
+            x += s.width + spacing
+            rowH = max(rowH, s.height)
+        }
+        return out
+    }
+
+    private func rows(_ width: CGFloat, _ subviews: Subviews) -> [(y: CGFloat, h: CGFloat)] {
+        var y: CGFloat = 0, x: CGFloat = 0, rowH: CGFloat = 0, out: [(CGFloat, CGFloat)] = []
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > 0 && x + s.width > width { out.append((y, rowH)); x = 0; y += rowH + spacing; rowH = 0 }
+            x += s.width + spacing
+            rowH = max(rowH, s.height)
+        }
+        if !subviews.isEmpty { out.append((y, rowH)) }
+        return out.map { (y: $0.0, h: $0.1) }
     }
 }
 

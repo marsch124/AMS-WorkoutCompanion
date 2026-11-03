@@ -96,4 +96,33 @@ final class FormsUITests: XCTestCase {
         for _ in 0..<6 where mine.count == 0 { app.swipeUp() }
         XCTAssertGreaterThan(mine.count, 0)
     }
+
+    // MARK: 1.9.1
+
+    func testNothingHidesUnderTheTabBar() {
+        launchGymDemo()
+        app.buttons["machine-Lat pulldown"].tap()
+        let pill = app.buttons["machine-done-pill"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 5))
+        let bar = app.buttons["open-train"].frame.minY
+        XCTAssertLessThanOrEqual(pill.frame.maxY, bar + 1, "Exercise done is under the tab bar")
+        pill.tap()
+        XCTAssertTrue(app.buttons["gym-new-machine"].waitForExistence(timeout: 5))
+        app.buttons["open-history"].tap()
+        for _ in 0..<8 { app.swipeUp() }
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'history-row-'"))
+        let last = rows.element(boundBy: rows.count - 1)
+        XCTAssertLessThanOrEqual(last.frame.maxY, app.buttons["open-history"].frame.minY + 1, "the last session is under the tab bar")
+    }
+
+    func testAGymVisitShowsTilesAndAMachineCard() {
+        launchGymDemo()
+        app.buttons["open-history"].tap()
+        let row = app.buttons["history-row-1"]
+        for _ in 0..<6 where !row.isHittable { app.swipeUp() }
+        row.tap()
+        XCTAssertTrue(app.staticTexts["visit-sets"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["visit-kg"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["visit-machine-Chest press"].exists)
+    }
 }

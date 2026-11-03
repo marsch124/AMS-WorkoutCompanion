@@ -11,7 +11,7 @@ An iPhone companion for workouts that change from day to day. Three kinds:
 | **Backups** (1.6) | keeping everything safe | Settings → Backups: **Back up now** makes one file (workouts, gym log, history, photos) to save in Files or iCloud Drive; **Restore from a file…** after a check and a question, keeping today's data aside; a weekly copy on the iPhone (newest 4); 1.7: **automatic backup** once a day to a folder you choose (iCloud Drive), newest 7 |
 | **History** (1.4, own tab 1.5) | what you did and when | every gym session and every other workout, newest first, with colourful filters, this week as four coloured tiles, month, and minutes per week for 8 weeks |
 
-Version 1.9. The app has three tabs (1.5): Train, History and Settings. Every workout has its own colour and hand-drawn icon from the shared AMS icon hub
+Version 1.9.1. The app has three tabs (1.5): Train, History and Settings. Every workout has its own colour and hand-drawn icon from the shared AMS icon hub
 ([AMS-Icons](https://github.com/marsch124/AMS-Icons)). Settings has How it works, What's new
 and the version. Full description: [`docs/specification.md`](docs/specification.md).
 Sound, vibration and spoken cues ("Set 2 of 5. 20 reps.", "Rest", "Last round. Go!"),

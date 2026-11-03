@@ -86,6 +86,10 @@ final class Library {
                i + 1 < ProcessInfo.processInfo.arguments.count {
                 try? fm.copyItem(atPath: ProcessInfo.processInfo.arguments[i + 1], toPath: dir.appendingPathComponent("gym.json").path)
             }
+            if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "-photosdir"),
+               i + 1 < ProcessInfo.processInfo.arguments.count {
+                try? fm.copyItem(atPath: ProcessInfo.processInfo.arguments[i + 1], toPath: dir.appendingPathComponent("Photos").path)
+            }
             return Library(folder: dir)
         }
         let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
