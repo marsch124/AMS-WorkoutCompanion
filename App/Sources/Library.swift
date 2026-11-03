@@ -41,8 +41,10 @@ final class Library {
                 try? fm.copyItem(at: file, to: aside)
             }
         } else {
+            // Saved below, once the gym log is read: saving now would tidy away every gym photo,
+            // since the gym log is still empty here (found 3 Nov 2026 replaying his backup).
             workouts = Starters.all
-            persist()
+            needsFirstSave = true
         }
         if let data = try? Data(contentsOf: gymFile) {
             if let log = try? GymFile.decode(data) {
@@ -62,7 +64,14 @@ final class Library {
                 try? fm.copyItem(at: historyFile, to: aside)
             }
         }
+        if needsFirstSave {
+            needsFirstSave = false
+            persist()
+        }
     }
+
+    /// The starter workouts still have to be written (a first launch, or a backup without workouts).
+    private var needsFirstSave = false
 
     /// True when history.json could not be read: it is kept aside and never overwritten.
     private var historyUnreadable = false
@@ -77,9 +86,24 @@ final class Library {
             let dir = fm.temporaryDirectory.appendingPathComponent("uitest", isDirectory: true)
             try? fm.removeItem(at: dir)
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-            if ProcessInfo.processInfo.arguments.contains("-gymdemo"),
-               let data = try? GymFile.encode(GymLog.demo()) {
-                try? data.write(to: dir.appendingPathComponent("gym.json"))
+            if ProcessInfo.processInfo.arguments.contains("-gymdemo") {
+                var demo = GymLog.demo()
+                // -tallphotos: an upright photo on every machine, like his home-gym photos (1.9.2 test).
+                if ProcessInfo.processInfo.arguments.contains("-tallphotos") {
+                    let photos = dir.appendingPathComponent("Photos", isDirectory: true)
+                    try? fm.createDirectory(at: photos, withIntermediateDirectories: true)
+                    let format = UIGraphicsImageRendererFormat()
+                    format.scale = 1
+                    let tall = UIGraphicsImageRenderer(size: CGSize(width: 1200, height: 1600), format: format).image { c in
+                        UIColor.systemTeal.setFill()
+                        c.fill(CGRect(x: 0, y: 0, width: 1200, height: 1600))
+                    }
+                    if let jpeg = tall.jpegData(compressionQuality: 0.6) {
+                        try? jpeg.write(to: photos.appendingPathComponent("tall.jpg"))
+                        for i in demo.machines.indices { demo.machines[i].photo = "tall.jpg" }
+                    }
+                }
+                if let data = try? GymFile.encode(demo) { try? data.write(to: dir.appendingPathComponent("gym.json")) }
             }
             // UI tests can start from a given gym file (to replay a problem with real data on the Mac only).
             if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "-gymfile"),

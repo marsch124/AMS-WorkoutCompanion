@@ -654,21 +654,26 @@ struct MachinePhoto: View {
     var icon: String? = nil
 
     var body: some View {
-        Group {
-            if let image = library.image(name) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                IconMark(.hand(icon ?? "strength"), size: height * 0.42, colour: Gym.tint)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Gym.fill.opacity(0.1))
+        // The photo fills a fixed box and is cut to it — for drawing AND for taps. Before 1.9.2 an
+        // upright photo on a wide tile reached invisibly above it and took the taps meant for
+        // "Plan today" (his home gym: tapping Plan today opened Dumbbell).
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .overlay {
+                if let image = library.image(name) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    IconMark(.hand(icon ?? "strength"), size: height * 0.42, colour: Gym.tint)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Gym.fill.opacity(0.1))
+                }
             }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: height)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .accessibilityHidden(true)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .accessibilityHidden(true)
     }
 }
 

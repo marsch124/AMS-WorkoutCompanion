@@ -10,6 +10,10 @@ public struct Release: Sendable, Equatable {
 /// The words of Settings: What's new (every version, newest first) and How it works.
 public enum AppText {
     public static let releases: [Release] = [
+        Release(version: "1.9.2", date: "3 November 2026", items: [
+            "Fixed: \"Plan today\" opened a machine instead of the plan in a gym whose photos were taken upright (your home gym). An upright photo on a wide tile reached invisibly above the tile and caught the tap meant for Plan today. Photos now take taps only inside their own tile — this also makes \"Repeat last visit\" and the gym menu safe to tap.",
+            "Fixed: when the app started without its workouts file (for example after restoring a backup without workouts), it could tidy away the gym's photos before reading the gym log. The gym log is now read first.",
+        ]),
         Release(version: "1.9.1", date: "3 November 2026", items: [
             "Fixed: the Train / History / Settings bar no longer covers the bottom of a page. \"Exercise done\" on a machine was hidden underneath it, and so was the last session in History.",
             "Changed: a gym visit in History is now colourful: the day and gym on an indigo card with tiles for time, sets, kilograms lifted and machines; a New best line; and a card per machine with its muscle group in colour, each set as a small chip, the plan for next time and your note.",

@@ -125,4 +125,31 @@ final class FormsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["visit-kg"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["visit-machine-Chest press"].exists)
     }
+
+    // MARK: 1.9.2 — his home gym, with upright photos
+
+    func launchWithTallPhotos() {
+        app.terminate()
+        app.launchArguments = ["-uitest", "-gymdemo", "-tallphotos"]
+        app.launch()
+    }
+
+    func testPlanTodayOpensThePlanWithUprightPhotos() {
+        launchWithTallPhotos()
+        app.buttons["open-gym"].tap()
+        let plan = app.buttons["gym-plan"]
+        XCTAssertTrue(plan.waitForExistence(timeout: 5))
+        plan.tap()
+        // Before 1.9.2 the photo under the button took the tap and a machine opened instead.
+        XCTAssertTrue(app.buttons["plan-save"].waitForExistence(timeout: 5), "Plan today did not open the plan")
+        XCTAssertFalse(app.buttons["gym-set-done"].exists)
+    }
+
+    func testAFirstStartKeepsTheGymPhotos() {
+        launchWithTallPhotos()
+        app.buttons["open-settings"].tap()
+        app.buttons["settings-health"].tap()
+        // Before 1.9.2 the first save of the starter workouts tidied the gym photos away.
+        XCTAssertTrue(app.staticTexts["health-ok"].waitForExistence(timeout: 5), "a gym photo went missing")
+    }
 }
