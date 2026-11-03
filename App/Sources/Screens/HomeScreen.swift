@@ -140,7 +140,7 @@ private struct WorkoutCard: View {
     var body: some View {
         Button(action: start) {
             VStack(alignment: .leading, spacing: 4) {
-                IconMark(.hand(workout.kind.iconKey), size: 30, colour: workout.inkOnFill)
+                IconMark(.hand(workout.icon ?? workout.kind.iconKey), size: 30, colour: workout.inkOnFill)
                     .accessibilityHidden(true)
                 Spacer(minLength: 6)
                 Text(workout.name.isEmpty ? "Untitled" : workout.name)

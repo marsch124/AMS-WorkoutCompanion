@@ -20,8 +20,18 @@ final class Library {
 
     init(folder: URL) {
         self.folder = folder
+        load()
+    }
+
+    /// Reads the three files; at launch and again after a restore.
+    private func load() {
         let fm = FileManager.default
         try? fm.createDirectory(at: photoFolder, withIntermediateDirectories: true)
+        workouts = []
+        gym = GymLog()
+        history = []
+        gymUnreadable = false
+        historyUnreadable = false
         if let data = try? Data(contentsOf: file) {
             if let list = try? WorkoutFile.decode(data) {
                 workouts = list
@@ -74,7 +84,9 @@ final class Library {
             return Library(folder: dir)
         }
         let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return Library(folder: docs)
+        let library = Library(folder: docs)
+        library.weeklyBackup()
+        return library
     }
 
     func save(_ workout: Workout) {
@@ -186,6 +198,86 @@ final class Library {
         } catch {
             return nil
         }
+    }
+
+    // MARK: Backups (since 1.6)
+
+    /// Weekly copies stay in Documents/Backups on this iPhone (the newest 4).
+    var backupFolder: URL { folder.appendingPathComponent("Backups", isDirectory: true) }
+
+    /// Everything — the three files and every photo — as one backup.
+    func makeBackup(at now: Date = Date()) -> Backup {
+        let fm = FileManager.default
+        var files: [String: Data] = [:]
+        for name in Backup.fileNames {
+            if let data = try? Data(contentsOf: folder.appendingPathComponent(name)) { files[name] = data }
+        }
+        var photos: [String: Data] = [:]
+        for name in (try? fm.contentsOfDirectory(atPath: photoFolder.path)) ?? [] {
+            if let data = try? Data(contentsOf: photoFolder.appendingPathComponent(name)) { photos[name] = data }
+        }
+        return Backup(made: now, files: files, photos: photos)
+    }
+
+    /// A backup file in the temporary folder, ready for the share sheet; nil when it could not be written.
+    func backupFile() -> URL? {
+        let b = makeBackup()
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(Backup.fileName(b.made))
+        guard let data = try? Backup.encode(b), (try? data.write(to: url, options: .atomic)) != nil else { return nil }
+        return url
+    }
+
+    /// Once a week, at launch: a copy in Backups; only the newest 4 are kept.
+    func weeklyBackup(now: Date = Date(), force: Bool = false) {
+        let fm = FileManager.default
+        try? fm.createDirectory(at: backupFolder, withIntermediateDirectories: true)
+        let copies = weeklyCopies()
+        guard force || Backup.weeklyDue(newest: copies.first?.made, now: now),
+              !workouts.isEmpty || !gym.machines.isEmpty || !history.isEmpty,
+              let data = try? Backup.encode(makeBackup(at: now)) else { return }
+        try? data.write(to: backupFolder.appendingPathComponent(Backup.fileName(now)), options: .atomic)
+        let all = weeklyCopies().map { (name: $0.url.lastPathComponent, date: $0.made) }
+        for name in Backup.toRemove(all) { try? fm.removeItem(at: backupFolder.appendingPathComponent(name)) }
+    }
+
+    /// The weekly copies on this iPhone, newest first.
+    func weeklyCopies() -> [(url: URL, made: Date)] {
+        let fm = FileManager.default
+        let urls = (try? fm.contentsOfDirectory(at: backupFolder, includingPropertiesForKeys: [.creationDateKey])) ?? []
+        return urls.filter { $0.pathExtension == "json" }.map { url in
+            let made = (try? url.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
+            return (url, made)
+        }.sorted { $0.made > $1.made }
+    }
+
+    /// Puts a backup's data in place of today's. Today's files and photos are first kept aside in
+    /// Documents/Before restore <date>, so a wrong restore can be undone; nothing is overwritten blindly.
+    func restore(_ backup: Backup) throws {
+        _ = try backup.contents()   // every file must read before anything changes
+        let fm = FileManager.default
+        let aside = folder.appendingPathComponent("Before restore \(Int(Date().timeIntervalSince1970))", isDirectory: true)
+        try fm.createDirectory(at: aside, withIntermediateDirectories: true)
+        for name in Backup.fileNames where fm.fileExists(atPath: folder.appendingPathComponent(name).path) {
+            try fm.copyItem(at: folder.appendingPathComponent(name), to: aside.appendingPathComponent(name))
+        }
+        if fm.fileExists(atPath: photoFolder.path) {
+            try fm.copyItem(at: photoFolder, to: aside.appendingPathComponent("Photos", isDirectory: true))
+        }
+        // Then the backup's files and photos.
+        for name in Backup.fileNames {
+            let url = folder.appendingPathComponent(name)
+            if let data = backup.files[name] {
+                try data.write(to: url, options: .atomic)
+            } else {
+                try? fm.removeItem(at: url)
+            }
+        }
+        try? fm.removeItem(at: photoFolder)
+        try fm.createDirectory(at: photoFolder, withIntermediateDirectories: true)
+        for (name, data) in backup.photos where !name.contains("/") {
+            try data.write(to: photoFolder.appendingPathComponent(name), options: .atomic)
+        }
+        load()
     }
 
     // MARK: Saving

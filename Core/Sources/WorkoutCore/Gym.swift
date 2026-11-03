@@ -11,10 +11,12 @@ public struct GymPlace: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-/// What a machine logs: weight and reps, or time (treadmill, rowing machine) with level and incline.
+/// What a machine logs: weight and reps, time (treadmill, rowing machine) with level and incline,
+/// or reps only (push-ups, sit-ups — an exercise without a machine, since 1.6).
 public enum MachineLogs: String, Codable, CaseIterable, Sendable {
     case weights
     case time
+    case reps
 }
 
 /// A machine or exercise at the gym, with its photo and how it is set up.
@@ -38,6 +40,8 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
     /// Time machines: a treadmill may have no level, a bike no incline (since 1.5; nil = has it).
     public var noLevel: Bool?
     public var noIncline: Bool?
+    /// The hand-drawn icon shown when there is no photo (an AMS-Icons key, since 1.6); nil = the usual one.
+    public var icon: String?
 
     public var hasLevel: Bool { noLevel != true }
     public var hasIncline: Bool { noIncline != true }
@@ -64,7 +68,7 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
         self.instructions = instructions
     }
 
-    enum CodingKeys: String, CodingKey { case id, gymID, name, photo, setting, logs, instructions, restSeconds, step, topReps, noLevel, noIncline }
+    enum CodingKeys: String, CodingKey { case id, gymID, name, photo, setting, logs, instructions, restSeconds, step, topReps, noLevel, noIncline, icon }
 
     /// Files from before 1.4 have no gym, no `logs` and no instructions.
     public init(from decoder: Decoder) throws {
@@ -81,6 +85,7 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
         topReps = try c.decodeIfPresent(Int.self, forKey: .topReps)
         noLevel = try c.decodeIfPresent(Bool.self, forKey: .noLevel)
         noIncline = try c.decodeIfPresent(Bool.self, forKey: .noIncline)
+        icon = try c.decodeIfPresent(String.self, forKey: .icon)
     }
 }
 
@@ -169,6 +174,12 @@ public struct MachineEntry: Codable, Identifiable, Hashable, Sendable {
     }
 
     public var heaviest: Double { sets.map(\.kg).max() ?? 0 }
+
+    /// The most reps in one set — the best of a reps-only exercise.
+    public var mostReps: Int { sets.map(\.reps).max() ?? 0 }
+
+    /// "15, 15, 12 reps" — a reps-only exercise has no weight to show.
+    public var repsText: String { sets.map { String($0.reps) }.joined(separator: ", ") + " reps" }
 }
 
 /// One trip to the gym: its date and the machines used, in the order they were used.
@@ -257,6 +268,8 @@ public struct GymLog: Codable, Equatable, Sendable {
     public static let restSeconds = 90
     /// A new machine's first set, before there is anything to go by.
     public static let starter = GymSet(kg: 20, reps: 10)
+    /// A new reps-only exercise's first set: 10 reps, no weight.
+    public static let starterReps = GymSet(kg: 0, reps: 10)
 
     public var machines: [Machine]
     public var visits: [GymVisit]
@@ -265,16 +278,26 @@ public struct GymLog: Codable, Equatable, Sendable {
     public var gyms: [GymPlace]
     /// The gym chosen last; the gym screen opens there.
     public var currentGymID: UUID?
-    public var plan: DayPlan?
+    /// Each gym's plan for its day (since 1.6; before, one plan for all gyms, so planning a second
+    /// gym wiped the first gym's plan).
+    public var plans: [DayPlan]
+    /// The icon on the At the gym tile (an AMS-Icons key, since 1.6); nil = the usual one.
+    public var homeIcon: String?
 
     public init(machines: [Machine] = [], visits: [GymVisit] = [], busyMarks: [BusyMark] = [],
-                gyms: [GymPlace] = [], currentGymID: UUID? = nil, plan: DayPlan? = nil) {
+                gyms: [GymPlace] = [], currentGymID: UUID? = nil, plans: [DayPlan] = [], homeIcon: String? = nil) {
         self.machines = machines
         self.visits = visits
         self.busyMarks = busyMarks
         self.gyms = gyms
         self.currentGymID = currentGymID
-        self.plan = plan
+        self.plans = plans
+        self.homeIcon = homeIcon
+    }
+
+    /// The plan holding this machine (a machine stands in one gym, so in at most one plan).
+    private func planIndex(with machineID: UUID) -> Int? {
+        plans.firstIndex { $0.order.contains(machineID) || $0.skipped.contains(machineID) }
     }
 
     public func machine(_ id: UUID) -> Machine? { machines.first { $0.id == id } }
@@ -301,7 +324,7 @@ public struct GymLog: Codable, Equatable, Sendable {
         let first = gyms[0].id
         for i in machines.indices where machines[i].gymID == nil { machines[i].gymID = first }
         for i in visits.indices where visits[i].gymID == nil { visits[i].gymID = first }
-        if plan?.gymID == nil { plan?.gymID = first }
+        for i in plans.indices where plans[i].gymID == nil { plans[i].gymID = first }
         if currentGym?.id != currentGymID { currentGymID = currentGym?.id }
     }
 
@@ -323,12 +346,13 @@ public struct GymLog: Codable, Equatable, Sendable {
 
     /// Today's plan at this gym, if one was made.
     public func plan(on day: Date, gym: UUID?, calendar: Calendar = .current) -> DayPlan? {
-        guard let plan, plan.gymID == gym, calendar.isDate(plan.day, inSameDayAs: day) else { return nil }
-        return plan
+        plans.first { $0.gymID == gym && calendar.isDate($0.day, inSameDayAs: day) }
     }
 
+    /// Sets this gym's plan; the other gyms keep theirs.
     public mutating func setPlan(_ order: [UUID], on day: Date, gym: UUID?) {
-        plan = order.isEmpty ? nil : DayPlan(day: day, gymID: gym, order: order)
+        plans.removeAll { $0.gymID == gym }
+        if !order.isEmpty { plans.append(DayPlan(day: day, gymID: gym, order: order)) }
     }
 
     /// A planned machine counts as done once it has a set in today's visit.
@@ -347,28 +371,31 @@ public struct GymLog: Codable, Equatable, Sendable {
 
     /// Moves a planned machine to the end, for later.
     public mutating func later(_ machineID: UUID) {
-        guard plan?.order.contains(machineID) == true else { return }
-        plan?.order.removeAll { $0 == machineID }
-        plan?.order.append(machineID)
+        guard let p = planIndex(with: machineID), plans[p].order.contains(machineID) else { return }
+        plans[p].order.removeAll { $0 == machineID }
+        plans[p].order.append(machineID)
     }
 
     /// Leaves a planned machine out today, or brings it back.
     public mutating func skip(_ machineID: UUID, _ on: Bool = true) {
-        plan?.skipped.removeAll { $0 == machineID }
-        if on { plan?.skipped.append(machineID) }
+        guard let p = planIndex(with: machineID) else { return }
+        plans[p].skipped.removeAll { $0 == machineID }
+        if on { plans[p].skipped.append(machineID) }
     }
 
     /// Puts another machine in a planned machine's place.
     public mutating func swap(_ machineID: UUID, for other: UUID) {
-        guard let i = plan?.order.firstIndex(of: machineID), plan?.order.contains(other) == false else { return }
-        plan?.order[i] = other
-        plan?.skipped.removeAll { $0 == machineID }
+        guard let p = planIndex(with: machineID), let i = plans[p].order.firstIndex(of: machineID),
+              !plans[p].order.contains(other) else { return }
+        plans[p].order[i] = other
+        plans[p].skipped.removeAll { $0 == machineID }
     }
 
     public mutating func removeFromPlan(_ machineID: UUID) {
-        plan?.order.removeAll { $0 == machineID }
-        plan?.skipped.removeAll { $0 == machineID }
-        if plan?.order.isEmpty == true { plan = nil }
+        guard let p = planIndex(with: machineID) else { return }
+        plans[p].order.removeAll { $0 == machineID }
+        plans[p].skipped.removeAll { $0 == machineID }
+        if plans[p].order.isEmpty { plans.remove(at: p) }
     }
 
     /// Visits, newest first.
@@ -384,12 +411,29 @@ public struct GymLog: Codable, Equatable, Sendable {
         return nil
     }
 
-    /// The heaviest weight ever done on this machine, leaving out one visit.
+    /// The heaviest weight ever done on this machine, leaving out one visit —
+    /// on a reps-only exercise, the most reps in one set.
     public func best(_ machineID: UUID, excluding visitID: UUID? = nil) -> Double? {
-        let weights = visits.filter { $0.id != visitID }
+        let sets = visits.filter { $0.id != visitID }
             .flatMap(\.entries).filter { $0.machineID == machineID }
-            .flatMap(\.sets).filter { $0.reps > 0 }.map(\.kg)
-        return weights.max()
+            .flatMap(\.sets).filter { $0.reps > 0 }
+        if machine(machineID)?.logs == .reps { return sets.map { Double($0.reps) }.max() }
+        return sets.map(\.kg).max()
+    }
+
+    /// What counts as "better" on a machine: the weight, or the reps on a reps-only exercise.
+    public func score(_ set: GymSet, machine machineID: UUID) -> Double {
+        machine(machineID)?.logs == .reps ? Double(set.reps) : set.kg
+    }
+
+    /// One set, said the machine's way: "30 kg × 12" or "12 reps".
+    public func text(_ set: GymSet, machine machineID: UUID) -> String {
+        machine(machineID)?.logs == .reps ? "\(set.reps) reps" : set.text
+    }
+
+    /// One visit's entry, said the machine's way: "30 kg × 12, 10" or "15, 12 reps".
+    public func text(_ entry: MachineEntry) -> String {
+        machine(entry.machineID)?.logs == .reps ? entry.repsText : entry.text
     }
 
     /// The numbers to offer for the next set on a machine, in this visit:
@@ -400,15 +444,24 @@ public struct GymLog: Codable, Equatable, Sendable {
             return NextSet(set: done, reason: nil)
         }
         let isTime = machine(machineID)?.logs == .time
+        let isReps = machine(machineID)?.logs == .reps
         guard let lastEntry = last(machineID, excluding: visit.id)?.entry, let first = lastEntry.sets.first else {
+            if isReps { return NextSet(set: GymLog.starterReps, reason: nil) }
             guard isTime, let m = machine(machineID) else { return NextSet(set: GymLog.starter, reason: nil) }
             return NextSet(set: GymSet(seconds: 20 * 60, level: m.hasLevel ? 5 : nil, incline: m.hasIncline ? 0 : nil), reason: nil)
         }
         if let planned = lastEntry.nextTime {
-            return NextSet(set: planned, reason: "Your plan from last time: \(planned.text)")
+            return NextSet(set: planned, reason: "Your plan from last time: \(text(planned, machine: machineID))")
         }
         let previous = lastEntry.sets
         if isTime || first.isTime { return NextSet(set: first, reason: nil) }
+        if isReps {
+            // Every set reached the first set's reps: one more rep next time.
+            guard previous.allSatisfy({ $0.reps >= first.reps }) else { return NextSet(set: first, reason: nil) }
+            let up = first.reps + 1
+            return NextSet(set: GymSet(kg: 0, reps: up),
+                           reason: "Try \(up) reps — every set last time reached \(first.reps)")
+        }
         let top = machine(machineID)?.repsForMore ?? GymLog.topReps
         if previous.allSatisfy({ $0.reps >= top }) {
             let up = first.kg + (machine(machineID)?.weightStep ?? GymLog.step)
@@ -423,18 +476,24 @@ public struct GymLog: Codable, Equatable, Sendable {
         var seen: [UUID] = []
         for e in visit.entries where !seen.contains(e.machineID) {
             guard let before = best(e.machineID, excluding: visit.id) else { continue }
-            let today = visit.entries.filter { $0.machineID == e.machineID }.map(\.heaviest).max() ?? 0
-            if today > before { seen.append(e.machineID) }
+            if top(e.machineID, in: visit) > before { seen.append(e.machineID) }
         }
         return seen
     }
 
-    /// The heaviest weight of every visit on this machine, oldest first — for the little chart.
+    /// The best of a visit on this machine: its heaviest weight, or most reps on a reps-only exercise.
+    public func top(_ machineID: UUID, in visit: GymVisit) -> Double {
+        let sets = visit.entries.filter { $0.machineID == machineID }.flatMap(\.sets)
+        return sets.map { score($0, machine: machineID) }.max() ?? 0
+    }
+
+    /// The heaviest weight (reps-only: most reps) of every visit on this machine, oldest first — for the little chart.
     public func history(_ machineID: UUID) -> [(date: Date, kg: Double, entry: MachineEntry)] {
         visits.sorted { $0.date < $1.date }.compactMap { v in
             let entries = v.entries.filter { $0.machineID == machineID && !$0.sets.isEmpty }
-            guard let top = entries.max(by: { $0.heaviest < $1.heaviest }) else { return nil }
-            return (v.date, top.heaviest, top)
+            let score: (MachineEntry) -> Double = { e in e.sets.map { self.score($0, machine: machineID) }.max() ?? 0 }
+            guard let top = entries.max(by: { score($0) < score($1) }) else { return nil }
+            return (v.date, score(top), top)
         }
     }
 
@@ -464,7 +523,7 @@ public struct GymLog: Codable, Equatable, Sendable {
         v.finished = now
         put(v)
         busyMarks.removeAll { calendar.isDate($0.day, inSameDayAs: v.date) }
-        if plan(on: v.date, gym: v.gymID, calendar: calendar) != nil { plan = nil }
+        plans.removeAll { $0.gymID == v.gymID && calendar.isDate($0.day, inSameDayAs: v.date) }
     }
 
     /// After the sets on a machine: what to do next time and how it felt; nil and empty words take them away.
@@ -546,7 +605,10 @@ public enum GymFile {
         var busy: [BusyMark]?
         var gyms: [GymPlace]?
         var currentGym: UUID?
+        /// Before 1.6: one plan for all gyms.
         var plan: DayPlan?
+        var plans: [DayPlan]?
+        var homeIcon: String?
     }
 
     public static func encode(_ log: GymLog) throws -> Data {
@@ -554,7 +616,8 @@ public enum GymFile {
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         enc.dateEncodingStrategy = .iso8601
         return try enc.encode(Envelope(version: 1, machines: log.machines, visits: log.visits, busy: log.busyMarks,
-                                        gyms: log.gyms, currentGym: log.currentGymID, plan: log.plan))
+                                        gyms: log.gyms, currentGym: log.currentGymID, plan: nil,
+                                        plans: log.plans, homeIcon: log.homeIcon))
     }
 
     public static func decode(_ data: Data) throws -> GymLog {
@@ -562,7 +625,8 @@ public enum GymFile {
         dec.dateDecodingStrategy = .iso8601
         let e = try dec.decode(Envelope.self, from: data)
         var log = GymLog(machines: e.machines, visits: e.visits, busyMarks: e.busy ?? [],
-                         gyms: e.gyms ?? [], currentGymID: e.currentGym, plan: e.plan)
+                         gyms: e.gyms ?? [], currentGymID: e.currentGym,
+                         plans: e.plans ?? (e.plan.map { [$0] } ?? []), homeIcon: e.homeIcon)
         log.ensureGym()
         return log
     }

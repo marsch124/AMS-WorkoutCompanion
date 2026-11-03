@@ -109,7 +109,9 @@ public enum History {
             return HistoryItem(source: .gym(v.id), date: v.started ?? v.date,
                                name: place.map { "At the gym · \($0)" } ?? "At the gym", colour: "indigo",
                                group: gymGroup, title: v.title, notes: v.notes,
-                               detail: "\(v.entries.count) machine\(v.entries.count == 1 ? "" : "s") · \(v.setCount) set\(v.setCount == 1 ? "" : "s") · \(GymSet.number(v.totalKg)) kg",
+                               // Push-ups only: no "0 kg" (since 1.6).
+                               detail: "\(v.entries.count) machine\(v.entries.count == 1 ? "" : "s") · \(v.setCount) set\(v.setCount == 1 ? "" : "s")"
+                                   + (v.totalKg > 0 ? " · \(GymSet.number(v.totalKg)) kg" : ""),
                                minutes: v.minutes, kg: v.totalKg, completed: true)
         }
         let done = records.map { r in

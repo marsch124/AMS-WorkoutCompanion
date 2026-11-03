@@ -133,7 +133,7 @@ final class WorkoutTests: XCTestCase {
 
 final class AppTextTests: XCTestCase {
     func testWhatsNewIsNewestFirstAndStartsWithThisVersion() {
-        XCTAssertEqual(AppText.releases.map(\.version), ["1.5", "1.4", "1.3", "1.2", "1.1", "1.0"])
+        XCTAssertEqual(AppText.releases.map(\.version), ["1.6", "1.5", "1.4", "1.3", "1.2", "1.1", "1.0"])
         XCTAssertTrue(AppText.releases.allSatisfy { !$0.items.isEmpty })
     }
 

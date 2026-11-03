@@ -98,9 +98,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.5 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.6 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.5"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.6"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -367,5 +367,124 @@ final class WorkoutCompanionUITests: XCTestCase {
         let left = app.staticTexts["gym-rest"]
         XCTAssertTrue(left.waitForExistence(timeout: 3))
         XCTAssertTrue(left.label.hasPrefix("2:"), left.label)
+    }
+
+    // MARK: 1.6
+
+    func testAnExerciseWithoutAMachineLogsRepsOnly() {
+        app.buttons["open-gym"].tap()
+        app.buttons["gym-new-machine"].tap()
+        let name = app.textFields["machine-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("Push-ups")
+        app.segmentedControls["machine-logs"].buttons.element(boundBy: 2).tap()
+        // Reps only: no weight step, no "More weight at".
+        XCTAssertFalse(app.segmentedControls["machine-step"].exists)
+        XCTAssertFalse(app.steppers["machine-top-reps"].exists)
+        XCTAssertTrue(app.steppers["machine-rest"].exists)
+        app.buttons["machine-save"].tap()
+
+        // No weight on the exercise: reps only, starting at 10.
+        waitFor(app.staticTexts["gym-next-set"], label: "Set 1")
+        XCTAssertFalse(app.textFields["gym-weight"].exists)
+        app.buttons["gym-reps-plus"].tap()
+        app.buttons["gym-set-done"].tap()
+        waitFor(app.buttons["gym-set-1"], label: "Set 1, 11 reps")
+
+        app.buttons["gym-rest-skip"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["machine-Push-ups"].waitForExistence(timeout: 5))
+        app.buttons["gym-finish"].tap()
+        waitFor(app.staticTexts["gym-summary-sets"], label: "1")
+        XCTAssertFalse(app.staticTexts["gym-summary-total"].exists)
+    }
+
+    func testABackupCopyCanBeRestored() {
+        app.buttons["open-settings"].tap()
+        app.buttons["settings-backups"].tap()
+        XCTAssertTrue(app.buttons["backup-now"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["backup-restore-file"].exists)
+        XCTAssertFalse(app.buttons["backup-copy-0"].exists)
+        app.buttons["backup-keep-copy"].tap()
+        XCTAssertTrue(app.buttons["backup-copy-0"].waitForExistence(timeout: 5))
+
+        app.buttons["backup-copy-0"].tap()
+        let restore = app.alerts.firstMatch.buttons["backup-restore-confirm"].firstMatch
+        XCTAssertTrue(restore.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.alerts.firstMatch.staticTexts.containing(NSPredicate(format: "label CONTAINS '3 workouts'")).firstMatch.exists)
+        restore.tap()
+        let message = app.staticTexts["backup-message"]
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        XCTAssertTrue(message.label.hasPrefix("Restored: 3 workouts"), message.label)
+
+        app.buttons["open-train"].tap()
+        XCTAssertTrue(app.buttons["workout-Push-ups"].waitForExistence(timeout: 5))
+    }
+
+    func testBackUpNowOpensTheShareSheet() {
+        app.buttons["open-settings"].tap()
+        app.buttons["settings-backups"].tap()
+        app.buttons["backup-now"].tap()
+        // The iPhone's own share sheet, with Save to Files.
+        XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(timeout: 8)
+                      || app.collectionViews.cells.firstMatch.waitForExistence(timeout: 2))
+    }
+
+    func testASecondGymCanBePlannedToo() {
+        launchGymDemo()
+        app.buttons["gym-place-menu"].tap()
+        app.buttons["gym-place-new"].tap()
+        let gym = app.alerts.firstMatch.textFields.firstMatch
+        XCTAssertTrue(gym.waitForExistence(timeout: 3))
+        gym.typeText("Hotel gym")
+        app.alerts.firstMatch.buttons["Save"].firstMatch.tap()
+        waitFor(app.buttons["gym-place-menu"], label: "Gym: Hotel gym")
+        for n in ["Rower", "Squats", "Dips"] {
+            app.buttons["gym-new-machine"].tap()
+            let name = app.textFields["machine-name"]
+            XCTAssertTrue(name.waitForExistence(timeout: 5))
+            name.tap()
+            name.typeText(n)
+            app.buttons["machine-save"].tap()
+            XCTAssertTrue(app.buttons["gym-set-done"].waitForExistence(timeout: 5))
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(app.buttons["machine-\(n)"].waitForExistence(timeout: 5))
+        }
+        app.buttons["gym-plan"].tap()
+        app.buttons["plan-machine-Squats"].tap()
+        app.buttons["plan-machine-Rower"].tap()
+        app.buttons["plan-save"].tap()
+        waitFor(app.buttons["plan-row-1"], label: "1, Squats, up next")
+        waitFor(app.buttons["plan-row-2"], label: "2, Rower")
+    }
+
+    func testAWorkoutGetsTheIconYouChoose() {
+        app.buttons["edit-Push-ups"].tap()
+        let icon = app.buttons["editor-icon"]
+        XCTAssertTrue(icon.waitForExistence(timeout: 5))
+        icon.tap()
+        let run = app.buttons["icon-run"]
+        XCTAssertTrue(run.waitForExistence(timeout: 5))
+        run.tap()
+        app.buttons["icon-picker-save"].tap()
+        XCTAssertEqual(app.buttons["editor-icon"].value as? String, "run")
+        app.buttons["editor-save"].tap()
+        app.buttons["edit-Push-ups"].tap()
+        XCTAssertTrue(app.buttons["editor-icon"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["editor-icon"].value as? String, "run")
+    }
+
+    func testTheGymTileIconCanBeChanged() {
+        let tile = app.buttons["open-gym"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 5))
+        tile.press(forDuration: 1.2)
+        let change = app.buttons["gym-change-icon"].firstMatch
+        XCTAssertTrue(change.waitForExistence(timeout: 5))
+        change.tap()
+        XCTAssertTrue(app.buttons["icon-run"].waitForExistence(timeout: 5))
+        app.buttons["icon-run"].tap()
+        app.buttons["icon-picker-save"].tap()
+        XCTAssertTrue(tile.waitForExistence(timeout: 5))
     }
 }

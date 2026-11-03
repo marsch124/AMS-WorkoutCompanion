@@ -143,4 +143,35 @@ final class ScreenTour: XCTestCase {
         XCTAssertTrue(app.buttons["history-row-1"].waitForExistence(timeout: 5))
         snap("16 History")
     }
+
+    /// 1.6: the larger At the gym title, the icon picker, a reps-only exercise and Backups.
+    func testNewIn16Tour() {
+        app.launch()
+        XCTAssertTrue(app.buttons["open-gym"].waitForExistence(timeout: 10))
+        snap("17 Train")
+        app.buttons["edit-Push-ups"].tap()
+        app.buttons["editor-icon"].tap()
+        XCTAssertTrue(app.buttons["icon-run"].waitForExistence(timeout: 5))
+        snap("18 Icon picker")
+        app.buttons["icon-picker-cancel"].tap()
+        app.buttons["editor-cancel"].firstMatch.tap()
+        app.buttons["open-gym"].tap()
+        app.buttons["gym-new-machine"].tap()
+        let name = app.textFields["machine-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("Push-ups")
+        app.segmentedControls["machine-logs"].buttons.element(boundBy: 2).tap()
+        snap("19 New exercise")
+        app.buttons["machine-save"].tap()
+        app.buttons["gym-set-done"].tap()
+        app.buttons["gym-rest-skip"].tap()
+        snap("20 Reps only")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["open-settings"].tap()
+        app.buttons["settings-backups"].tap()
+        app.buttons["backup-keep-copy"].tap()
+        XCTAssertTrue(app.buttons["backup-copy-0"].waitForExistence(timeout: 5))
+        snap("21 Backups")
+    }
 }

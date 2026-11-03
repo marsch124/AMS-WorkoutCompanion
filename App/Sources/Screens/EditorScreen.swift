@@ -39,6 +39,11 @@ struct EditorScreen: View {
                 SwatchGrid(selected: $draft.colour)
             }
 
+            Section {
+                IconRow(icon: draft.icon, usual: draft.kind.iconKey, tint: draft.swatch.fillColor,
+                        identifier: "editor-icon") { draft.icon = $0 }
+            }
+
             Section("Type") {
                 Picker("Type", selection: $draft.kind) {
                     Text("Sets").tag(WorkoutKind.reps)

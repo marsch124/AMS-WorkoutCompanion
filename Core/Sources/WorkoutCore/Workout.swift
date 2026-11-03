@@ -80,6 +80,8 @@ public struct Workout: Codable, Identifiable, Hashable, Sendable {
     public var kind: WorkoutKind
     /// A colour key of the AMS-Icons hub (`IconColour.palette`).
     public var colour: String
+    /// A hand-icon key chosen by the owner; nil = the kind's usual icon.
+    public var icon: String?
     // Sets & reps
     public var sets: Int
     public var reps: Int
@@ -95,8 +97,9 @@ public struct Workout: Codable, Identifiable, Hashable, Sendable {
         id: UUID = UUID(), name: String = "", kind: WorkoutKind, colour: String? = nil,
         sets: Int = 5, reps: Int = 10, restSeconds: Int = 90,
         rounds: Int = 8, workSeconds: Int = 40, offSeconds: Int = 20,
-        exercises: [Exercise] = []
+        exercises: [Exercise] = [], icon: String? = nil
     ) {
+        self.icon = icon
         self.id = id
         self.name = name
         self.kind = kind
@@ -124,7 +127,8 @@ public struct Workout: Codable, Identifiable, Hashable, Sendable {
             rounds: try c.decodeIfPresent(Int.self, forKey: .rounds) ?? 8,
             workSeconds: try c.decodeIfPresent(Int.self, forKey: .workSeconds) ?? 40,
             offSeconds: try c.decodeIfPresent(Int.self, forKey: .offSeconds) ?? 20,
-            exercises: try c.decodeIfPresent([Exercise].self, forKey: .exercises) ?? []
+            exercises: try c.decodeIfPresent([Exercise].self, forKey: .exercises) ?? [],
+            icon: try c.decodeIfPresent(String.self, forKey: .icon)
         )
     }
 

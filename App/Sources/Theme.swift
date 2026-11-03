@@ -48,7 +48,7 @@ struct WorkoutTile: View {
     var size: CGFloat = 44
 
     var body: some View {
-        IconTile(.hand(workout.kind.iconKey), colour: workout.swatch, fallbackTint: Theme.accent,
+        IconTile(.hand(workout.icon ?? workout.kind.iconKey), colour: workout.swatch, fallbackTint: Theme.accent,
                  letter: workout.name, size: size)
             .accessibilityHidden(true)
     }

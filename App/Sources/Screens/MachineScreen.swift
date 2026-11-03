@@ -36,6 +36,9 @@ struct MachineScreen: View {
     private var visit: GymVisit { library.gym.visit(on: day, gym: gymID) ?? GymVisit(gymID: gymID, date: day) }
     private var entryToday: MachineEntry? { visit.entries.last { $0.machineID == machineID } }
     private var isTime: Bool { machine?.logs == .time }
+    /// Push-ups, sit-ups: reps only, no weight (since 1.6).
+    private var isReps: Bool { machine?.logs == .reps }
+    private func said(_ s: GymSet) -> String { library.gym.text(s, machine: machineID) }
     private var step: Double { machine?.weightStep ?? GymLog.step }
     private var upNext: Machine? {
         library.gym.upNext(on: day, gym: gymID, excluding: machineID).flatMap { library.gym.machine($0) }
@@ -50,7 +53,7 @@ struct MachineScreen: View {
             VStack(alignment: .leading, spacing: 10) {
                 if let machine {
                     Button { zoom = machine.photo != nil } label: {
-                        MachinePhoto(name: machine.photo, height: machine.photo == nil ? 90 : 180)
+                        MachinePhoto(name: machine.photo, height: machine.photo == nil ? 90 : 180, icon: machine.icon)
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("gym-photo")
@@ -145,7 +148,7 @@ struct MachineScreen: View {
         }
         .sheet(item: Binding(get: { changingSet.map { SetIndex(index: $0) } }, set: { changingSet = $0?.index })) { s in
             NavigationStack {
-                SetEditor(number: s.index + 1, set: today[s.index]) { result in
+                SetEditor(number: s.index + 1, repsOnly: isReps, set: today[s.index]) { result in
                     if let result {
                         library.changeGym { $0.change(visit: visit.id, machine: machineID, set: s.index, to: result) }
                     }
@@ -165,7 +168,7 @@ struct MachineScreen: View {
         }
         .sheet(isPresented: $nextTimeOpen) {
             NavigationStack {
-                NextTimeForm(isTime: isTime, step: step,
+                NextTimeForm(isTime: isTime, repsOnly: isReps, step: step,
                              set: entryToday?.nextTime ?? today.last ?? next.set,
                              note: entryToday?.note ?? "") { result in
                     nextTimeOpen = false
@@ -183,7 +186,7 @@ struct MachineScreen: View {
     @ViewBuilder private var lastTime: some View {
         if let last = library.gym.last(machineID, excluding: visit.id) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Last time, \(last.visit.date.formatted(.dateTime.day().month(.abbreviated))): \(last.entry.text)")
+                Text("Last time, \(last.visit.date.formatted(.dateTime.day().month(.abbreviated))): \(library.gym.text(last.entry))")
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
                     .accessibilityIdentifier("gym-last")
@@ -209,7 +212,7 @@ struct MachineScreen: View {
                     HStack {
                         Text("Set \(i + 1)").foregroundStyle(Theme.muted)
                         Spacer()
-                        Text(s.text).fontWeight(.semibold).foregroundStyle(Theme.ink)
+                        Text(said(s)).fontWeight(.semibold).foregroundStyle(Theme.ink)
                         ControlMarkView(.check, size: 16, colour: Gym.tint)
                     }
                     .padding(.horizontal, 12)
@@ -218,7 +221,7 @@ struct MachineScreen: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Set \(i + 1), \(s.text)")
+                .accessibilityLabel("Set \(i + 1), \(said(s))")
                 .accessibilityIdentifier("gym-set-\(i + 1)")
                 if i < today.count - 1 { Divider().padding(.leading, 12) }
             }
@@ -244,11 +247,13 @@ struct MachineScreen: View {
                     .accessibilityIdentifier("gym-new-best")
                 }
             }
-            Stepper2(title: "kg", id: "gym-weight",
-                     minus: { kg = max(0, kg - step) }, plus: { kg += step }) {
-                TextField("0", value: $kg, format: .number.precision(.fractionLength(0...2)))
-                    .keyboardType(.decimalPad)
-                    .focused($typing)
+            if !isReps {
+                Stepper2(title: "kg", id: "gym-weight",
+                         minus: { kg = max(0, kg - step) }, plus: { kg += step }) {
+                    TextField("0", value: $kg, format: .number.precision(.fractionLength(0...2)))
+                        .keyboardType(.decimalPad)
+                        .focused($typing)
+                }
             }
             Stepper2(title: "reps", id: "gym-reps",
                      minus: { reps = max(1, reps - 1) }, plus: { reps += 1 }) {
@@ -265,7 +270,8 @@ struct MachineScreen: View {
                 if !today.isEmpty { nextButton }
             }
             if today.isEmpty {
-                Text(kg <= 0 ? "0 kg means body weight." : "Filled in from last time — change only what is different.")
+                Text(isReps ? "Filled in from last time — your own body weight, reps only."
+                     : kg <= 0 ? "0 kg means body weight." : "Filled in from last time — change only what is different.")
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
             }
@@ -290,7 +296,7 @@ struct MachineScreen: View {
                 }
             }
             .frame(width: 160, height: 160)
-            Text("Next: set \(today.count + 1) · \(GymSet(kg: kg, reps: reps).text)")
+            Text("Next: set \(today.count + 1) · \(said(GymSet(kg: isReps ? 0 : kg, reps: reps)))")
                 .font(.subheadline)
                 .foregroundStyle(Theme.muted)
             if let target, today.count >= target {
@@ -437,7 +443,7 @@ struct MachineScreen: View {
                             .foregroundStyle(Gym.tint)
                     }
                     .chartYScale(domain: max(0, (points.map(\.kg).min() ?? 0) - 5)...((points.map(\.kg).max() ?? 0) + 5))
-                    .chartYAxisLabel("kg")
+                    .chartYAxisLabel(isReps ? "reps" : "kg")
                     .frame(height: 120)
                     .accessibilityIdentifier("gym-chart")
                 }
@@ -446,7 +452,7 @@ struct MachineScreen: View {
                         Text(p.date.formatted(.dateTime.day().month(.abbreviated).year()))
                             .foregroundStyle(Theme.muted)
                         Spacer()
-                        Text(p.entry.text).foregroundStyle(Theme.ink)
+                        Text(library.gym.text(p.entry)).foregroundStyle(Theme.ink)
                     }
                     .font(.subheadline)
                 }
@@ -483,10 +489,10 @@ struct MachineScreen: View {
 
     private func setDone() {
         typing = false
-        let set = GymSet(kg: max(0, kg), reps: max(1, reps))
+        let set = GymSet(kg: isReps ? 0 : max(0, kg), reps: max(1, reps))
         let before = library.gym.best(machineID)
         library.changeGym { $0.add(set, machine: machineID, on: day) }
-        newBest = before.map { set.kg > $0 } ?? false
+        newBest = before.map { library.gym.score(set, machine: machineID) > $0 } ?? false
         Cues.shared.tap()
         restLength = Double(machine?.rest ?? GymLog.restSeconds)
         // A machine with no rest goes straight on to the next set.
@@ -551,6 +557,7 @@ private struct Stepper2<Field: View>: View {
 /// Change or remove one set. Cancel leaves it as it was.
 private struct SetEditor: View {
     let number: Int
+    var repsOnly = false
     @State var set: GymSet
     let done: (GymSet?) -> Void
     let remove: () -> Void
@@ -558,6 +565,7 @@ private struct SetEditor: View {
     var body: some View {
         Form {
             Section {
+                if !repsOnly {
                 HStack {
                     Text("Weight")
                     Spacer()
@@ -566,6 +574,7 @@ private struct SetEditor: View {
                         .multilineTextAlignment(.trailing)
                         .accessibilityIdentifier("set-edit-kg")
                     Text("kg").foregroundStyle(Theme.muted)
+                }
                 }
                 Stepper("Reps: \(set.reps)", value: $set.reps, in: 1...500)
                     .accessibilityIdentifier("set-edit-reps")
@@ -594,6 +603,7 @@ private struct SetEditor: View {
 /// After the sets: what to do next time and how it felt. Nothing is kept until Save.
 private struct NextTimeForm: View {
     let isTime: Bool
+    var repsOnly = false
     let step: Double
     @State var set: GymSet
     @State var note: String
@@ -622,10 +632,12 @@ private struct NextTimeForm: View {
                                     onDecrement: { set.incline = max(0, (set.incline ?? 0) - 0.5) })
                         }
                     } else {
-                        Stepper("Weight: \(GymSet.weight(set.kg))",
-                                onIncrement: { set.kg += step },
-                                onDecrement: { set.kg = max(0, set.kg - step) })
-                            .accessibilityIdentifier("next-time-kg")
+                        if !repsOnly {
+                            Stepper("Weight: \(GymSet.weight(set.kg))",
+                                    onIncrement: { set.kg += step },
+                                    onDecrement: { set.kg = max(0, set.kg - step) })
+                                .accessibilityIdentifier("next-time-kg")
+                        }
                         Stepper("Reps: \(set.reps)", value: $set.reps, in: 1...500)
                             .accessibilityIdentifier("next-time-reps")
                     }
@@ -678,8 +690,12 @@ struct MachineForm: View {
     var body: some View {
         Form {
             Section {
-                MachinePhoto(name: draft.photo, height: draft.photo == nil ? 80 : 200)
+                MachinePhoto(name: draft.photo, height: draft.photo == nil ? 80 : 200, icon: draft.icon)
                     .listRowInsets(EdgeInsets())
+                if draft.photo == nil {
+                    IconRow(icon: draft.icon, usual: "strength", tint: Gym.tint,
+                            identifier: "machine-icon") { draft.icon = $0 }
+                }
                 if CameraPicker.available {
                     Button { camera = true } label: {
                         MarkLabel(title: draft.photo == nil ? "Take photo" : "Take photo again", mark: .photo, colour: Gym.tint)
@@ -717,13 +733,16 @@ struct MachineForm: View {
                 Picker("Logs", selection: $draft.logs) {
                     Text("Weight × reps").tag(MachineLogs.weights)
                     Text("Time").tag(MachineLogs.time)
+                    Text("Reps only").tag(MachineLogs.reps)
                 }
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("machine-logs")
             } header: {
                 Text("What you log")
             } footer: {
-                Text(draft.logs == .time ? "Minutes, level and incline — for a treadmill, rowing machine or bike." : "Weight and reps per set.")
+                Text(draft.logs == .time ? "Minutes, level and incline — for a treadmill, rowing machine or bike. A plank: Time, with level and incline off."
+                     : draft.logs == .reps ? "Reps per set, no weight — push-ups, sit-ups, pull-ups."
+                     : "Weight and reps per set.")
             }
             if draft.logs == .time {
                 Section {
@@ -739,7 +758,7 @@ struct MachineForm: View {
                     Text("A treadmill often has no level; a bike or rowing machine no incline.")
                 }
             }
-            if draft.logs == .weights {
+            if draft.logs != .time {
                 Section {
                     Stepper(value: Binding(get: { draft.rest }, set: { draft.restSeconds = $0 }), in: 0...300, step: 15) {
                         HStack {
@@ -749,6 +768,7 @@ struct MachineForm: View {
                         }
                     }
                     .accessibilityIdentifier("machine-rest")
+                    if draft.logs == .weights {
                     Picker("Weight step", selection: Binding(get: { draft.weightStep }, set: { draft.step = $0 })) {
                         Text("1 kg").tag(1.0)
                         Text("2.5 kg").tag(2.5)
@@ -764,10 +784,12 @@ struct MachineForm: View {
                         }
                     }
                     .accessibilityIdentifier("machine-top-reps")
+                    }
                 } header: {
-                    Text("On this machine")
+                    Text(draft.logs == .reps ? "This exercise" : "On this machine")
                 } footer: {
-                    Text("Rest after each set; how much − and + change the weight; and when every set reaches this many reps, the machine suggests one step more next time.")
+                    Text(draft.logs == .reps ? "Rest after each set. When every set reaches the first set's reps, it suggests one rep more next time."
+                         : "Rest after each set; how much − and + change the weight; and when every set reaches this many reps, the machine suggests one step more next time.")
                 }
             }
             Section {
@@ -797,12 +819,12 @@ struct MachineForm: View {
             }
             if !isNew {
                 Section {
-                    Button("Delete machine", role: .destructive) { askDelete = true }
+                    Button(draft.logs == .reps ? "Delete exercise" : "Delete machine", role: .destructive) { askDelete = true }
                         .accessibilityIdentifier("machine-delete")
                 }
             }
         }
-        .navigationTitle(isNew ? "New machine" : "Edit machine")
+        .navigationTitle(draft.logs == .reps ? (isNew ? "New exercise" : "Edit exercise") : (isNew ? "New machine" : "Edit machine"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {

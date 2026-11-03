@@ -74,17 +74,17 @@ final class GymPlanHistoryTests: XCTestCase {
         var log = GymLog(machines: [a, b, c, d])
         log.setPlan([a.id, b.id, c.id], on: day(3), gym: nil)
         log.later(a.id)
-        XCTAssertEqual(log.plan?.order, [b.id, c.id, a.id])
+        XCTAssertEqual(log.plans.first?.order, [b.id, c.id, a.id])
         log.swap(c.id, for: d.id)
-        XCTAssertEqual(log.plan?.order, [b.id, d.id, a.id])
+        XCTAssertEqual(log.plans.first?.order, [b.id, d.id, a.id])
         log.swap(b.id, for: a.id) // already planned: nothing happens
-        XCTAssertEqual(log.plan?.order, [b.id, d.id, a.id])
+        XCTAssertEqual(log.plans.first?.order, [b.id, d.id, a.id])
         log.removeFromPlan(d.id)
-        XCTAssertEqual(log.plan?.order, [b.id, a.id])
+        XCTAssertEqual(log.plans.first?.order, [b.id, a.id])
         log.delete(machine: b.id)
-        XCTAssertEqual(log.plan?.order, [a.id])
+        XCTAssertEqual(log.plans.first?.order, [a.id])
         log.removeFromPlan(a.id)
-        XCTAssertNil(log.plan)
+        XCTAssertTrue(log.plans.isEmpty)
     }
 
     func testFinishEndsTodaysPlanAndKeepsTheHeadingAndNotes() throws {
@@ -94,7 +94,7 @@ final class GymPlanHistoryTests: XCTestCase {
         log.add(GymSet(kg: 30, reps: 10), machine: a.id, on: day(3), now: day(3, 18), calendar: cal)
         let v = log.visits[0].id
         log.finish(visit: v, at: day(3, 19), calendar: cal)
-        XCTAssertNil(log.plan)
+        XCTAssertTrue(log.plans.isEmpty)
         XCTAssertEqual(log.visits[0].minutes, 60)
         log.describe(visit: v, title: " Leg day ", notes: "Knee felt fine.")
         log.describe(visit: v, title: " Leg day ", notes: "Knee felt fine.")

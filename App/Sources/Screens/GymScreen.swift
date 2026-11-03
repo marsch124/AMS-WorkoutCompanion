@@ -23,6 +23,7 @@ struct MachineRef: Hashable {
 struct GymCard: View {
     @Environment(Library.self) private var library
     let open: () -> Void
+    @State private var changingIcon = false
 
     private var summary: String {
         if let today = library.gym.visits.first(where: { Calendar.current.isDateInToday($0.date) && $0.setCount > 0 }) {
@@ -35,12 +36,12 @@ struct GymCard: View {
     var body: some View {
         Button(action: open) {
             HStack(spacing: 12) {
-                IconMark(.hand("strength"), size: 34, colour: Gym.ink)
+                IconMark(.hand(library.gym.homeIcon ?? "strength"), size: 34, colour: Gym.ink)
                     .frame(width: 44, height: 44)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("At the gym")
-                        .font(.title3.weight(.bold))
+                        .font(.title2.weight(.bold))
                         .foregroundStyle(Gym.ink)
                     Text(summary)
                         .font(.subheadline)
@@ -59,6 +60,18 @@ struct GymCard: View {
         .buttonStyle(.plain)
         .accessibilityLabel("At the gym, \(summary)")
         .accessibilityIdentifier("open-gym")
+        .contextMenu {
+            Button("Change icon…") { changingIcon = true }
+                .accessibilityIdentifier("gym-change-icon")
+        }
+        .sheet(isPresented: $changingIcon) {
+            NavigationStack {
+                IconPicker(current: library.gym.homeIcon, tint: Gym.tint) { key in
+                    library.changeGym { $0.homeIcon = key }
+                    changingIcon = false
+                } onCancel: { changingIcon = false }
+            }
+        }
     }
 }
 
@@ -196,6 +209,22 @@ struct GymScreen: View {
                 newMachine = Machine(gymID: gymID, photo: library.storePhoto(data))
             }
             .ignoresSafeArea()
+            // Push-ups or a plank have no machine to photograph: on to the form without a photo.
+            .overlay(alignment: .top) {
+                Button {
+                    camera = false
+                    newMachine = Machine(gymID: gymID)
+                } label: {
+                    Text("Skip photo")
+                        .font(.headline)
+                        .foregroundStyle(Gym.ink)
+                        .padding(.horizontal, 20)
+                        .frame(height: 44)
+                        .background(Gym.fill, in: Capsule())
+                }
+                .padding(.top, 110)
+                .accessibilityIdentifier("machine-skip-photo")
+            }
         }
         .sheet(item: $newMachine) { m in
             NavigationStack {
@@ -442,6 +471,7 @@ struct GymScreen: View {
         }
         if let last = library.gym.last(m.id, excluding: visit?.id) {
             if m.logs == .time, let first = last.entry.sets.first { return "Last: \(first.text)" }
+            if m.logs == .reps { return "Last: \(last.entry.mostReps) reps" }
             return "Last: \(GymSet.weight(last.entry.heaviest))"
         }
         return "New"
@@ -507,7 +537,7 @@ private struct PlanSheet: View {
                                 .frame(width: 26, height: 26)
                                 .background(n == nil ? AnyShapeStyle(Color.clear) : AnyShapeStyle(Gym.fill), in: Circle())
                                 .overlay(Circle().stroke(Gym.fill, lineWidth: n == nil ? 1.5 : 0))
-                            MachinePhoto(name: m.photo, height: 36)
+                            MachinePhoto(name: m.photo, height: 36, icon: m.icon)
                                 .frame(width: 36)
                             Text(m.name).foregroundStyle(Theme.ink)
                             Spacer()
@@ -557,7 +587,7 @@ private struct MachineTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .topTrailing) {
-                MachinePhoto(name: machine.photo, height: 96)
+                MachinePhoto(name: machine.photo, height: 96, icon: machine.icon)
                 if done {
                     ControlMarkView(.check, size: 14, colour: Gym.ink)
                         .frame(width: 26, height: 26)
@@ -604,8 +634,9 @@ private struct NewMachineTile: View {
     var body: some View {
         VStack(spacing: 6) {
             IconMark(.hand("camera"), size: 34, colour: Gym.tint)
-            Text("New machine")
+            Text("New machine\nor exercise")
                 .font(.subheadline.weight(.semibold))
+                .multilineTextAlignment(.center)
                 .foregroundStyle(Gym.tint)
         }
         .frame(maxWidth: .infinity, minHeight: 142)
@@ -621,6 +652,7 @@ struct MachinePhoto: View {
     @Environment(Library.self) private var library
     let name: String?
     var height: CGFloat
+    var icon: String? = nil
 
     var body: some View {
         Group {
@@ -629,7 +661,7 @@ struct MachinePhoto: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                IconMark(.hand("strength"), size: height * 0.42, colour: Gym.tint)
+                IconMark(.hand(icon ?? "strength"), size: height * 0.42, colour: Gym.tint)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Gym.fill.opacity(0.1))
             }
@@ -695,16 +727,16 @@ struct VisitScreen: View {
                 Section {
                     ForEach(visit.entries) { e in
                         HStack(alignment: .top, spacing: 10) {
-                            MachinePhoto(name: library.gym.machine(e.machineID)?.photo, height: 40)
+                            MachinePhoto(name: library.gym.machine(e.machineID)?.photo, height: 40, icon: library.gym.machine(e.machineID)?.icon)
                                 .frame(width: 40)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(library.gym.machine(e.machineID)?.name ?? "Machine")
                                     .font(.body.weight(.semibold))
-                                Text(e.text)
+                                Text(library.gym.text(e))
                                     .font(.subheadline)
                                     .foregroundStyle(Theme.muted)
                                 if let next = e.nextTime {
-                                    Text("Next time: \(next.text)").font(.caption).foregroundStyle(Gym.tint)
+                                    Text("Next time: \(library.gym.text(next, machine: e.machineID))").font(.caption).foregroundStyle(Gym.tint)
                                 }
                                 if let note = e.note {
                                     Text(note).font(.caption).foregroundStyle(Theme.ink)
@@ -783,17 +815,20 @@ struct SummaryScreen: View {
                     if visit.minutesOnMachines > 0 {
                         row("On time machines", "\(visit.minutesOnMachines) min", id: "gym-summary-cardio")
                     }
-                    row("Lifted in all", "\(GymSet.number(visit.totalKg)) kg", id: "gym-summary-total")
+                    if visit.totalKg > 0 {
+                        row("Lifted in all", "\(GymSet.number(visit.totalKg)) kg", id: "gym-summary-total")
+                    }
                 }
                 if !bests.isEmpty {
                     Section("New bests") {
                         ForEach(bests, id: \.self) { id in
-                            let top = visit.entries.filter { $0.machineID == id }.map(\.heaviest).max() ?? 0
+                            let top = library.gym.top(id, in: visit)
+                            let isReps = library.gym.machine(id)?.logs == .reps
                             HStack {
                                 IconMark(.hand("trophy"), size: 20, colour: Gym.tint)
                                 Text(library.gym.machine(id)?.name ?? "Machine")
                                 Spacer()
-                                Text(GymSet.weight(top)).foregroundStyle(Gym.tint).fontWeight(.semibold)
+                                Text(isReps ? "\(Int(top)) reps" : GymSet.weight(top)).foregroundStyle(Gym.tint).fontWeight(.semibold)
                             }
                         }
                     }

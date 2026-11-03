@@ -22,6 +22,10 @@ struct SettingsScreen: View {
                     .accessibilityIdentifier("settings-new")
             }
             Section {
+                NavigationLink("Backups") { BackupScreen() }
+                    .accessibilityIdentifier("settings-backups")
+            }
+            Section {
                 HStack {
                     Text("Version").foregroundStyle(Theme.ink)
                     Spacer()
