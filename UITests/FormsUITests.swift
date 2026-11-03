@@ -152,4 +152,26 @@ final class FormsUITests: XCTestCase {
         // Before 1.9.2 the first save of the starter workouts tidied the gym photos away.
         XCTAssertTrue(app.staticTexts["health-ok"].waitForExistence(timeout: 5), "a gym photo went missing")
     }
+
+    // MARK: 1.9.3 — drag handles in the plan
+
+    func testThePlanOrderCanBeDraggedAndAMachineTakenOut() {
+        launchGymDemo()
+        app.buttons["gym-plan"].tap()
+        app.buttons["plan-machine-Leg press"].tap()
+        app.buttons["plan-machine-Chest press"].tap()
+        app.buttons["plan-machine-Treadmill"].tap()
+        let first = app.descendants(matching: .any)["plan-order-1"]
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        XCTAssertTrue(first.label.hasSuffix("Leg press"), first.label)
+        // Drag Chest press (2) by its handle above Leg press (1).
+        let handles = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Reorder'"))
+        XCTAssertGreaterThanOrEqual(handles.count, 3)
+        handles.element(boundBy: 1).press(forDuration: 0.6, thenDragTo: handles.element(boundBy: 0), withVelocity: .slow, thenHoldForDuration: 0.4)
+        XCTAssertTrue(app.descendants(matching: .any)["plan-order-1"].label.hasSuffix("Chest press"),
+                      app.descendants(matching: .any)["plan-order-1"].label)
+        app.buttons["plan-save"].tap()
+        waitFor(app.buttons["plan-row-1"], label: "1, Chest press, up next")
+        waitFor(app.buttons["plan-row-2"], label: "2, Leg press")
+    }
 }

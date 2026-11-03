@@ -533,6 +533,34 @@ private struct PlanSheet: View {
 
     var body: some View {
         List {
+            // Today's order with drag handles (1.9.3, his "adjust the plan — maybe with drag handles?").
+            if !order.isEmpty {
+                Section {
+                    ForEach(Array(order.enumerated()), id: \.element) { i, id in
+                        if let m = machines.first(where: { $0.id == id }) {
+                            HStack(spacing: 10) {
+                                Text("\(i + 1)")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(Gym.ink)
+                                    .frame(width: 26, height: 26)
+                                    .background(Gym.fill, in: Circle())
+                                MachinePhoto(name: m.photo, height: 36, icon: m.icon)
+                                    .frame(width: 36)
+                                Text(m.name).foregroundStyle(Theme.ink)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("\(i + 1), \(m.name)")
+                            .accessibilityIdentifier("plan-order-\(i + 1)")
+                        }
+                    }
+                    .onMove { order.move(fromOffsets: $0, toOffset: $1) }
+                    .onDelete { order.remove(atOffsets: $0) }
+                } header: {
+                    Text("Today's order")
+                } footer: {
+                    Text("Drag the handles to change the order; the red minus takes a machine out.")
+                }
+            }
             Section {
                 ForEach(machines) { m in
                     let n = order.firstIndex(of: m.id).map { $0 + 1 }
@@ -556,6 +584,10 @@ private struct PlanSheet: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("plan-machine-\(m.name)")
                 }
+                .moveDisabled(true)
+                .deleteDisabled(true)
+            } header: {
+                Text(order.isEmpty ? "Machines" : "Add or take out")
             } footer: {
                 Text("Tap the machines in the order you want them; tap again to take one out. You can still use any machine at the gym.")
             }
@@ -566,6 +598,8 @@ private struct PlanSheet: View {
                 }
             }
         }
+        // Always in edit mode, so the handles show without an Edit button.
+        .environment(\.editMode, .constant(.active))
         .navigationTitle("Plan today")
         .navigationBarTitleDisplayMode(.inline)
         .bottomActions(cancel: { done(nil) }, save: { done(order) }, tint: Gym.fill,

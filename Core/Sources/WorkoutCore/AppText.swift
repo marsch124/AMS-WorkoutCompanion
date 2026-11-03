@@ -10,6 +10,9 @@ public struct Release: Sendable, Equatable {
 /// The words of Settings: What's new (every version, newest first) and How it works.
 public enum AppText {
     public static let releases: [Release] = [
+        Release(version: "1.9.3", date: "3 November 2026", items: [
+            "New: drag handles in Plan today. The machines you chose are listed at the top under \"Today's order\", each with a handle on the right — drag it to move the machine up or down. The red minus takes a machine out. Below, under \"Add or take out\", tap a machine to add it at the end. \"Change\" on today's plan opens the same page, so you can adjust the order at any time during the visit.",
+        ]),
         Release(version: "1.9.2", date: "3 November 2026", items: [
             "Fixed: \"Plan today\" opened a machine instead of the plan in a gym whose photos were taken upright (your home gym). An upright photo on a wide tile reached invisibly above the tile and caught the tap meant for Plan today. Photos now take taps only inside their own tile — this also makes \"Repeat last visit\" and the gym menu safe to tap.",
             "Fixed: when the app started without its workouts file (for example after restoring a backup without workouts), it could tidy away the gym's photos before reading the gym log. The gym log is now read first.",
@@ -167,6 +170,7 @@ public enum AppText {
         ("Week picture", "In History, the bars show the last 12 weeks — switch between Sessions and Minutes. Tap a bar to list that week's sessions."),
         ("Statistics", "History starts with your numbers: switch between This week and This month. Tiles show sessions, minutes, exercises, sets and kilograms. Below: sets per muscle group, minutes on cardio machines, weeks in a row, your best streak, records this month, and badges — tap one to see how to earn it. Give each machine a muscle group in its edit page so the bars are right."),
         ("Exercise done and one-hand buttons", "On a machine, the big \"Exercise done\" pill at the bottom takes you back to the machines; the green \"Next ›\" beside Set done goes on to the next planned machine. Every edit page has Cancel and Save at the bottom, within reach of your thumb."),
+        ("Changing today's plan", "Tap Plan today (or Change once there is a plan). Today's order is at the top: drag a machine by its handle to move it, or tap the red minus to take it out. Tap machines below to add them at the end. Save keeps it; Cancel leaves the plan as it was."),
         ("Making a workout", "Give it a name, pick a colour and choose its type. The numbers change with − and +. For an exercise list, Add exercise adds one; its ••• menu moves it up or down or removes it. Add photo takes a picture from your Photos. Nothing is kept until you tap Save; Cancel leaves everything as it was. Save needs a name — without one it tells you so."),
         ("Where things are kept", "Everything stays on this iPhone unless you save a backup file somewhere. The gym log keeps every visit in every gym, and History keeps your workouts, so you can see last time and your progress. Apple Health is not connected."),
     ]

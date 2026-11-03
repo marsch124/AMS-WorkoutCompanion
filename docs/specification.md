@@ -177,3 +177,6 @@ Version 1.6. iPhone only, portrait, iOS 17+, light and dark. The name under the 
 ## Version 1.9.2
 - `MachinePhoto`: a clear box of fixed size with the photo as an overlay, clipped AND given a content shape — an upright photo scaled to fill a wide tile no longer reaches above the tile for taps (it caught "Plan today" in his home gym). Test `testPlanTodayOpensThePlanWithUprightPhotos` (`-tallphotos`: 1200 × 1600 photo on every demo machine), seen red with the old view.
 - `Library.load`: the starter workouts are written only after the gym log and history are read; writing them first ran the unused-photo tidy-up against an empty gym log and deleted every gym photo. Test `testAFirstStartKeepsTheGymPhotos` (Check my data must say All good), seen red.
+
+## Version 1.9.3
+- Plan sheet: the List is always in edit mode. Section "Today's order" (shown once something is chosen): rows `plan-order-<n>` with drag handles (`onMove`) and the red minus (`onDelete`). Section "Add or take out": the tap-to-toggle rows `plan-machine-<name>` (move and delete off). Test `testThePlanOrderCanBeDraggedAndAMachineTakenOut` drags by the "Reorder" handle.

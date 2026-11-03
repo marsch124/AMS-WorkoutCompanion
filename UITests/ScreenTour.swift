@@ -262,4 +262,17 @@ final class ScreenTour: XCTestCase {
         XCTAssertTrue(app.staticTexts["visit-sets"].waitForExistence(timeout: 5))
         snap("35 Gym visit")
     }
+
+    /// 1.9.3: the plan sheet with drag handles.
+    func testNewIn193Tour() {
+        app.launchArguments += ["-gymdemo"]
+        app.launch()
+        app.buttons["open-gym"].tap()
+        app.buttons["gym-plan"].tap()
+        app.buttons["plan-machine-Leg press"].tap()
+        app.buttons["plan-machine-Chest press"].tap()
+        app.buttons["plan-machine-Treadmill"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["plan-order-3"].waitForExistence(timeout: 5))
+        snap("36 Plan with handles")
+    }
 }
