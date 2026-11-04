@@ -86,6 +86,8 @@ struct GymScreen: View {
     @State private var newMachine: Machine?
     @State private var opened: MachineRef?
     @State private var summary: GymVisit?
+    /// The gym log just before Finish, for Undo Finish (since 1.14).
+    @State private var beforeFinish: GymLog?
     @State private var planning = false
     @State private var naming: GymNaming?
     @State private var gymName = ""
@@ -281,7 +283,11 @@ struct GymScreen: View {
         }
         .sheet(item: $summary) { v in
             NavigationStack {
-                SummaryScreen(visitID: v.id) { summary = nil }
+                SummaryScreen(visitID: v.id, undo: {
+                    if let before = beforeFinish { library.changeGym { $0.undoFinish(visit: v.id, before: before) } }
+                    beforeFinish = nil
+                    summary = nil
+                }) { summary = nil }
             }
             .environment(library)
         }
@@ -558,6 +564,7 @@ struct GymScreen: View {
 
     private func finish(_ visit: GymVisit) {
         let now = Date()
+        beforeFinish = library.gym
         library.changeGym { $0.finish(visit: visit.id, at: now) }
         Cues.shared.finished("Well done")
         summary = library.gym.visits.first { $0.id == visit.id }
@@ -625,7 +632,6 @@ private struct PlanSheet: View {
     let done: ([UUID]?) -> Void
     @State private var namingTemplate = false
     @State private var templateName = ""
-    @State private var deleting: PlanTemplate?
 
     private var templates: [PlanTemplate] { library.gym.templates(gym: gymID) }
 
@@ -634,6 +640,7 @@ private struct PlanSheet: View {
             if !templates.isEmpty {
                 Section {
                     ForEach(templates) { t in
+                        // Deleting a template lives in Settings → Plan templates (since 1.14).
                         HStack {
                             Button {
                                 order = library.gym.order(of: t)
@@ -649,12 +656,6 @@ private struct PlanSheet: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("plan-template-\(t.name)")
-                            Button { deleting = t } label: {
-                                ControlMarkView(.close, size: 18, colour: .red)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Delete the template \(t.name)")
-                            .accessibilityIdentifier("plan-template-delete-\(t.name)")
                         }
                     }
                     .moveDisabled(true)
@@ -755,17 +756,6 @@ private struct PlanSheet: View {
             .accessibilityIdentifier("plan-template-name-save")
         } message: {
             Text("The same name in this gym is replaced.")
-        }
-        .alert("Delete the template \"\(deleting?.name ?? "")\"?", isPresented: Binding(
-            get: { deleting != nil }, set: { if !$0 { deleting = nil } }
-        )) {
-            Button("Cancel", role: .cancel) { deleting = nil }
-            Button("Delete", role: .destructive) {
-                if let t = deleting { library.changeGym { $0.deleteTemplate(t.id) } }
-                deleting = nil
-            }
-        } message: {
-            Text("Today's plan stays.")
         }
         // Always in edit mode, so the handles show without an Edit button.
         .environment(\.editMode, .constant(.active))
@@ -929,6 +919,8 @@ extension GymVisit {
 struct SummaryScreen: View {
     @Environment(Library.self) private var library
     let visitID: UUID
+    /// Undo Finish — tapped by mistake: the session goes on (since 1.14).
+    var undo: (() -> Void)? = nil
     let done: () -> Void
     @State private var title = ""
     @State private var notes = ""
@@ -998,10 +990,13 @@ struct SummaryScreen: View {
             title = visit?.title ?? ""
             notes = visit?.notes ?? ""
         }
-        .bottomActions(cancel: nil, save: {
+        .bottomActions(cancel: undo.map { u in {
+            library.changeGym { $0.describe(visit: visitID, title: title, notes: notes) }
+            u()
+        } }, cancelTitle: "Undo Finish", save: {
             library.changeGym { $0.describe(visit: visitID, title: title, notes: notes) }
             done()
-        }, saveTitle: "Done", tint: Gym.fill, saveID: "gym-summary-done")
+        }, saveTitle: "Done", tint: Gym.fill, cancelID: "gym-summary-undo", saveID: "gym-summary-done")
     }
 
     private func row(_ title: String, _ value: String, id: String) -> some View {

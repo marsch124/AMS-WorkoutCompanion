@@ -44,7 +44,7 @@ struct RootView: View {
     private var bar: some View {
         HStack(spacing: 0) {
             item(.train, "Train", id: "open-train", colour: Theme.accent) { c in IconMark(.hand("kettlebell"), size: 24, colour: c) }
-            item(.history, "History", id: "open-history", colour: Past.tint) { c in IconMark(.hand("pulse"), size: 24, colour: c) }
+            item(.history, "History", id: "open-history", colour: Past.tint) { c in AppMarkView(.history, size: 24, colour: c) }
             item(.settings, "Settings", id: "open-settings", colour: Theme.accent) { c in ControlMarkView(.settings, size: 24, colour: c) }
         }
         .padding(.top, 6)

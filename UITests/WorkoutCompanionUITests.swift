@@ -208,6 +208,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         waitFor(any("session-photos"), label: any("session-photos").label)
         XCTAssertTrue(any("session-photo-2").waitForExistence(timeout: 5))
         XCTAssertEqual(any("session-photos").value as? String, "2 photos")
+        // 1.14: the first session photo goes into the share picture.
+        waitFor(app.buttons["visit-share"], label: "Share this visit")
+        XCTAssertEqual(app.buttons["visit-share"].value as? String, "0 photos, session photo")
 
         any("session-photo-1").tap()
         app.buttons["session-photo-remove"].tap()
@@ -253,6 +256,53 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["gym-summary-done"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["gym-session-done"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertEqual(rows.count, before + 2)
+    }
+
+    /// 1.14: Undo Finish — the session goes on, Finish is back, and it is not listed as done.
+    func testUndoFinishKeepsTheSessionOpen() {
+        app.terminate()
+        app.launchArguments = ["-uitest", "-gymdemo"]
+        app.launch()
+        app.buttons["open-gym"].tap()
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'gym-visit-'"))
+        XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+        let before = rows.count
+        app.buttons["machine-Chest press"].tap()
+        waitFor(app.staticTexts["gym-next-set"], label: "Set 1")
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 3))
+        goBack()
+        app.buttons["gym-finish"].tap()
+        let undo = app.buttons["gym-summary-undo"].firstMatch
+        XCTAssertTrue(undo.waitForExistence(timeout: 5))
+        undo.tap()
+        XCTAssertTrue(app.buttons["gym-finish"].waitForExistence(timeout: 5), "Finish is back after Undo")
+        XCTAssertFalse(app.descendants(matching: .any)["gym-session-done"].firstMatch.exists)
+        XCTAssertEqual(rows.count, before, "the session is not listed as an earlier visit")
+    }
+
+    /// 1.14: a session can be deleted from its page; Undo brings it back.
+    func testDeleteASessionAndUndo() {
+        app.terminate()
+        app.launchArguments = ["-uitest", "-gymdemo"]
+        app.launch()
+        app.buttons["open-history"].tap()
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'history-row-'"))
+        let row = app.buttons["history-row-1"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        let before = rows.count
+        row.tap()
+        let delete = app.buttons["visit-delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        while !delete.isHittable { app.swipeUp() }
+        delete.tap()
+        app.buttons["visit-delete-confirm"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 5))
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertEqual(rows.count, before - 1, "the session is gone from History")
+        app.buttons["undo-button"].tap()
+        let back = NSPredicate(format: "count == %d", before)
+        XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: back, evaluatedWith: rows)], timeout: 5), .completed, "Undo brings it back")
     }
 
     func testABusyMachineMovesToComeBackToAndClearsWhenOpened() {

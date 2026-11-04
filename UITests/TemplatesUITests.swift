@@ -35,11 +35,18 @@ final class TemplatesUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["plan-order-2"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["plan-order-3"].exists)
 
-        app.buttons["plan-template-delete-Leg day"].tap()
-        let sure = app.alerts.firstMatch.buttons["Delete"].firstMatch
-        XCTAssertTrue(sure.waitForExistence(timeout: 5))
-        sure.tap()
-        XCTAssertTrue(app.buttons["plan-template-Leg day"].waitForNonExistence(timeout: 5), "the template is still there")
-        XCTAssertTrue(app.descendants(matching: .any)["plan-order-2"].exists, "today's plan should stay")
+        // 1.14: no deleting in Plan today — that is in Settings → Plan templates.
+        XCTAssertFalse(app.buttons["plan-template-delete-Leg day"].exists)
+        app.buttons["plan-save"].tap()
+
+        app.buttons["open-settings"].tap()
+        app.buttons["open-templates"].tap()
+        let delete = app.buttons["template-delete-Leg day"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), "the template is not in Settings")
+        delete.tap()
+        XCTAssertTrue(delete.waitForNonExistence(timeout: 5), "the template is still there")
+        app.buttons["open-train"].tap()
+        app.buttons["gym-plan"].tap()
+        XCTAssertFalse(app.buttons["plan-template-Leg day"].waitForExistence(timeout: 2), "deleted in Settings, gone from Plan today")
     }
 }

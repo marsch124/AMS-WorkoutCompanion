@@ -12,6 +12,10 @@ struct VisitScreen: View {
     @State private var picture: Image?
     /// How many machine photos the share picture holds — read by a test.
     @State private var sharePhotos = 0
+    /// Whether the session's own photo is in the share picture (since 1.14) — read by a test.
+    @State private var shareSession = false
+    @State private var askDelete = false
+    @Environment(\.dismiss) private var dismiss
 
     private struct ChangingSet: Identifiable {
         let entryID: UUID
@@ -61,6 +65,19 @@ struct VisitScreen: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     ForEach(Array(visit.entries.enumerated()), id: \.element.id) { n, e in machineCard(e, position: n + 1) }
+                    // Delete this session (since 1.14) — after asking; Undo brings it back for 10 seconds.
+                    Button(role: .destructive) { askDelete = true } label: {
+                        HStack(spacing: 8) {
+                            AppMarkView(.trash, size: 20, colour: .red)
+                            Text("Delete this session").foregroundStyle(.red)
+                        }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 6)
+                    .accessibilityIdentifier("visit-delete")
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -78,7 +95,7 @@ struct VisitScreen: View {
                         ShareMark().stroke(Gym.tint, style: StrokeStyle(lineWidth: 1.9, lineCap: .round, lineJoin: .round)).frame(width: 22, height: 22)
                     }
                     .accessibilityLabel("Share this visit")
-                    .accessibilityValue("\(sharePhotos) photos")
+                    .accessibilityValue("\(sharePhotos) photos" + (shareSession ? ", session photo" : ""))
                     .accessibilityIdentifier("visit-share")
                 }
             }
@@ -87,6 +104,13 @@ struct VisitScreen: View {
                     .accessibilityLabel("Title and notes")
                     .accessibilityIdentifier("visit-edit")
             }
+        }
+        .confirmationDialog("Delete this session and all its sets?", isPresented: $askDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                dismiss()
+                library.changeGym(undo: "Session deleted") { $0.delete(visit: visitID) }
+            }
+            .accessibilityIdentifier("visit-delete-confirm")
         }
         .sheet(item: $changing) { c in
             if let e = visit?.entries.first(where: { $0.id == c.entryID }), e.sets.indices.contains(c.index) {
@@ -134,6 +158,7 @@ struct VisitScreen: View {
         let drawn = VisitShareCard.render(visit, gym: library.gym) { library.image($0) }
         picture = drawn?.image
         sharePhotos = drawn?.photos ?? 0
+        shareSession = drawn?.session ?? false
         // Test runs keep a copy of the picture, to look at it (never on his iPhone: -uitest only).
         if ProcessInfo.processInfo.arguments.contains("-uitest"), let ui = VisitShareCard.renderUIImage(visit, gym: library.gym, photo: { library.image($0) }) {
             try? ui.pngData()?.write(to: FileManager.default.temporaryDirectory.appendingPathComponent("uitest/share.png"))

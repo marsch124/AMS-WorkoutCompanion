@@ -733,6 +733,19 @@ public struct GymLog: Codable, Equatable, Sendable {
         plans.removeAll { $0.gymID == v.gymID && calendar.isDate($0.day, inSameDayAs: v.date) }
     }
 
+    /// Undo Finish (since 1.14): the session is open again, and the day's Busy marks and plan come back as they were.
+    /// Title, notes and photos given since stay.
+    public mutating func undoFinish(visit visitID: UUID, before: GymLog) {
+        guard var v = visits.first(where: { $0.id == visitID }) else { return }
+        v.finished = before.visits.first { $0.id == visitID }?.finished
+        put(v)
+        busyMarks = before.busyMarks
+        plans = before.plans
+    }
+
+    /// Deletes one session with all its sets (since 1.14). Its photos go once Undo is no longer offered.
+    public mutating func delete(visit visitID: UUID) { visits.removeAll { $0.id == visitID } }
+
     /// After the sets on a machine: what to do next time and how it felt; nil and empty words take them away.
     public mutating func nextTime(visit visitID: UUID, machine machineID: UUID, set: GymSet?, note: String) {
         guard var v = visits.first(where: { $0.id == visitID }),

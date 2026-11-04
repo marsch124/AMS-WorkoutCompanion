@@ -26,6 +26,8 @@ struct SettingsScreen: View {
                     .accessibilityIdentifier("settings-backups")
                 NavigationLink("Muscle groups") { MuscleGroupsScreen() }
                     .accessibilityIdentifier("open-muscle-groups")
+                NavigationLink("Plan templates") { TemplatesScreen() }
+                    .accessibilityIdentifier("open-templates")
                 NavigationLink("Rest times") { RestTimesScreen() }
                     .accessibilityIdentifier("open-rest-times")
                 NavigationLink("Check my data") { HealthCheckScreen() }

@@ -25,6 +25,10 @@ enum AppMark: String {
     case pair = "M10 14l4-4 M8.6 11.6l-2 2a3 3 0 0 0 4.2 4.2l2-2 M15.4 12.4l2-2a3 3 0 0 0 -4.2 -4.2l-2 2"
     /// A bookmark, for keeping a plan as a template (since 1.13).
     case template = "M7 4.5h10v15l-5 -3.6l-5 3.6Z M10 8.5h4"
+    /// Bars going up, for History (since 1.14; before: a heart-rate line, his "looks like heart rate, not history").
+    case history = "M4.5 19.5h15 M7 16v-3 M11 16V9 M15 16v-5 M18.5 16V6"
+    /// A bin, for deleting (since 1.14).
+    case trash = "M4.5 7h15 M9.5 7V4.5h5V7 M6.5 7l1 12.5h9l1 -12.5 M10.5 10.5v6 M13.5 10.5v6"
     /// A small flame, for a warm-up set.
     case warmup = "M12 4c2.4 3.2 5 5.2 5 9a5 5 0 0 1 -10 0c0 -2.2 1.2 -3.5 2.3 -4.5c.3 1.6 1 2.4 1.9 2.7C11.5 8.6 11.4 6.6 12 4Z"
 }

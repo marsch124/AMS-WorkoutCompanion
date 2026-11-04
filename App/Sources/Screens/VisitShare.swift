@@ -9,6 +9,8 @@ struct VisitShareCard: View {
     let gym: GymLog
     /// Each machine's photo, small, by machine (since 1.11.1). A machine without one shows its drawn icon.
     var photos: [UUID: UIImage] = [:]
+    /// The session's first photo, wide under the heading (since 1.14).
+    var sessionPhoto: UIImage?
 
     private let ink = Color(red: 0.11, green: 0.11, blue: 0.14)
     private let muted = Color(red: 0.42, green: 0.42, blue: 0.48)
@@ -27,6 +29,13 @@ struct VisitShareCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
             .background(indigo, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            if let sessionPhoto {
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 240)
+                    .overlay { Image(uiImage: sessionPhoto).resizable().scaledToFill() }
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
             HStack(spacing: 8) {
                 tile("Time", visit.minutes.map { "\($0) min" } ?? "–", Color(red: 0.13, green: 0.55, blue: 0.30))
                 tile("Sets", "\(visit.setCount)", Color(red: 0.85, green: 0.45, blue: 0.08))
@@ -93,14 +102,22 @@ struct VisitShareCard: View {
     /// The picture, drawn at three times the size.
     /// `photo` finds a machine's photo file; each is scaled down to 156 px first, so a long visit stays quick.
     /// Also says how many photos went into the picture.
-    @MainActor static func render(_ visit: GymVisit, gym: GymLog, photo: (String?) -> UIImage?) -> (image: Image, photos: Int)? {
+    /// Also says whether the session's own photo is in it.
+    @MainActor static func render(_ visit: GymVisit, gym: GymLog, photo: (String?) -> UIImage?) -> (image: Image, photos: Int, session: Bool)? {
         let photos = thumbs(visit, gym: gym, photo: photo)
-        guard let ui = draw(visit, gym: gym, photos: photos) else { return nil }
-        return (Image(uiImage: ui), photos.count)
+        let first = sessionPhoto(visit, photo: photo)
+        guard let ui = draw(visit, gym: gym, photos: photos, session: first) else { return nil }
+        return (Image(uiImage: ui), photos.count, first != nil)
     }
 
     @MainActor static func renderUIImage(_ visit: GymVisit, gym: GymLog, photo: (String?) -> UIImage?) -> UIImage? {
-        draw(visit, gym: gym, photos: thumbs(visit, gym: gym, photo: photo))
+        draw(visit, gym: gym, photos: thumbs(visit, gym: gym, photo: photo), session: sessionPhoto(visit, photo: photo))
+    }
+
+    /// The first session photo, scaled to the picture's width (1170 px) first.
+    private static func sessionPhoto(_ visit: GymVisit, photo: (String?) -> UIImage?) -> UIImage? {
+        guard let name = visit.photos?.first, let full = photo(name) else { return nil }
+        return small(full, side: 1170)
     }
 
     private static func thumbs(_ visit: GymVisit, gym: GymLog, photo: (String?) -> UIImage?) -> [UUID: UIImage] {
@@ -111,14 +128,13 @@ struct VisitShareCard: View {
         return photos
     }
 
-    @MainActor private static func draw(_ visit: GymVisit, gym: GymLog, photos: [UUID: UIImage]) -> UIImage? {
-        let r = ImageRenderer(content: VisitShareCard(visit: visit, gym: gym, photos: photos))
+    @MainActor private static func draw(_ visit: GymVisit, gym: GymLog, photos: [UUID: UIImage], session: UIImage?) -> UIImage? {
+        let r = ImageRenderer(content: VisitShareCard(visit: visit, gym: gym, photos: photos, sessionPhoto: session))
         r.scale = 3
         return r.uiImage
     }
 
-    private static func small(_ image: UIImage) -> UIImage {
-        let side: CGFloat = 156
+    private static func small(_ image: UIImage, side: CGFloat = 156) -> UIImage {
         let k = side / min(image.size.width, image.size.height)
         guard k < 1 else { return image }
         let size = CGSize(width: image.size.width * k, height: image.size.height * k)

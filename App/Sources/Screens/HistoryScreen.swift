@@ -37,7 +37,7 @@ struct HistoryScreen: View {
             VStack(alignment: .leading, spacing: 10) {
                 if all.isEmpty {
                     VStack(spacing: 10) {
-                        IconMark(.hand("pulse"), size: 48, colour: Past.tint)
+                        AppMarkView(.history, size: 48, colour: Past.tint)
                         Text("Every workout you finish — or end early — and every gym session is kept here, with your week in numbers.")
                             .font(.subheadline)
                             .foregroundStyle(Theme.muted)
