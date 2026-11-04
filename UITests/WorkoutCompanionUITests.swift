@@ -108,9 +108,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.11.3 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.12 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.11.3"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.12"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -177,6 +177,44 @@ final class WorkoutCompanionUITests: XCTestCase {
         waitFor(app.staticTexts["gym-summary-machines"], label: "1")
         app.buttons["gym-summary-done"].tap()
         XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+    }
+
+    /// 1.12: after Finish the button goes, the session joins Earlier visits, and a set starts a second session.
+    func testFinishClosesTheSessionAndASecondOneCanStart() {
+        app.terminate()
+        app.launchArguments = ["-uitest", "-gymdemo"]
+        app.launch()
+        app.buttons["open-gym"].tap()
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'gym-visit-'"))
+        XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+        let before = rows.count
+
+        func oneSet() {
+            app.buttons["machine-Chest press"].tap()
+            waitFor(app.staticTexts["gym-next-set"], label: "Set 1")
+            app.buttons["gym-set-done"].tap()
+            XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 3))
+            goBack()
+            XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+        }
+
+        oneSet()
+        XCTAssertTrue(app.buttons["gym-finish"].waitForExistence(timeout: 3))
+        app.buttons["gym-finish"].tap()
+        app.buttons["gym-summary-done"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["gym-finish"].exists, "Finish must go once the session is stored")
+        XCTAssertTrue(app.descendants(matching: .any)["gym-session-done"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(rows.count, before + 1, "the finished session is listed under Earlier visits")
+
+        // A second session the same day: Finish is back, starting again at set 1.
+        oneSet()
+        XCTAssertTrue(app.buttons["gym-finish"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.descendants(matching: .any)["gym-session-done"].firstMatch.exists)
+        app.buttons["gym-finish"].tap()
+        app.buttons["gym-summary-done"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["gym-session-done"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(rows.count, before + 2)
     }
 
     func testABusyMachineMovesToComeBackToAndClearsWhenOpened() {

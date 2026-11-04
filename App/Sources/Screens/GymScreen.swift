@@ -26,8 +26,11 @@ struct GymCard: View {
     @State private var changingIcon = false
 
     private var summary: String {
-        if let today = library.gym.visits.first(where: { Calendar.current.isDateInToday($0.date) && $0.setCount > 0 }) {
-            return "Today: \(today.entries.count) machine\(today.entries.count == 1 ? "" : "s") · \(today.setCount) set\(today.setCount == 1 ? "" : "s")"
+        let today = library.gym.visits.filter { Calendar.current.isDateInToday($0.date) && $0.setCount > 0 }
+        if !today.isEmpty {
+            let sets = today.reduce(0) { $0 + $1.setCount }
+            let lead = today.count > 1 ? "\(today.count) sessions" : "\(today[0].entries.count) machine\(today[0].entries.count == 1 ? "" : "s")"
+            return "Today: \(lead) · \(sets) set\(sets == 1 ? "" : "s")"
         }
         let n = library.gym.machines.count
         return n == 0 ? "Photo, weight and reps per machine" : "\(n) machine\(n == 1 ? "" : "s")"
@@ -92,7 +95,7 @@ struct GymScreen: View {
     @State private var repeatName = ""
 
     private var gymID: UUID? { library.gym.currentGym?.id }
-    private var visit: GymVisit? { library.gym.visit(on: day, gym: gymID) }
+    private var visit: GymVisit? { library.gym.openVisit(on: day, gym: gymID) }
     private var machines: [Machine] { library.gym.machines(in: gymID) }
     private var plan: DayPlan? { library.gym.plan(on: day, gym: gymID) }
     private var isToday: Bool { Calendar.current.isDateInToday(day) }
@@ -126,6 +129,21 @@ struct GymScreen: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
                     .accessibilityIdentifier("gym-intro")
+
+                // After Finish the session is closed; a set now starts the day's next one (since 1.12).
+                let doneToday = library.gym.visits(on: day, gym: gymID).filter { $0.finished != nil && $0.setCount > 0 }.count
+                if visit == nil, doneToday > 0 {
+                    HStack(spacing: 8) {
+                        ControlMarkView(.check, size: 16, colour: Gym.tint)
+                        Text(doneToday == 1
+                             ? "Session done. Tap a machine to start a second session."
+                             : "\(doneToday) sessions done. Tap a machine to start another.")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Gym.tint)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("gym-session-done")
+                }
 
                 planSection
 
@@ -859,6 +877,7 @@ private struct VisitRow: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Theme.ink)
                 Text((visit.title == nil ? "" : visit.date.formatted(.dateTime.day().month(.abbreviated)) + " · ")
+                     + (visit.started.map { $0.formatted(date: .omitted, time: .shortened) + " · " } ?? "")
                      + "\(visit.entries.count) machine\(visit.entries.count == 1 ? "" : "s") · \(visit.setCount) set\(visit.setCount == 1 ? "" : "s")")
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)

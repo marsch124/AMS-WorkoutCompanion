@@ -458,6 +458,18 @@ public struct GymLog: Codable, Equatable, Sendable {
         visits.first { $0.gymID == gym && calendar.isDate($0.date, inSameDayAs: day) }
     }
 
+    /// The session still going on this day at this gym — not yet finished (since 1.12).
+    /// After Finish there is none: the next set starts a second session that day.
+    public func openVisit(on day: Date, gym: UUID? = nil, calendar: Calendar = .current) -> GymVisit? {
+        visits.first { $0.gymID == gym && $0.finished == nil && calendar.isDate($0.date, inSameDayAs: day) }
+    }
+
+    /// Every session on this day at this gym, the earliest first.
+    public func visits(on day: Date, gym: UUID? = nil, calendar: Calendar = .current) -> [GymVisit] {
+        visits.filter { $0.gymID == gym && calendar.isDate($0.date, inSameDayAs: day) }
+            .sorted { ($0.started ?? $0.date) < ($1.started ?? $1.date) }
+    }
+
     // MARK: Gyms
 
     public static let firstGymName = "My gym"
@@ -520,7 +532,7 @@ public struct GymLog: Codable, Equatable, Sendable {
 
     /// A planned machine counts as done once it has a set in today's visit.
     public func isDone(_ machineID: UUID, on day: Date, gym: UUID?, calendar: Calendar = .current) -> Bool {
-        visit(on: day, gym: gym, calendar: calendar)?.entries.contains { $0.machineID == machineID && !$0.sets.isEmpty } ?? false
+        openVisit(on: day, gym: gym, calendar: calendar)?.entries.contains { $0.machineID == machineID && !$0.sets.isEmpty } ?? false
     }
 
     /// The next planned machine: not done today, not skipped and not busy.
@@ -562,7 +574,9 @@ public struct GymLog: Codable, Equatable, Sendable {
     }
 
     /// Visits, newest first.
-    public var visitsNewestFirst: [GymVisit] { visits.sorted { $0.date > $1.date } }
+    public var visitsNewestFirst: [GymVisit] {
+        visits.sorted { ($0.date, $0.started ?? $0.date) > ($1.date, $1.started ?? $1.date) }
+    }
 
     /// The most recent earlier visit's entry for this machine (visits other than `excluding`).
     public func last(_ machineID: UUID, excluding visitID: UUID? = nil) -> (visit: GymVisit, entry: MachineEntry)? {
@@ -743,7 +757,8 @@ public struct GymLog: Codable, Equatable, Sendable {
     public mutating func add(_ set: GymSet, machine machineID: UUID, on day: Date, now: Date = Date(),
                              calendar: Calendar = .current) {
         let gym = machine(machineID)?.gymID
-        var v = visit(on: day, gym: gym, calendar: calendar) ?? GymVisit(gymID: gym, date: day)
+        // A finished session stays closed: a set after Finish starts the day's next session (since 1.12).
+        var v = openVisit(on: day, gym: gym, calendar: calendar) ?? GymVisit(gymID: gym, date: day)
         if v.started == nil { v.started = now }
         var set = set
         set.at = now   // a prefilled set may carry last time's stamp

@@ -35,7 +35,7 @@ struct MachineScreen: View {
     private let clock = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     private var machine: Machine? { library.gym.machine(machineID) }
-    private var visit: GymVisit { library.gym.visit(on: day, gym: gymID) ?? GymVisit(gymID: gymID, date: day) }
+    private var visit: GymVisit { library.gym.openVisit(on: day, gym: gymID) ?? GymVisit(gymID: gymID, date: day) }
     private var entryToday: MachineEntry? { visit.entries.last { $0.machineID == machineID } }
     private var isTime: Bool { machine?.logs == .time }
     /// Push-ups, sit-ups: reps only, no weight (since 1.6).
@@ -581,7 +581,7 @@ struct MachineScreen: View {
         warmup = false
         Cues.shared.tap()
         // Superset: straight on to the partner while it is behind — no rest in between (since 1.11).
-        if let jump = library.gym.supersetJump(after: machineID, in: library.gym.visit(on: day, gym: gymID)) {
+        if let jump = library.gym.supersetJump(after: machineID, in: library.gym.openVisit(on: day, gym: gymID)) {
             moveOn(jump)
             return
         }
