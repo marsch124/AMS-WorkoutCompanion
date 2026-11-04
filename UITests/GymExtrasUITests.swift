@@ -19,6 +19,21 @@ final class GymExtrasUITests: XCTestCase {
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
+    /// 1.11.3: the Earlier visits heading names the gym; an earlier visit's date has the year.
+    func testEarlierVisitsNameTheGymAndTheDateHasTheYear() {
+        openGym()
+        let heading = any("gym-earlier-heading")
+        XCTAssertTrue(heading.waitForExistence(timeout: 5))
+        XCTAssertTrue(heading.label.hasPrefix("Earlier visits · "), heading.label)
+        let row = app.buttons["gym-visit-1"]
+        for _ in 0..<8 where !row.isHittable { app.swipeUp() }   // it sits far below the machines
+        row.tap()
+        let date = any("visit-date")
+        XCTAssertTrue(date.waitForExistence(timeout: 5))
+        let year = String(Calendar.current.component(.year, from: Date()))
+        XCTAssertTrue(date.label.contains(year), date.label)
+    }
+
     /// Up the weight far past the best (Leg press: 55 kg), then Set done.
     private func heavySet() {
         let plus = app.buttons["gym-weight-plus"]

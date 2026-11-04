@@ -309,6 +309,16 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
         return max(1, Int(end.timeIntervalSince(started) / 60))
     }
 
+    /// "Tuesday, 3 November 2026 · yesterday" — with the year, and today/yesterday when it is (since 1.11.3).
+    public static func dateText(_ date: Date, now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current) -> String {
+        var style = Date.FormatStyle(date: .complete, time: .omitted, locale: locale, calendar: calendar)
+        style.timeZone = calendar.timeZone
+        let text = date.formatted(style)
+        if calendar.isDate(date, inSameDayAs: now) { return text + " · today" }
+        if let y = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: y) { return text + " · yesterday" }
+        return text
+    }
+
     /// Everything lifted, in kilograms: weight × reps of every set.
     public var totalKg: Double {
         entries.reduce(0) { sum, e in sum + e.sets.reduce(0) { $0 + $1.kg * Double($1.reps) } }
@@ -562,6 +572,26 @@ public struct GymLog: Codable, Equatable, Sendable {
             }
         }
         return nil
+    }
+
+    /// A machine tile's line before it is used today: "Last: 35 kg", "Last: 12 reps", "Last: 25 min · level 8" or "New".
+    /// Only sets of the machine's own kind count, so a machine switched to time never shows kilograms (since 1.11.3).
+    public func lastText(_ m: Machine, excluding visitID: UUID? = nil) -> String {
+        for v in visitsNewestFirst where v.id != visitID {
+            for e in v.entries.reversed() where e.machineID == m.id {
+                switch m.logs {
+                case .time:
+                    if let t = e.sets.first(where: \.isTime) { return "Last: \(t.text)" }
+                case .reps:
+                    let reps = e.working.filter { !$0.isTime }.map(\.reps).max() ?? 0
+                    if reps > 0 { return "Last: \(reps) reps" }
+                default:
+                    let w = e.working.filter { !$0.isTime }
+                    if !w.isEmpty { return "Last: \(GymSet.weight(w.map(\.kg).max() ?? 0))" }
+                }
+            }
+        }
+        return "New"
     }
 
     /// The heaviest weight ever done on this machine, leaving out one visit —

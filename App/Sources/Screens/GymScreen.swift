@@ -186,13 +186,15 @@ struct GymScreen: View {
 
                 let earlier = library.gym.visits(in: gymID).filter { $0.id != visit?.id }
                 if !earlier.isEmpty {
-                    Text("Earlier visits")
+                    Text(library.gym.gyms.first { $0.id == gymID }.map { "Earlier visits · \($0.name)" } ?? "Earlier visits")
                         .font(.headline)
+                        .accessibilityIdentifier("gym-earlier-heading")
                         .foregroundStyle(Gym.tint)
                         .padding(.top, 10)
                     VStack(spacing: 0) {
                         ForEach(Array(earlier.enumerated()), id: \.element.id) { i, v in
-                            NavigationLink(value: v) {
+                            // The row carries its page (a value lookup did not open — the 1.5 History fault).
+                            NavigationLink { VisitScreen(visitID: v.id) } label: {
                                 VisitRow(visit: v)
                             }
                             .buttonStyle(.plain)
@@ -223,9 +225,6 @@ struct GymScreen: View {
                 }
             }
             .id(ref.id)
-        }
-        .navigationDestination(for: GymVisit.self) { v in
-            VisitScreen(visitID: v.id)
         }
         .fullScreenCover(isPresented: $camera) {
             CameraPicker { data in
@@ -538,12 +537,7 @@ struct GymScreen: View {
             let sets = visit.entries.filter { $0.machineID == m.id }.reduce(0) { $0 + $1.sets.count }
             if sets > 0 { return m.logs == .time ? "Done today" : "\(sets) set\(sets == 1 ? "" : "s") done" }
         }
-        if let last = library.gym.last(m.id, excluding: visit?.id) {
-            if m.logs == .time, let first = last.entry.sets.first { return "Last: \(first.text)" }
-            if m.logs == .reps { return "Last: \(last.entry.mostReps) reps" }
-            return "Last: \(GymSet.weight(last.entry.heaviest))"
-        }
-        return "New"
+        return library.gym.lastText(m, excluding: visit?.id)
     }
 
     private func finish(_ visit: GymVisit) {

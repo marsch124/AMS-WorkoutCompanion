@@ -137,8 +137,9 @@ struct VisitScreen: View {
         let place = library.gym.gyms.first { $0.id == visit.gymID }?.name ?? "At the gym"
         return VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 0) {
-                Text(visit.date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                Text(GymVisit.dateText(visit.date))
                     .font(.title2.weight(.bold))
+                    .accessibilityIdentifier("visit-date")
                     .foregroundStyle(Gym.ink)
                 Text(place).font(.subheadline.weight(.semibold)).foregroundStyle(Gym.ink.opacity(0.85))
             }
