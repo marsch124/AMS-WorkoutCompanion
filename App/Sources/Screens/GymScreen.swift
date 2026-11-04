@@ -901,15 +901,24 @@ struct MachinePhoto: View {
 private struct VisitRow: View {
     let visit: GymVisit
 
+    /// "4 Nov · 17:05 · 3 machines · 9 sets" — in small steps, so GitHub's compiler does not give up (1.16).
+    private var detail: String {
+        var parts: [String] = []
+        if visit.title != nil { parts.append(visit.date.formatted(.dateTime.day().month(.abbreviated))) }
+        if let started = visit.started { parts.append(started.formatted(date: .omitted, time: .shortened)) }
+        let machines = visit.entries.count, sets = visit.setCount
+        parts.append("\(machines) machine" + (machines == 1 ? "" : "s"))
+        parts.append("\(sets) set" + (sets == 1 ? "" : "s"))
+        return parts.joined(separator: " · ")
+    }
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(visit.title ?? visit.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year()))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Theme.ink)
-                Text((visit.title == nil ? "" : visit.date.formatted(.dateTime.day().month(.abbreviated)) + " · ")
-                     + (visit.started.map { $0.formatted(date: .omitted, time: .shortened) + " · " } ?? "")
-                     + "\(visit.entries.count) machine\(visit.entries.count == 1 ? "" : "s") · \(visit.setCount) set\(visit.setCount == 1 ? "" : "s")")
+                Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
             }
