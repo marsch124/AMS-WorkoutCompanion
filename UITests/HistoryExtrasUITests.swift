@@ -26,8 +26,7 @@ final class HistoryExtrasUITests: XCTestCase {
         let reps = app.textFields["visit-set-reps"]
         XCTAssertTrue(reps.waitForExistence(timeout: 5))
         XCTAssertTrue(any("visit-set-remove").exists)
-        reps.doubleTap()   // selects the number
-        reps.typeText("7")
+        replace(reps, with: "7")
         app.buttons["visit-set-save"].tap()
         XCTAssertTrue(app.buttons["visit-set-1-1"].waitForExistence(timeout: 5))
         XCTAssertNotEqual(app.buttons["visit-set-1-1"].label, before)
@@ -43,8 +42,7 @@ final class HistoryExtrasUITests: XCTestCase {
         let minutes = app.textFields["visit-time-minutes"]
         XCTAssertTrue(minutes.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["visit-time-cancel"].exists)
-        minutes.doubleTap()   // selects the number
-        minutes.typeText("31")
+        replace(minutes, with: "31")
         app.buttons["visit-time-save"].tap()
         XCTAssertTrue(any("visit-time").waitForExistence(timeout: 5))
         XCTAssertEqual(any("visit-time").label, "31 min")
@@ -81,5 +79,13 @@ final class HistoryExtrasUITests: XCTestCase {
         XCTAssertTrue(share.waitForExistence(timeout: 10))
         // The latest demo visit: Chest press, Lat pulldown and Treadmill — three photos.
         XCTAssertEqual(share.value as? String, "3 photos")
+    }
+
+    /// Clears a field key by key, then types — a double tap does not always select on GitHub's simulator.
+    private func replace(_ field: XCUIElement, with text: String) {
+        field.tap()                                                              // focus
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.5)).tap()   // cursor after the number
+        let old = (field.value as? String) ?? ""
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count + 2) + text)
     }
 }
