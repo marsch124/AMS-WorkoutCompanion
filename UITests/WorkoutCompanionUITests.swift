@@ -108,9 +108,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.12 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.13 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.12"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.13"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -177,6 +177,44 @@ final class WorkoutCompanionUITests: XCTestCase {
         waitFor(app.staticTexts["gym-summary-machines"], label: "1")
         app.buttons["gym-summary-done"].tap()
         XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+    }
+
+    /// 1.13: photos of a session — added on Session done, shown on the visit page, removed after asking.
+    func testASessionKeepsItsPhotos() {
+        app.terminate()
+        app.launchArguments = ["-uitest", "-gymdemo", "-fakephoto"]
+        app.launch()
+        let any = { (id: String) in self.app.descendants(matching: .any)[id].firstMatch }
+        app.buttons["open-gym"].tap()
+        app.buttons["machine-Chest press"].tap()
+        waitFor(app.staticTexts["gym-next-set"], label: "Set 1")
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 3))
+        goBack()
+        app.buttons["gym-finish"].tap()
+
+        let add = any("session-photo-add")
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.tap()
+        add.tap()
+        XCTAssertTrue(any("session-photo-2").waitForExistence(timeout: 5))
+        app.buttons["gym-summary-done"].firstMatch.tap()
+
+        // The finished session is the newest earlier visit; its page shows both photos.
+        let row = app.buttons["gym-visit-1"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        while !row.isHittable { app.swipeUp() }
+        row.tap()
+        waitFor(any("session-photos"), label: any("session-photos").label)
+        XCTAssertTrue(any("session-photo-2").waitForExistence(timeout: 5))
+        XCTAssertEqual(any("session-photos").value as? String, "2 photos")
+
+        any("session-photo-1").tap()
+        app.buttons["session-photo-remove"].tap()
+        app.buttons["session-photo-remove-confirm"].firstMatch.tap()
+        XCTAssertTrue(any("session-photo-1").waitForExistence(timeout: 5))
+        XCTAssertFalse(any("session-photo-2").exists)
+        XCTAssertEqual(any("session-photos").value as? String, "1 photo")
     }
 
     /// 1.12: after Finish the button goes, the session joins Earlier visits, and a set starts a second session.

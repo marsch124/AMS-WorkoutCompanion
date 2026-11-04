@@ -55,3 +55,31 @@ final class TwoSessionsTests: XCTestCase {
         XCTAssertEqual(l.visits[0].setCount, 2)
     }
 }
+
+/// 1.13: his 4 Nov session — bike 70 min, then treadmill 50 min — said 77 min instead of 2 hours.
+final class TimeMachineMinutesTests: XCTestCase {
+    func testTimeSetsCountFromWhenTheyBegan() {
+        let gym = UUID()
+        let bike = Machine(gymID: gym, name: "Bike", logs: .time)
+        let tread = Machine(gymID: gym, name: "Treadmill", logs: .time)
+        var l = GymLog(gyms: [GymPlace(id: gym, name: "G")], currentGymID: gym)
+        l.save(bike); l.save(tread)
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        // Saved at the end of each ride.
+        l.add(GymSet(seconds: 70 * 60, level: 0, incline: nil), machine: bike.id, on: start, now: start.addingTimeInterval(70 * 60))
+        l.add(GymSet(seconds: 50 * 60, level: 5, incline: nil), machine: tread.id, on: start, now: start.addingTimeInterval(122 * 60))
+        XCTAssertEqual(l.visits[0].minutes, 122)
+    }
+
+    func testNeverShorterThanTheMinutesOnTimeMachines() {
+        let gym = UUID()
+        let bike = Machine(gymID: gym, name: "Bike", logs: .time)
+        var l = GymLog(gyms: [GymPlace(id: gym, name: "G")], currentGymID: gym)
+        l.save(bike)
+        let t = Date(timeIntervalSince1970: 1_800_000_000)
+        // Both typed in afterwards, a minute apart.
+        l.add(GymSet(seconds: 70 * 60, level: nil, incline: nil), machine: bike.id, on: t, now: t)
+        l.add(GymSet(seconds: 50 * 60, level: nil, incline: nil), machine: bike.id, on: t, now: t.addingTimeInterval(60))
+        XCTAssertEqual(l.visits[0].minutes, 120)
+    }
+}

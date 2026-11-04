@@ -386,4 +386,33 @@ final class ScreenTour: XCTestCase {
         Thread.sleep(forTimeInterval: 2)
         snap("51 Share a visit")
     }
+
+    /// 1.13: the action tiles, the small Busy pill, Session done with photos, the visit's photos.
+    func testNewIn113Tour() {
+        app.launchArguments = ["-uitest", "-gymdemo", "-fakephoto"]
+        app.launch()
+        let any = { (id: String) in self.app.descendants(matching: .any)[id].firstMatch }
+        app.buttons["open-gym"].tap()
+        XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+        app.buttons["busy-Leg press"].tap()
+        snap("52 Gym tiles and Busy")
+        app.buttons["busy-Leg press"].tap()
+        app.buttons["machine-Chest press"].tap()
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 3))
+        app.buttons["machine-done-pill"].tap()
+        app.buttons["gym-finish"].tap()
+        XCTAssertTrue(any("session-photo-add").waitForExistence(timeout: 5))
+        any("session-photo-add").tap()
+        any("session-photo-add").tap()
+        snap("53 Session done with photos")
+        app.buttons["gym-summary-done"].firstMatch.tap()
+        XCTAssertTrue(any("gym-session-done").waitForExistence(timeout: 5))
+        snap("54 Session done line")
+        let row = app.buttons["gym-visit-1"]
+        while !row.isHittable { app.swipeUp() }
+        row.tap()
+        XCTAssertTrue(any("session-photo-1").waitForExistence(timeout: 5))
+        snap("55 Visit with photos")
+    }
 }

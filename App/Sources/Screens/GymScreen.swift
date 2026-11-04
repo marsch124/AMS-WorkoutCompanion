@@ -133,8 +133,9 @@ struct GymScreen: View {
                 // After Finish the session is closed; a set now starts the day's next one (since 1.12).
                 let doneToday = library.gym.visits(on: day, gym: gymID).filter { $0.finished != nil && $0.setCount > 0 }.count
                 if visit == nil, doneToday > 0 {
-                    HStack(spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         ControlMarkView(.check, size: 16, colour: Gym.tint)
+                            .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 2 }
                         Text(doneToday == 1
                              ? "Session done. Tap a machine to start a second session."
                              : "\(doneToday) sessions done. Tap a machine to start another.")
@@ -397,48 +398,42 @@ struct GymScreen: View {
                 .font(.caption)
                 .foregroundStyle(Theme.muted)
         } else if !machines.isEmpty {
-            HStack(spacing: 8) {
-            Button { planning = true } label: {
-                MarkLabel(title: "Plan today", mark: .list, size: 18, colour: Gym.tint)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Gym.tint)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .overlay(Capsule().stroke(Gym.fill, lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("gym-plan")
-            // Same machines, same order as last time — a plan in one tap (since 1.7).
+            // Three equal tiles, mark above words (1.13 — his "the buttons look like crap": capsules wrapped unevenly).
+            // Repeat last visit is the main one: full colour.
             let repeatOrder = library.gym.lastOrder(gym: gymID, before: day)
-            if !repeatOrder.isEmpty {
-                Button {
-                    library.changeGym { $0.setPlan(repeatOrder, on: day, gym: gymID) }
-                } label: {
-                    MarkLabel(title: "Repeat last visit", mark: .play, size: 16, colour: Gym.ink)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Gym.ink)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(Gym.fill, in: Capsule())
+            HStack(spacing: 8) {
+                Button { planning = true } label: {
+                    GymActionTile(title: "Plan today", main: false) {
+                        ControlMarkView(.list, size: 22, colour: Gym.tint)
+                    }
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier("gym-repeat")
-                // Keep last visit as a template, without planning first (since 1.11).
-                Button {
-                    repeatName = ""
-                    namingRepeat = true
-                } label: {
-                    Text("Save as template")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Gym.tint)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .overlay(Capsule().stroke(Gym.fill, lineWidth: 1))
+                .accessibilityIdentifier("gym-plan")
+                // Same machines, same order as last time — a plan in one tap (since 1.7).
+                if !repeatOrder.isEmpty {
+                    Button {
+                        library.changeGym { $0.setPlan(repeatOrder, on: day, gym: gymID) }
+                    } label: {
+                        GymActionTile(title: "Repeat last visit", main: true) {
+                            ControlMarkView(.play, size: 22, colour: Gym.ink)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("gym-repeat")
+                    // Keep last visit as a template, without planning first (since 1.11).
+                    Button {
+                        repeatName = ""
+                        namingRepeat = true
+                    } label: {
+                        GymActionTile(title: "Save as template", main: false) {
+                            AppMarkView(.template, size: 22, colour: Gym.tint)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("gym-repeat-template")
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("gym-repeat-template")
             }
-            }
+            .fixedSize(horizontal: false, vertical: true)
             .alert("Save last visit as template", isPresented: $namingRepeat) {
                 TextField("For example: Leg day", text: $repeatName)
                 Button("Cancel", role: .cancel) {}
@@ -524,14 +519,17 @@ struct GymScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("machine-\(m.name)")
-        .overlay(alignment: .topLeading) {
+        // Bottom right of the photo, small (1.13, his "not so visible or intrusive"): photo is 6 pt in, 96 pt tall.
+        .overlay(alignment: .topTrailing) {
             Button {
                 library.changeGym { $0.setBusy(m.id, !busy, on: day) }
             } label: {
-                BusyPill(on: busy)
+                // A small pill, but a finger-sized place to tap.
+                BusyPill(on: busy).padding(6).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(10)
+            .padding(.top, 6 + 96 - BusyPill.height - 4 - 6)
+            .padding(.trailing, 10 - 6)
             .accessibilityLabel(busy ? "\(m.name) is busy" : "Mark \(m.name) busy")
             .accessibilityIdentifier("busy-\(m.name)")
         }
@@ -572,6 +570,32 @@ extension GymScreen {
 }
 
 private enum GymNaming { case new, rename }
+
+/// One of the gym screen's action tiles: a hand-drawn mark above its words, all tiles the same size.
+private struct GymActionTile<Mark: View>: View {
+    let title: String
+    let main: Bool
+    @ViewBuilder let mark: () -> Mark
+
+    var body: some View {
+        VStack(spacing: 4) {
+            mark()
+                .frame(height: 24)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .foregroundStyle(main ? Gym.ink : Gym.tint)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(main ? AnyShapeStyle(Gym.fill) : AnyShapeStyle(Gym.fill.opacity(0.14)),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
 
 /// For a session you forgot to log: pick the day. Nothing changes until Done.
 private struct DayPicker: View {
@@ -802,17 +826,18 @@ private struct MachineTile: View {
 
 /// "Busy" on a machine's photo: full orange when marked, a light outline when not.
 private struct BusyPill: View {
+    static let height: CGFloat = 20
     let on: Bool
 
     var body: some View {
-        HStack(spacing: 4) {
-            IconMark(.hand("stopwatch"), size: 14, colour: on ? Gym.busy.inkColor : Gym.busyTint)
+        HStack(spacing: 2) {
+            IconMark(.hand("stopwatch"), size: 11, colour: on ? Gym.busy.inkColor : Gym.busyTint)
             Text("Busy")
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(on ? Gym.busy.inkColor : Gym.busyTint)
         }
-        .padding(.horizontal, 8)
-        .frame(height: 26)
+        .padding(.horizontal, 5)
+        .frame(height: Self.height)
         .background(on ? AnyShapeStyle(Gym.busy.fillColor) : AnyShapeStyle(Theme.card.opacity(0.92)), in: Capsule())
         .overlay(Capsule().stroke(Gym.busy.fillColor, lineWidth: on ? 0 : 1))
         .contentShape(Capsule())
@@ -932,6 +957,11 @@ struct SummaryScreen: View {
                         .accessibilityIdentifier("gym-summary-notes")
                 } header: {
                     Text("Title and notes")
+                }
+                Section {
+                    SessionPhotos(visitID: visit.id)
+                } header: {
+                    Text("Photos of this session")
                 }
                 Section {
                     row("Machines", "\(visit.entries.count)", id: "gym-summary-machines")

@@ -53,6 +53,13 @@ struct VisitScreen: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Photos").font(.headline).foregroundStyle(Gym.tint)
+                        SessionPhotos(visitID: visit.id)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     ForEach(Array(visit.entries.enumerated()), id: \.element.id) { n, e in machineCard(e, position: n + 1) }
                 }
                 .padding(.horizontal, 16)
@@ -152,7 +159,12 @@ struct VisitScreen: View {
                 tile("Sets", "\(visit.setCount)", "orange", id: "visit-sets")
             }
             HStack(spacing: 8) {
-                tile("Lifted", "\(GymSet.number(visit.totalKg)) kg", "plum", id: "visit-kg")
+                // No "0 kg" on a cardio-only visit: its time-machine minutes instead (1.13).
+                if visit.totalKg > 0 {
+                    tile("Lifted", "\(GymSet.number(visit.totalKg)) kg", "plum", id: "visit-kg")
+                } else {
+                    tile("On time machines", "\(visit.minutesOnMachines) min", "plum", id: "visit-cardio")
+                }
                 tile("Machines", "\(visit.entries.count)", "blue", id: "visit-machines")
             }
         }

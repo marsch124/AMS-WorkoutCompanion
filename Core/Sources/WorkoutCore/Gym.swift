@@ -265,6 +265,8 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
     public var notes: String?
     /// The time typed by hand on the visit page (since 1.11.2); wins over the worked-out time.
     public var minutesByHand: Int?
+    /// Photos of the session itself (since 1.13): file names in the Photos folder, in the order added.
+    public var photos: [String]?
 
     public init(id: UUID = UUID(), gymID: UUID? = nil, date: Date, entries: [MachineEntry] = [],
                 started: Date? = nil, finished: Date? = nil) {
@@ -294,7 +296,12 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
     /// Minutes from the first set to the last set — or to Finish, when tapped soon after the last set.
     public var minutes: Int? {
         if let minutesByHand { return minutesByHand }
-        guard let started else { return nil }
+        guard var started else { return nil }
+        // A time set is saved when it ends: it began its own minutes earlier (1.13 — his 70 min bike
+        // + 50 min treadmill showed 77 min, because the bike's 70 minutes came before "started").
+        for set in entries.flatMap(\.sets) {
+            if let at = set.at, let s = set.seconds, s > 0 { started = min(started, at.addingTimeInterval(-Double(s))) }
+        }
         let end: Date
         if let last = lastSetAt {
             if let finished, finished >= last, finished <= last.addingTimeInterval(Self.finishGrace) {
@@ -306,7 +313,8 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
             guard let finished, finished.timeIntervalSince(started) <= Self.longestOldVisit else { return nil }
             end = finished
         }
-        return max(1, Int(end.timeIntervalSince(started) / 60))
+        // Never shorter than the minutes on time machines (sets typed in afterwards).
+        return max(1, Int(end.timeIntervalSince(started) / 60), minutesOnMachines)
     }
 
     /// "Tuesday, 3 November 2026 · yesterday" — with the year, and today/yesterday when it is (since 1.11.3).
@@ -957,7 +965,24 @@ public struct GymLog: Codable, Equatable, Sendable {
         if v.entries.isEmpty { visits.removeAll { $0.id == visitID } } else { put(v) }
     }
 
-    public var photosInUse: Set<String> { Set(machines.compactMap(\.photo) + machines.compactMap(\.instructions)) }
+    public var photosInUse: Set<String> {
+        Set(machines.compactMap(\.photo) + machines.compactMap(\.instructions) + visits.flatMap { $0.photos ?? [] })
+    }
+
+    /// Adds a photo of the session (since 1.13).
+    public mutating func addPhoto(visit visitID: UUID, _ name: String) {
+        guard var v = visits.first(where: { $0.id == visitID }) else { return }
+        v.photos = (v.photos ?? []) + [name]
+        put(v)
+    }
+
+    /// Takes a photo off the session; the file goes with the next tidy-up.
+    public mutating func removePhoto(visit visitID: UUID, _ name: String) {
+        guard var v = visits.first(where: { $0.id == visitID }) else { return }
+        v.photos = (v.photos ?? []).filter { $0 != name }
+        if v.photos?.isEmpty == true { v.photos = nil }
+        put(v)
+    }
 }
 
 /// `gym.json`: `{"version":1,"machines":[…],"visits":[…],"busy":[…],"gyms":[…],"currentGym":…,"plan":…}`
