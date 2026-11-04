@@ -93,9 +93,9 @@ final class GymPlanHistoryTests: XCTestCase {
         log.setPlan([a.id], on: day(3), gym: nil)
         log.add(GymSet(kg: 30, reps: 10), machine: a.id, on: day(3), now: day(3, 18), calendar: cal)
         let v = log.visits[0].id
-        log.finish(visit: v, at: day(3, 19), calendar: cal)
+        log.finish(visit: v, at: day(3, 18).addingTimeInterval(5 * 60), calendar: cal)
         XCTAssertTrue(log.plans.isEmpty)
-        XCTAssertEqual(log.visits[0].minutes, 60)
+        XCTAssertEqual(log.visits[0].minutes, 5)
         log.describe(visit: v, title: " Leg day ", notes: "Knee felt fine.")
         log.describe(visit: v, title: " Leg day ", notes: "Knee felt fine.")
         XCTAssertEqual(log.visits[0].title, "Leg day")
@@ -134,7 +134,7 @@ final class GymPlanHistoryTests: XCTestCase {
         log.ensureGym()
         log.machines[0].gymID = log.gyms[0].id
         log.add(GymSet(kg: 30, reps: 10), machine: a.id, on: day(2), now: day(2, 18), calendar: cal)
-        log.finish(visit: log.visits[0].id, at: day(2, 19), calendar: cal)
+        log.finish(visit: log.visits[0].id, at: day(2, 18).addingTimeInterval(5 * 60), calendar: cal)
         let rec = SessionRecord(workoutID: nil, kind: .reps, name: "Push-ups", colour: "orange",
                                 started: day(3, 7), ended: day(3, 7).addingTimeInterval(600), completed: false, detail: "2 of 5 sets × 20 reps")
         let items = History.items(records: [rec], gym: log)
@@ -142,7 +142,7 @@ final class GymPlanHistoryTests: XCTestCase {
         XCTAssertEqual(items[0].detail, "2 of 5 sets × 20 reps · ended early")
         XCTAssertEqual(items[1].detail, "1 machine · 1 set · 300 kg")
         let week = History.period(.weekOfYear, around: day(4), calendar: cal)
-        XCTAssertEqual(History.totals(items, in: week), HistoryTotals(sessions: 2, minutes: 70, kg: 300))
+        XCTAssertEqual(History.totals(items, in: week), HistoryTotals(sessions: 2, minutes: 15, kg: 300))
         XCTAssertEqual(try HistoryFile.decode(HistoryFile.encode([rec])), [rec])
     }
 

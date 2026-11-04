@@ -146,6 +146,8 @@ public struct GymSet: Codable, Hashable, Sendable {
     public var incline: Double?
     /// A warm-up set (since 1.11): kept and shown, but never a record or a reason for more weight.
     public var warmup: Bool?
+    /// When Set done was tapped (since 1.11.2); older sets have none.
+    public var at: Date?
 
     public init(kg: Double, reps: Int, warmup: Bool = false) {
         self.kg = kg
@@ -165,6 +167,16 @@ public struct GymSet: Codable, Hashable, Sendable {
     }
 
     public var isTime: Bool { seconds != nil }
+
+    /// The same set whenever weight, reps, time, level, incline and warm-up match; when it was done does not count.
+    public static func == (a: GymSet, b: GymSet) -> Bool {
+        a.kg == b.kg && a.reps == b.reps && a.seconds == b.seconds && a.level == b.level
+            && a.incline == b.incline && a.warmup == b.warmup
+    }
+
+    public func hash(into h: inout Hasher) {
+        h.combine(kg); h.combine(reps); h.combine(seconds); h.combine(level); h.combine(incline); h.combine(warmup)
+    }
 
     /// A new time machine's first go: 20 minutes, level 5, no incline.
     public static let starterTime = GymSet(seconds: 20 * 60, level: 5, incline: 0)
@@ -251,6 +263,8 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
     /// A heading and notes, given after Finish (since 1.4).
     public var title: String?
     public var notes: String?
+    /// The time typed by hand on the visit page (since 1.11.2); wins over the worked-out time.
+    public var minutesByHand: Int?
 
     public init(id: UUID = UUID(), gymID: UUID? = nil, date: Date, entries: [MachineEntry] = [],
                 started: Date? = nil, finished: Date? = nil) {
@@ -269,10 +283,30 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
         entries.flatMap(\.sets).reduce(0) { $0 + ($1.seconds ?? 0) } / 60
     }
 
-    /// Minutes from the first set to Finish, when both are known.
+    /// When the last set was done, for sets that know it (since 1.11.2).
+    public var lastSetAt: Date? { entries.flatMap(\.sets).compactMap(\.at).max() }
+
+    /// Finish counts only this long after the last set; a later Finish (at home, or tapped again) does not.
+    public static let finishGrace: TimeInterval = 10 * 60
+    /// An old visit (sets without times) longer than this was a forgotten Finish: no time is shown.
+    public static let longestOldVisit: TimeInterval = 3 * 60 * 60
+
+    /// Minutes from the first set to the last set — or to Finish, when tapped soon after the last set.
     public var minutes: Int? {
-        guard let started, let finished else { return nil }
-        return max(1, Int(finished.timeIntervalSince(started) / 60))
+        if let minutesByHand { return minutesByHand }
+        guard let started else { return nil }
+        let end: Date
+        if let last = lastSetAt {
+            if let finished, finished >= last, finished <= last.addingTimeInterval(Self.finishGrace) {
+                end = finished
+            } else {
+                end = last
+            }
+        } else {
+            guard let finished, finished.timeIntervalSince(started) <= Self.longestOldVisit else { return nil }
+            end = finished
+        }
+        return max(1, Int(end.timeIntervalSince(started) / 60))
     }
 
     /// Everything lifted, in kilograms: weight × reps of every set.
@@ -657,6 +691,13 @@ public struct GymLog: Codable, Equatable, Sendable {
         put(v)
     }
 
+    /// Sets a visit's time by hand; nil (or 0) goes back to the time worked out from the sets.
+    public mutating func setMinutes(visit visitID: UUID, _ minutes: Int?) {
+        guard var v = visits.first(where: { $0.id == visitID }) else { return }
+        v.minutesByHand = (minutes ?? 0) > 0 ? minutes : nil
+        put(v)
+    }
+
     /// The heading and notes of a visit; empty words are kept as none.
     public mutating func describe(visit visitID: UUID, title: String, notes: String) {
         guard var v = visits.first(where: { $0.id == visitID }) else { return }
@@ -674,6 +715,8 @@ public struct GymLog: Codable, Equatable, Sendable {
         let gym = machine(machineID)?.gymID
         var v = visit(on: day, gym: gym, calendar: calendar) ?? GymVisit(gymID: gym, date: day)
         if v.started == nil { v.started = now }
+        var set = set
+        set.at = now   // a prefilled set may carry last time's stamp
         if let i = v.entries.lastIndex(where: { $0.machineID == machineID }) {
             v.entries[i].sets.append(set)
         } else {
@@ -688,7 +731,10 @@ public struct GymLog: Codable, Equatable, Sendable {
         guard var v = visits.first(where: { $0.id == visitID }),
               let e = v.entries.lastIndex(where: { $0.machineID == machineID }),
               v.entries[e].sets.indices.contains(index) else { return }
-        if let set { v.entries[e].sets[index] = set } else { v.entries[e].sets.remove(at: index) }
+        if var set {
+            if set.at == nil { set.at = v.entries[e].sets[index].at }
+            v.entries[e].sets[index] = set
+        } else { v.entries[e].sets.remove(at: index) }
         if v.entries[e].sets.isEmpty { v.entries.remove(at: e) }
         if v.entries.isEmpty { visits.removeAll { $0.id == visitID } } else { put(v) }
     }

@@ -7,6 +7,7 @@ struct VisitScreen: View {
     @Environment(Library.self) private var library
     let visitID: UUID
     @State private var editing = false
+    @State private var timing = false
     @State private var changing: ChangingSet?
     @State private var picture: Image?
     /// How many machine photos the share picture holds — read by a test.
@@ -97,6 +98,17 @@ struct VisitScreen: View {
                 .presentationDetents([.medium, .large])
             }
         }
+        .sheet(isPresented: $timing) {
+            if let visit {
+                NavigationStack {
+                    VisitTimeEditor(minutes: visit.minutes ?? 0, byHand: visit.minutesByHand != nil) { result in
+                        timing = false
+                        if let result { library.changeGym { $0.setMinutes(visit: visitID, result) } }
+                    }
+                }
+                .presentationDetents([.medium])
+            }
+        }
         .sheet(isPresented: $editing) {
             if let visit {
                 NavigationStack {
@@ -131,7 +143,11 @@ struct VisitScreen: View {
                 Text(place).font(.subheadline.weight(.semibold)).foregroundStyle(Gym.ink.opacity(0.85))
             }
             HStack(spacing: 8) {
-                tile("Time", visit.minutes.map { "\($0) min" } ?? "–", "green", id: "visit-time")
+                tile("Time", visit.minutes.map { "\($0) min" } ?? "–", "green", id: "visit-time", editable: true)
+                    .contentShape(Rectangle())
+                    .onTapGesture { timing = true }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint("Change the time")
                 tile("Sets", "\(visit.setCount)", "orange", id: "visit-sets")
             }
             HStack(spacing: 8) {
@@ -143,10 +159,13 @@ struct VisitScreen: View {
         .background(Gym.fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    private func tile(_ title: String, _ value: String, _ colour: String, id: String) -> some View {
+    private func tile(_ title: String, _ value: String, _ colour: String, id: String, editable: Bool = false) -> some View {
         let c = IconColour.of(key: colour) ?? Gym.busy
         return VStack(alignment: .leading, spacing: 0) {
-            Text(title).font(.caption.weight(.semibold)).foregroundStyle(c.inkColor.opacity(0.85))
+            HStack(spacing: 4) {
+                Text(title).font(.caption.weight(.semibold)).foregroundStyle(c.inkColor.opacity(0.85))
+                if editable { ControlMarkView(.edit, size: 11, colour: c.inkColor.opacity(0.85)) }
+            }
             Text(value).font(.title3.weight(.bold)).monospacedDigit().foregroundStyle(c.inkColor)
                 .accessibilityIdentifier(id)
         }
@@ -230,6 +249,46 @@ private struct FlowChips: View {
                 .accessibilityIdentifier(item.id)
             }
         }
+    }
+}
+
+/// The time of a visit, typed by hand (since 1.11.2) — for a session whose time came out wrong.
+private struct VisitTimeEditor: View {
+    @State var minutes: Int
+    let byHand: Bool
+    let done: (Int?) -> Void
+
+    init(minutes: Int, byHand: Bool, done: @escaping (Int?) -> Void) {
+        _minutes = State(initialValue: minutes)
+        self.byHand = byHand
+        self.done = done
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                HStack {
+                    Text("Minutes")
+                    Spacer()
+                    TextField("30", value: $minutes, format: .number)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .accessibilityIdentifier("visit-time-minutes")
+                }
+            } footer: {
+                Text("How long the session really took. It counts in History and the statistics.")
+            }
+            if byHand {
+                Section {
+                    Button("Use the time from my sets") { done(0) }
+                        .accessibilityIdentifier("visit-time-reset")
+                }
+            }
+        }
+        .navigationTitle("Session time")
+        .navigationBarTitleDisplayMode(.inline)
+        .bottomActions(cancel: { done(nil) }, save: { done(max(0, minutes)) }, tint: Gym.fill,
+                       cancelID: "visit-time-cancel", saveID: "visit-time-save")
     }
 }
 

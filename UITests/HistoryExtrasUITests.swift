@@ -34,6 +34,22 @@ final class HistoryExtrasUITests: XCTestCase {
         XCTAssertTrue(app.buttons["visit-set-1-1"].label.hasSuffix("7"), app.buttons["visit-set-1-1"].label + " was " + before)
     }
 
+    /// 1.11.2: tap Time on an earlier visit, type the real minutes, Save — the visit shows them.
+    func testSetTheTimeOfAnEarlierVisitByHand() {
+        app.buttons["history-row-1"].tap()
+        let time = any("visit-time")
+        XCTAssertTrue(time.waitForExistence(timeout: 10))
+        time.tap()
+        let minutes = app.textFields["visit-time-minutes"]
+        XCTAssertTrue(minutes.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["visit-time-cancel"].exists)
+        minutes.doubleTap()   // selects the number
+        minutes.typeText("31")
+        app.buttons["visit-time-save"].tap()
+        XCTAssertTrue(any("visit-time").waitForExistence(timeout: 5))
+        XCTAssertEqual(any("visit-time").label, "31 min")
+    }
+
     func testRecordsWall() {
         let open = app.buttons["open-records"]
         XCTAssertTrue(open.waitForExistence(timeout: 10))
