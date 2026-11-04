@@ -167,7 +167,11 @@ final class FormsUITests: XCTestCase {
         // Drag Chest press (2) by its handle above Leg press (1).
         let handles = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Reorder'"))
         XCTAssertGreaterThanOrEqual(handles.count, 3)
-        handles.element(boundBy: 1).press(forDuration: 0.6, thenDragTo: handles.element(boundBy: 0), withVelocity: .slow, thenHoldForDuration: 0.4)
+        let top = app.descendants(matching: .any)["plan-order-1"]
+        for _ in 0..<3 where !top.label.hasSuffix("Chest press") {
+            // GitHub's slower simulator sometimes misses the first long press; try again.
+            handles.element(boundBy: 1).press(forDuration: 1.0, thenDragTo: handles.element(boundBy: 0), withVelocity: .slow, thenHoldForDuration: 0.6)
+        }
         XCTAssertTrue(app.descendants(matching: .any)["plan-order-1"].label.hasSuffix("Chest press"),
                       app.descendants(matching: .any)["plan-order-1"].label)
         app.buttons["plan-save"].tap()
