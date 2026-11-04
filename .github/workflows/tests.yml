@@ -11,7 +11,7 @@ on:
 jobs:
   tests:
     runs-on: macos-15
-    timeout-minutes: 90   # 60 screen tests take ~17 min on his Mac, over 60 on the hosted runner (1.16)
+    timeout-minutes: 75   # 60 screen tests ~17 min on his Mac; unsigned builds with the lock-screen widget hung before the first test (1.16), so it is signed ad hoc
     steps:
       - uses: actions/checkout@v4
 
@@ -49,9 +49,12 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIM_UDID" \
             -derivedDataPath build \
             -resultBundlePath TestResults.xcresult \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM=""
+            -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 180 \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
 
       - name: Keep the results when it goes red
         if: failure()
