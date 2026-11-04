@@ -264,8 +264,15 @@ struct MachineScreen: View {
                             Text("Set \(i + 1)").foregroundStyle(Theme.muted)
                         }
                         Spacer()
+                        if beats(s, i) {
+                            // More than the same set last time (since 1.16).
+                            AppMarkView(.up, size: 16, colour: Gym.better)
+                        }
                         Text(said(s)).fontWeight(s.isWarmup ? .regular : .semibold).foregroundStyle(s.isWarmup ? Theme.muted : Theme.ink)
-                        ControlMarkView(.check, size: 16, colour: s.isWarmup ? Warmup.tint : Gym.tint)
+                        // A tick in a filled circle (since 1.16; before, a bare tick).
+                        ControlMarkView(.check, size: 11, colour: s.isWarmup ? Warmup.swatch.inkColor : Gym.ink)
+                            .frame(width: 20, height: 20)
+                            .background(s.isWarmup ? Warmup.swatch.fillColor : Gym.fill, in: Circle())
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
@@ -273,13 +280,19 @@ struct MachineScreen: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(s.isWarmup ? "Warm-up" : "Set \(i + 1)"), \(said(s))")
+                .accessibilityLabel("\(s.isWarmup ? "Warm-up" : "Set \(i + 1)"), \(said(s))\(beats(s, i) ? ", more than last time" : "")")
                 .accessibilityIdentifier("gym-set-\(i + 1)")
                 if i < today.count - 1 { Divider().padding(.leading, 12) }
             }
         }
+        // Done sets on a light indigo wash (since 1.16; before, the plain card colour).
+        .background(Gym.fill.opacity(0.09), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.line, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Gym.fill.opacity(0.35), lineWidth: 1))
+    }
+
+    private func beats(_ s: GymSet, _ i: Int) -> Bool {
+        library.gym.beatsLastTime(s, at: i, machine: machineID, visit: visit.id)
     }
 
     private var entry: some View {
@@ -354,17 +367,24 @@ struct MachineScreen: View {
         let left = max(0, end.timeIntervalSince(now))
         return VStack(spacing: 10) {
             ZStack {
-                Ring(fractionLeft: left / max(1, restLength), colour: Gym.fill, width: 12)
+                // Orange → yellow → green as the rest runs out (since 1.16; before: always indigo).
+                let key = RestColour.key(fractionLeft: left / max(1, restLength))
+                Ring(fractionLeft: left / max(1, restLength), colour: IconColour.of(key: key)?.fillColor ?? Gym.fill, width: 14)
+                    .animation(.easeInOut(duration: 0.6), value: key)
+                    .accessibilityElement()
+                    .accessibilityLabel("Rest ring")
+                    .accessibilityValue(key)
+                    .accessibilityIdentifier("gym-rest-ring")
                 VStack(spacing: 0) {
                     Text("REST").font(.caption.weight(.bold)).foregroundStyle(Theme.muted)
                     Text(Clock.text(Int(left.rounded(.up))))
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .font(.system(size: 52, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(Theme.ink)
                         .accessibilityIdentifier("gym-rest")
                 }
             }
-            .frame(width: 160, height: 160)
+            .frame(width: 180, height: 180)
             Text("Next: set \(today.count + 1) · \(said(GymSet(kg: isReps ? 0 : kg, reps: reps)))")
                 .font(.subheadline)
                 .foregroundStyle(Theme.muted)

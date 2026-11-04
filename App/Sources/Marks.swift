@@ -29,6 +29,8 @@ enum AppMark: String {
     case history = "M4.5 19.5h15 M7 16v-3 M11 16V9 M15 16v-5 M18.5 16V6"
     /// A bin, for deleting (since 1.14).
     case trash = "M4.5 7h15 M9.5 7V4.5h5V7 M6.5 7l1 12.5h9l1 -12.5 M10.5 10.5v6 M13.5 10.5v6"
+    /// An arrow going up, for a set that beat last time (since 1.16).
+    case up = "M12 19V5.5 M6.5 11l5.5-5.5l5.5 5.5"
     /// A small flame, for a warm-up set.
     case warmup = "M12 4c2.4 3.2 5 5.2 5 9a5 5 0 0 1 -10 0c0 -2.2 1.2 -3.5 2.3 -4.5c.3 1.6 1 2.4 1.9 2.7C11.5 8.6 11.4 6.6 12 4Z"
 }

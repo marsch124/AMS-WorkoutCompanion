@@ -47,3 +47,28 @@ extension GymLog {
                         next: "Set \(done + 1) · \(numbers)", start: start, end: end)
     }
 }
+
+/// The rest ring's colour (since 1.16): orange while most of the rest is left, yellow past the
+/// middle, green when the next set is close.
+public enum RestColour {
+    public static func key(fractionLeft: Double) -> String {
+        fractionLeft > 0.5 ? "orange" : fractionLeft > 0.2 ? "yellow" : "green"
+    }
+}
+
+extension GymLog {
+    /// A working set that is more than the same set last time (since 1.16): more weight, or the
+    /// same weight with more reps; on a reps-only exercise, more reps. `index` is the set's place
+    /// in today's list on the machine (warm-ups count there, but are never compared).
+    /// Time machines, warm-ups and a first time on a machine: never.
+    public func beatsLastTime(_ set: GymSet, at index: Int, machine machineID: UUID, visit visitID: UUID) -> Bool {
+        guard !set.isWarmup, !set.isTime, let last = last(machineID, excluding: visitID) else { return false }
+        let today = visits.first { $0.id == visitID }?.entries.last { $0.machineID == machineID }?.sets ?? []
+        let place = today.prefix(index).filter { !$0.isWarmup }.count
+        let before = last.entry.working
+        guard place < before.count else { return false }
+        let then = before[place]
+        if machine(machineID)?.logs == .reps { return set.reps > then.reps }
+        return set.kg > then.kg || (set.kg == then.kg && set.reps > then.reps)
+    }
+}

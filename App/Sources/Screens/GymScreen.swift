@@ -12,6 +12,10 @@ enum Gym {
     /// A machine marked Busy: orange, so it stands out from the indigo of the rest.
     static let busy = IconColour.of(key: "orange")!
     static let busyTint = Color.pair("#c2410c", "#fdba74")
+    /// The band with the name over a machine photo: deep indigo, day and night (since 1.16).
+    static let band = Color(hex: "#1e1b4b")
+    /// A set that beat last time: a gold arrow (since 1.16).
+    static let better = Color.pair("#b7791f", "#f6c453")
 }
 
 /// A machine on the gym screen, to open it.
@@ -525,8 +529,8 @@ struct GymScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("machine-\(m.name)")
-        // Bottom right of the photo, small (1.13, his "not so visible or intrusive"): photo is 6 pt in, 96 pt tall.
-        .overlay(alignment: .topTrailing) {
+        // Top left of the photo, small (since 1.16; bottom right in 1.13 — the name band sits there now).
+        .overlay(alignment: .topLeading) {
             Button {
                 library.changeGym { $0.setBusy(m.id, !busy, on: day) }
             } label: {
@@ -534,8 +538,6 @@ struct GymScreen: View {
                 BusyPill(on: busy).padding(6).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.top, 6 + 96 - BusyPill.height - 4 - 6)
-            .padding(.trailing, 10 - 6)
             .accessibilityLabel(busy ? "\(m.name) is busy" : "Mark \(m.name) busy")
             .accessibilityIdentifier("busy-\(m.name)")
         }
@@ -774,13 +776,35 @@ private struct MachineTile: View {
     let done: Bool
     let busy: Bool
 
-    private var border: Color { busy ? Gym.busy.fillColor : done ? Gym.fill : Theme.line }
     private var stripe: IconColour? { library.gym.muscle(for: machine).flatMap { IconColour.of(key: $0.colour) } }
 
+    /// Dark indigo by default, orange when Busy (since 1.16).
+    private var bandFill: Color { busy ? Gym.busy.fillColor : Gym.band }
+    private var bandInk: Color { busy ? Gym.busy.inkColor : .white }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ZStack(alignment: .topTrailing) {
-                MachinePhoto(name: machine.photo, height: 96, icon: machine.icon)
+        // Since 1.16 the photo fills the whole tile, with the name and last time on a band over
+        // its bottom edge — before, the name and status sat under a smaller photo.
+        MachinePhoto(name: machine.photo, height: Self.height, icon: machine.icon, corner: 0)
+            .overlay(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(machine.name.isEmpty ? "Untitled" : machine.name)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Text(busy ? "Busy — come back later" : status)
+                        .font(.caption)
+                        .opacity(0.88)
+                        .lineLimit(1)
+                }
+                .foregroundStyle(bandInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .padding(.leading, stripe == nil ? 0 : 3)
+                .background(bandFill.opacity(busy ? 1 : 0.82))
+                .accessibilityIdentifier("tile-band-\(machine.name)")
+            }
+            .overlay(alignment: .topTrailing) {
                 if done {
                     ControlMarkView(.check, size: 14, colour: Gym.ink)
                         .frame(width: 26, height: 26)
@@ -788,30 +812,21 @@ private struct MachineTile: View {
                         .padding(6)
                 }
             }
-            Text(machine.name.isEmpty ? "Untitled" : machine.name)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.ink)
-                .lineLimit(1)
-            Text(busy ? "Busy — come back later" : status)
-                .font(.caption)
-                .foregroundStyle(busy ? Gym.busyTint : done ? Gym.tint : Theme.muted)
-                .lineLimit(1)
-        }
-        .padding(6)
-        .padding(.leading, stripe == nil ? 0 : 3)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        // The machine's muscle group colour, as a thin stripe down the left edge (since 1.11).
-        .overlay(alignment: .leading) {
-            if let stripe {
-                stripe.fillColor
-                    .frame(width: 5)
-                    .accessibilityIdentifier("tile-stripe-\(machine.name)")
+            // The machine's muscle group colour, as a thin stripe down the left edge (since 1.11).
+            .overlay(alignment: .leading) {
+                if let stripe {
+                    stripe.fillColor
+                        .frame(width: 5)
+                        .accessibilityIdentifier("tile-stripe-\(machine.name)")
+                }
             }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(border, lineWidth: busy ? 1.5 : 1))
-        .accessibilityElement(children: .combine)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(busy ? Gym.busy.fillColor : done ? Gym.fill : Theme.line, lineWidth: busy || done ? 2 : 1))
+            .accessibilityElement(children: .combine)
     }
+
+    static let height: CGFloat = 132
 }
 
 /// "Busy" on a machine's photo: full orange when marked, a light outline when not.
@@ -857,6 +872,7 @@ struct MachinePhoto: View {
     let name: String?
     var height: CGFloat
     var icon: String? = nil
+    var corner: CGFloat = 10
 
     var body: some View {
         // The photo fills a fixed box and is cut to it — for drawing AND for taps. Before 1.9.2 an
@@ -876,8 +892,8 @@ struct MachinePhoto: View {
                         .background(Gym.fill.opacity(0.1))
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
             .accessibilityHidden(true)
     }
 }
