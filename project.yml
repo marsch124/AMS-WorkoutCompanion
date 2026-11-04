@@ -11,7 +11,7 @@ settings:
     DEVELOPMENT_TEAM: D24ENP83QQ
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.14"
+    MARKETING_VERSION: "1.15"
     CURRENT_PROJECT_VERSION: "1"
 packages:
   # The model — workouts, their phases and the clock, with no screen in it.
@@ -30,9 +30,11 @@ targets:
     sources:
       - path: App/Sources
       - path: App/Resources
+      - path: App/Shared
     dependencies:
       - package: WorkoutCore
       - package: AMSIcons
+      - target: RestWidget
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.schabbauer.AMSWorkoutCompanion
@@ -57,6 +59,34 @@ targets:
         UILaunchScreen:
           UIColorName: ""
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # The rest on the lock screen and in the Dynamic Island (since 1.15).
+        NSSupportsLiveActivities: true
+  # Draws the rest on the lock screen and in the Dynamic Island (since 1.15).
+  RestWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widget
+      - path: App/Shared
+    dependencies:
+      - package: WorkoutCore
+      - package: AMSIcons
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.schabbauer.AMSWorkoutCompanion.RestWidget
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_FILE: Widget/Config/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+    info:
+      path: Widget/Config/Info.plist
+      properties:
+        CFBundleDisplayName: Workouts
+        CFBundleName: RestWidget
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
   AMSWorkoutCompanionUITests:
     type: bundle.ui-testing
     platform: iOS

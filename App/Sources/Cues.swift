@@ -1,6 +1,8 @@
+import ActivityKit
 import AVFoundation
 import UIKit
 import UserNotifications
+import WorkoutCore
 
 /// Sound, vibration and spoken words during a workout, and the screen kept awake.
 /// UI tests start the app with -uitest, which keeps it silent.
@@ -114,6 +116,42 @@ enum RestAlarm {
             centre.requestAuthorization(options: [.alert, .sound]) { granted, _ in
                 if granted { Task { @MainActor in schedule() } }
             }
+        }
+    }
+}
+
+/// The rest on the lock screen and in the Dynamic Island (since 1.15): one at a time.
+/// A new rest updates it, a skipped or finished rest ends it. The time ticks on by itself,
+/// even while the app sleeps; at the end it says "Go" until the app ends it.
+@MainActor
+enum RestLive {
+    private static var current: Activity<RestActivityAttributes>? {
+        Activity<RestActivityAttributes>.activities.first
+    }
+
+    /// True while the phone holds a rest on the lock screen.
+    static var isShowing: Bool {
+        Activity<RestActivityAttributes>.activities.contains { $0.activityState == .active || $0.activityState == .stale }
+    }
+
+    static func show(_ card: RestCard?) {
+        guard let card, card.end.timeIntervalSinceNow > 1 else {
+            end()
+            return
+        }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        let content = ActivityContent(state: RestActivityAttributes.ContentState(card: card), staleDate: card.end)
+        if let current {
+            Task { await current.update(content) }
+        } else {
+            _ = try? Activity.request(attributes: RestActivityAttributes(), content: content, pushType: nil)
+        }
+    }
+
+    /// Ends every rest on the lock screen — also one left over from before the app was closed.
+    static func end() {
+        for activity in Activity<RestActivityAttributes>.activities {
+            Task { await activity.end(nil, dismissalPolicy: .immediate) }
         }
     }
 }

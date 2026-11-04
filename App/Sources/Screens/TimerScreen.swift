@@ -46,6 +46,7 @@ struct TimerScreen: View {
         .onDisappear {
             Cues.shared.end()
             RestAlarm.set(nil, "")
+            RestLive.show(nil)
         }
         .onReceive(clock) { t in
             now = t
@@ -221,17 +222,26 @@ struct TimerScreen: View {
         let t = Date()
         guard !session.isPaused, let phase = session.current, let left = session.remaining(at: t) else {
             RestAlarm.set(nil, "")
+            RestLive.show(nil)
             return
         }
         let next = session.phases.dropFirst(session.index + 1).first
         switch (phase, next) {
         case (.rest, .set(let n, let of, let reps)?), (.getReady, .set(let n, let of, let reps)?):
             RestAlarm.set(t.addingTimeInterval(left), "\(workout.name): set \(n) of \(of), \(reps) reps")
+            live("Set \(n) of \(of) · \(reps) reps", t, left)
         case (.off, .work(_, let r, let of)?), (.getReady, .work(_, let r, let of)?):
             RestAlarm.set(t.addingTimeInterval(left), "\(workout.name): round \(r) of \(of)")
+            live("Round \(r) of \(of)", t, left)
         default:
             RestAlarm.set(nil, "")
+            RestLive.show(nil)
         }
+    }
+
+    /// The rest on the lock screen and in the Dynamic Island (since 1.15).
+    private func live(_ next: String, _ t: Date, _ left: TimeInterval) {
+        RestLive.show(RestCard(kind: .workout, title: workout.name, next: next, start: t, end: t.addingTimeInterval(left)))
     }
 
     private func announce() {

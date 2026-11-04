@@ -163,8 +163,16 @@ struct MachineScreen: View {
         // A locked iPhone still buzzes when the rest is over (since 1.8).
         .onChange(of: restEnd) { _, end in
             RestAlarm.set(end, "Set \(today.count + 1) on \(machine?.name ?? "the machine")")
+            // …and the countdown on the lock screen and in the Dynamic Island (since 1.15).
+            RestLive.show(end.map {
+                library.gym.restCard(machine: machineID, in: visit,
+                                     start: $0.addingTimeInterval(-restLength), end: $0)
+            })
         }
-        .onDisappear { RestAlarm.set(nil, "") }
+        .onDisappear {
+            RestAlarm.set(nil, "")
+            RestLive.show(nil)
+        }
         .onReceive(clock) { t in
             now = t
             if let end = restEnd {
@@ -360,6 +368,13 @@ struct MachineScreen: View {
             Text("Next: set \(today.count + 1) · \(said(GymSet(kg: isReps ? 0 : kg, reps: reps)))")
                 .font(.subheadline)
                 .foregroundStyle(Theme.muted)
+            if RestLive.isShowing {
+                // The same countdown is on the lock screen and in the Dynamic Island (since 1.15).
+                Text("Also on your lock screen")
+                    .font(.footnote)
+                    .foregroundStyle(Gym.tint)
+                    .accessibilityIdentifier("gym-rest-lock")
+            }
             if let partner {
                 // A superset round is done: after the rest, the partner again (since 1.11).
                 Button { moveOn(partner.id) } label: {
