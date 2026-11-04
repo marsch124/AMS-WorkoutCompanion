@@ -11,7 +11,7 @@ on:
 jobs:
   tests:
     runs-on: macos-15
-    timeout-minutes: 60   # 34 screen tests take ~8 min on his Mac, over 30 on the hosted runner
+    timeout-minutes: 90   # 60 screen tests take ~17 min on his Mac, over 60 on the hosted runner (1.16)
     steps:
       - uses: actions/checkout@v4
 
