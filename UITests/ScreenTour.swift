@@ -416,4 +416,19 @@ final class ScreenTour: XCTestCase {
         XCTAssertTrue(any("session-photo-1").waitForExistence(timeout: 5))
         snap("55 Visit with photos")
     }
+
+    func testNewIn117Tour() {
+        app.launchArguments = ["-uitest", "-gymdemo"]
+        app.launch()
+        let any = { (id: String) in self.app.descendants(matching: .any)[id].firstMatch }
+        app.buttons["open-gym"].tap()
+        XCTAssertTrue(app.buttons["gym-plan"].waitForExistence(timeout: 5))
+        snap("56 Small action tiles")
+        app.buttons["machine-Chest press"].tap()
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))
+        app.buttons["machine-done-pill"].tap()
+        XCTAssertTrue(any("gym-session-going").waitForExistence(timeout: 5))
+        snap("57 Session going")
+    }
 }

@@ -60,4 +60,29 @@ final class LookUITests: XCTestCase {
         XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["gym-set-1"].label.contains("more than last time"), app.buttons["gym-set-1"].label)
     }
+
+    // MARK: 1.17
+
+    /// His ask (5 Nov): the three action tiles smaller — they were ~84 pt tall.
+    func testActionTilesAreCompact() {
+        for id in ["gym-plan", "gym-repeat", "gym-repeat-template"] {
+            let tile = app.buttons[id]
+            XCTAssertTrue(tile.waitForExistence(timeout: 5), id)
+            XCTAssertLessThanOrEqual(tile.frame.height, 52, "\(id) is \(tile.frame.height) pt tall")
+        }
+    }
+
+    /// His ask (5 Nov): show that a session is going. No line before the first set; after it,
+    /// "Session going" at the top of the gym screen. Finish takes it away again.
+    func testTheGymScreenSaysASessionIsGoing() {
+        XCTAssertFalse(any("gym-session-going").exists)
+        app.buttons["machine-Leg press"].tap()
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))
+        app.buttons["machine-done-pill"].tap()
+        let going = any("gym-session-going")
+        XCTAssertTrue(going.waitForExistence(timeout: 5))
+        XCTAssertTrue(going.label.contains("Session going"), going.label)
+        XCTAssertTrue(going.label.contains("1 set"), going.label)
+    }
 }

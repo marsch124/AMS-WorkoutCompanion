@@ -154,6 +154,11 @@ struct GymScreen: View {
                     .accessibilityIdentifier("gym-session-done")
                 }
 
+                // A session is going (since 1.17, his ask): green dot, minutes since it began, sets so far.
+                if let visit, visit.setCount > 0 {
+                    SessionGoingLine(visit: visit)
+                }
+
                 planSection
 
                 let busy = library.gym.busy(on: day).compactMap { library.gym.machine($0) }.filter { $0.gymID == gymID }
@@ -416,7 +421,7 @@ struct GymScreen: View {
             HStack(spacing: 8) {
                 Button { planning = true } label: {
                     GymActionTile(title: "Plan today", main: false) {
-                        ControlMarkView(.list, size: 22, colour: Gym.tint)
+                        ControlMarkView(.list, size: 15, colour: Gym.tint)
                     }
                 }
                 .buttonStyle(.plain)
@@ -427,7 +432,7 @@ struct GymScreen: View {
                         library.changeGym { $0.setPlan(repeatOrder, on: day, gym: gymID) }
                     } label: {
                         GymActionTile(title: "Repeat last visit", main: true) {
-                            ControlMarkView(.play, size: 22, colour: Gym.ink)
+                            ControlMarkView(.play, size: 15, colour: Gym.ink)
                         }
                     }
                     .buttonStyle(.plain)
@@ -438,7 +443,7 @@ struct GymScreen: View {
                         namingRepeat = true
                     } label: {
                         GymActionTile(title: "Save as template", main: false) {
-                            AppMarkView(.template, size: 22, colour: Gym.tint)
+                            AppMarkView(.template, size: 15, colour: Gym.tint)
                         }
                     }
                     .buttonStyle(.plain)
@@ -585,25 +590,63 @@ extension GymScreen {
 
 private enum GymNaming { case new, rename }
 
-/// One of the gym screen's action tiles: a hand-drawn mark above its words, all tiles the same size.
+/// "Session going · 42 min · 3 machines · 7 sets" — shown while a session is open (since 1.17).
+/// The minutes count from the session's start (or its first set) and move on each minute.
+private struct SessionGoingLine: View {
+    let visit: GymVisit
+    static let green = Color.pair("#15803d", "#86efac")
+
+    private var start: Date? { visit.started ?? visit.entries.flatMap(\.sets).compactMap(\.at).min() }
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            HStack(spacing: 8) {
+                Circle().fill(Self.green).frame(width: 9, height: 9)
+                Text(words(now: context.date))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Self.green)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Self.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("gym-session-going")
+        }
+    }
+
+    private func words(now: Date) -> String {
+        var parts = ["Session going"]
+        if let start { parts.append("\(max(0, Int(now.timeIntervalSince(start) / 60))) min") }
+        let m = visit.entries.filter { !$0.sets.isEmpty }.count
+        parts.append(m == 1 ? "1 machine" : "\(m) machines")
+        parts.append(visit.setCount == 1 ? "1 set" : "\(visit.setCount) sets")
+        return parts.joined(separator: " · ")
+    }
+}
+
+/// One of the gym screen's action tiles: a hand-drawn mark beside its words, all tiles the same size.
 private struct GymActionTile<Mark: View>: View {
     let title: String
     let main: Bool
     @ViewBuilder let mark: () -> Mark
 
+    // Since 1.17 compact (his ask): mark beside the words, footnote text — ~44 pt instead of 82.
     var body: some View {
-        VStack(spacing: 4) {
+        HStack(spacing: 4) {
             mark()
-                .frame(height: 24)
+                .frame(width: 16, height: 16)
             Text(title)
-                .font(.subheadline.weight(.semibold))
-                .multilineTextAlignment(.center)
+                .font(.footnote.weight(.semibold))
+                .multilineTextAlignment(.leading)
                 .lineLimit(2)
                 .minimumScaleFactor(0.85)
                 .foregroundStyle(main ? Gym.ink : Gym.tint)
         }
         .padding(.horizontal, 6)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(main ? AnyShapeStyle(Gym.fill) : AnyShapeStyle(Gym.fill.opacity(0.14)),
                     in: RoundedRectangle(cornerRadius: 14, style: .continuous))

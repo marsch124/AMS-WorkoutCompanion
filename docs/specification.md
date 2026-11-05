@@ -244,3 +244,9 @@ His pick 1, 2 and 5 of six visual ideas (a Sonnet helper researched Hevy, Strong
 - His report: "When defining a new machine, it jumps automatically into the view set to done, exercise done. I just wanted to define the machine." The new-machine sheet's save closure in `GymScreen` no longer sets `opened`; it only closes the sheet. The tile `machine-<name>` is then on the gym screen.
 - Test `testAtTheGymANewMachineTwoSetsAndFinish`: after Save, the tile exists and `gym-set-done` / `machine-done-pill` do not (seen red first); then taps the tile. Tests that relied on the jump now tap the tile (`testAnExerciseWithoutAMachineLogsRepsOnly`, `testASecondGymCanBePlannedToo`, ScreenTour `testNewIn16Tour`).
 
+## Version 1.17 — smaller action tiles, "Session going" (5 Nov 2026)
+His two asks from the gym (screenshots): the three tiles too big; "could we make some indication that the session is ongoing?"
+- **Action tiles.** `GymActionTile`: mark (15 pt, in a 16 pt box) BESIDE the words (HStack, spacing 4), `.footnote` semibold, leading, up to 2 lines, padding 6 all round. ~45 pt tall (was 82: mark 22 above `.subheadline`, padding 8). Test `LookUITests.testActionTilesAreCompact` (`gym-plan`, `gym-repeat`, `gym-repeat-template` ≤ 52 pt; seen red at 82).
+- **Session going.** `SessionGoingLine` under the intro, shown when `openVisit(on:gym:)` has ≥ 1 set: green dot (9 pt) + "Session going · N min · M machines · S sets" (subheadline semibold, green #15803d / #86efac by night, on the same green at 12 %, corners 10). Minutes = now − (`started`, or the earliest set `at`), refreshed every 30 s by a `TimelineView`; machines = entries with sets. Identifier `gym-session-going`. Gone after Finish (then "Session done" shows as before). Test `LookUITests.testTheGymScreenSaysASessionIsGoing` (seen red).
+- Tour `ScreenTour.testNewIn117Tour`: 56 Small action tiles, 57 Session going — checked day + night.
+
