@@ -279,10 +279,10 @@ struct GymScreen: View {
         }
         .sheet(item: $newMachine) { m in
             NavigationStack {
-                MachineForm(machine: m, isNew: true) { saved in
+                MachineForm(machine: m, isNew: true) { _ in
+                    // Saving only defines the machine: stay on the gym screen, its tile is there.
+                    // (Until 1.16.1 it opened the machine at once; Martin only wanted to define it.)
                     newMachine = nil
-                    // Straight on to logging the first set.
-                    if let saved { opened = MachineRef(id: saved.id) }
                 }
             }
             .environment(library)

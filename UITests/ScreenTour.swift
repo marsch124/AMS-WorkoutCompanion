@@ -174,6 +174,7 @@ final class ScreenTour: XCTestCase {
         app.segmentedControls["machine-logs"].buttons.element(boundBy: 2).tap()
         snap("19 New exercise")
         app.buttons["machine-save"].tap()
+        app.buttons["machine-Push-ups"].tap()
         app.buttons["gym-set-done"].tap()
         app.buttons["gym-rest-skip"].tap()
         snap("20 Reps only")

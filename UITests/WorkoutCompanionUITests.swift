@@ -108,9 +108,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.16.1 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.16.2 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.16.1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.16.2"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -154,7 +154,14 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.textFields["machine-setting"].typeText("Seat 4")
         app.buttons["machine-save"].tap()
 
-        // Straight on to the machine, with a new machine's 20 kg × 10.
+        // Saving only defines the machine (since 1.16.2): back on the gym screen, its tile there.
+        let tile = app.buttons["machine-Chest press"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["gym-set-done"].exists, "saving a new machine must not open it")
+        XCTAssertFalse(app.buttons["machine-done-pill"].exists)
+
+        // Tap it to log: a new machine's 20 kg × 10.
+        tile.tap()
         XCTAssertTrue(app.staticTexts["gym-setting"].waitForExistence(timeout: 5))
         waitFor(app.staticTexts["gym-next-set"], label: "Set 1")
         app.buttons["gym-weight-plus"].tap()
@@ -525,6 +532,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertFalse(app.steppers["machine-top-reps"].exists)
         XCTAssertTrue(app.steppers["machine-rest"].exists)
         app.buttons["machine-save"].tap()
+        app.buttons["machine-Push-ups"].tap()
 
         // No weight on the exercise: reps only, starting at 10.
         waitFor(app.staticTexts["gym-next-set"], label: "Set 1")
@@ -588,8 +596,6 @@ final class WorkoutCompanionUITests: XCTestCase {
             name.tap()
             name.typeText(n)
             app.buttons["machine-save"].tap()
-            XCTAssertTrue(app.buttons["gym-set-done"].waitForExistence(timeout: 5))
-            goBack()
             XCTAssertTrue(app.buttons["machine-\(n)"].waitForExistence(timeout: 5))
         }
         app.buttons["gym-plan"].tap()
