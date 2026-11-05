@@ -104,6 +104,8 @@ struct GymScreen: View {
 
     private var gymID: UUID? { library.gym.currentGym?.id }
     private var visit: GymVisit? { library.gym.openVisit(on: day, gym: gymID) }
+    /// When the session going today began — the gym screen opening counts (since 1.20).
+    private var sessionStart: Date? { library.gym.sessionStart(on: day, gym: gymID) }
     private var machines: [Machine] { library.gym.machines(in: gymID) }
     private var plan: DayPlan? { library.gym.plan(on: day, gym: gymID) }
     private var isToday: Bool { Calendar.current.isDateInToday(day) }
@@ -155,8 +157,9 @@ struct GymScreen: View {
                 }
 
                 // A session is going (since 1.17, his ask): green dot, minutes since it began, sets so far.
-                if let visit, visit.setCount > 0 {
-                    SessionGoingLine(visit: visit)
+                // Since 1.20 from the moment the gym screen opens (his ask), before any set.
+                if sessionStart != nil || (visit?.setCount ?? 0) > 0 {
+                    SessionGoingLine(start: sessionStart, visit: visit)
                 }
 
                 planSection
@@ -206,11 +209,14 @@ struct GymScreen: View {
                         .accessibilityIdentifier("gym-new-machine")
                 }
 
-                if let visit, visit.setCount > 0 {
+                if sessionStart != nil || (visit?.setCount ?? 0) > 0 {
                     // Since 1.18 (his ask) the button carries the session's minutes, seen when scrolled down.
+                    // Since 1.20 it is there from opening; with no set yet it ends the session and saves nothing.
                     TimelineView(.periodic(from: .now, by: 30)) { context in
-                        let minutes = SessionGoingLine.minutes(of: visit, now: context.date)
-                        Button { finish(visit) } label: {
+                        let minutes = SessionGoingLine.minutes(from: sessionStart ?? visit.flatMap(SessionGoingLine.start(of:)), now: context.date)
+                        Button {
+                            if let visit, visit.setCount > 0 { finish(visit) } else { library.changeGym { $0.leave() } }
+                        } label: {
                             MarkLabel(title: minutes.map { "Finish this session · \($0) min" } ?? "Finish this session",
                                       mark: .check, size: 22, colour: Gym.ink)
                         }
@@ -252,6 +258,7 @@ struct GymScreen: View {
         .navigationBarTitleDisplayMode(.large)
         .onAppear {
             if library.gym.gyms.isEmpty { library.changeGym { $0.ensureGym() } }
+            arrive()
         }
         .navigationDestination(item: $opened) { ref in
             MachineScreen(machineID: ref.id, day: day, gymID: gymID) { next in
@@ -580,6 +587,12 @@ struct GymScreen: View {
         return library.gym.lastText(m, excluding: visit?.id)
     }
 
+    /// Opening the gym today starts the session's clock (since 1.20); nothing is saved as a visit.
+    private func arrive() {
+        guard isToday else { return }
+        library.changeGym { $0.arrive(gym: gymID) }
+    }
+
     private func finish(_ visit: GymVisit) {
         let now = Date()
         beforeFinish = library.gym
@@ -600,19 +613,27 @@ private enum GymNaming { case new, rename }
 /// The minutes count from the session's start (or its first set) and move on each minute.
 /// Since 1.18 also under the At the gym card on the Train page (identifier `home-session-going`).
 struct SessionGoingLine: View {
-    let visit: GymVisit
+    /// When the session began: since 1.20 the moment the gym screen opened, else its first set.
+    let start: Date?
+    var machines = 0
+    var sets = 0
     var identifier = "gym-session-going"
     static let green = Color.pair("#15803d", "#86efac")
 
-    private var start: Date? { Self.start(of: visit) }
+    init(start: Date?, visit: GymVisit?, identifier: String = "gym-session-going") {
+        self.start = start ?? visit.flatMap(Self.start(of:))
+        self.machines = visit?.entries.filter { !$0.sets.isEmpty }.count ?? 0
+        self.sets = visit?.setCount ?? 0
+        self.identifier = identifier
+    }
 
     static func start(of visit: GymVisit) -> Date? {
         visit.started ?? visit.entries.flatMap(\.sets).compactMap(\.at).min()
     }
 
     /// Whole minutes since the session began, or nil when it has no start yet.
-    static func minutes(of visit: GymVisit, now: Date) -> Int? {
-        start(of: visit).map { max(0, Int(now.timeIntervalSince($0) / 60)) }
+    static func minutes(from start: Date?, now: Date) -> Int? {
+        start.map { max(0, Int(now.timeIntervalSince($0) / 60)) }
     }
 
     var body: some View {
@@ -636,10 +657,13 @@ struct SessionGoingLine: View {
 
     private func words(now: Date) -> String {
         var parts = ["Session going"]
-        if let m = Self.minutes(of: visit, now: now) { parts.append("\(m) min") }
-        let m = visit.entries.filter { !$0.sets.isEmpty }.count
-        parts.append(m == 1 ? "1 machine" : "\(m) machines")
-        parts.append(visit.setCount == 1 ? "1 set" : "\(visit.setCount) sets")
+        if let m = Self.minutes(from: start, now: now) { parts.append("\(m) min") }
+        if sets == 0 {
+            parts.append("no sets yet")
+        } else {
+            parts.append(machines == 1 ? "1 machine" : "\(machines) machines")
+            parts.append(sets == 1 ? "1 set" : "\(sets) sets")
+        }
         return parts.joined(separator: " · ")
     }
 }

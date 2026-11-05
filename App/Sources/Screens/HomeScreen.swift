@@ -88,9 +88,11 @@ struct HomeScreen: View {
                     if library.backupReminderDue { BackupReminder() }
                     GymCard { showGym = true }
                     // A gym session is going today (since 1.18, his ask): the same green line as on the gym screen.
-                    if let going = library.gym.openVisit(on: Date(), gym: library.gym.currentGym?.id), going.setCount > 0 {
+                    // Since 1.20 from the moment the gym screen opened today, before any set.
+                    if let start = library.gym.sessionStart(on: Date(), gym: library.gym.currentGym?.id) {
                         Button { showGym = true } label: {
-                            SessionGoingLine(visit: going, identifier: "home-session-going")
+                            SessionGoingLine(start: start, visit: library.gym.openVisit(on: Date(), gym: library.gym.currentGym?.id),
+                                             identifier: "home-session-going")
                         }
                         .buttonStyle(.plain)
                     }

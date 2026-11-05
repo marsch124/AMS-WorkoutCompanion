@@ -138,8 +138,8 @@ struct MachineScreen: View {
         .navigationBarBackButtonHidden(true)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // Back to the machines; the green Next goes on to the next planned one.
-            // With no set yet it says "Back to machines" and logs nothing (since 1.19, his ask); Escape on the Mac.
-            let leaving = today.isEmpty ? "Back to machines" : "Exercise done"
+            // With no set yet it says "Back to gym" and logs nothing (since 1.19, his ask; his word since 1.20); Escape on the Mac.
+            let leaving = today.isEmpty ? "Back to gym" : "Exercise done"
             Button { moveOn(nil) } label: {
                 Text(leaving)
             }

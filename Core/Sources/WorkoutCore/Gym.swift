@@ -334,6 +334,17 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
 }
 
 /// A machine someone else is on: come back to it later that day.
+/// When the gym screen was opened for a session that has no set yet (since 1.20): the session's clock starts here.
+public struct Arrival: Codable, Hashable, Sendable {
+    public var gymID: UUID?
+    public var at: Date
+
+    public init(gymID: UUID?, at: Date) {
+        self.gymID = gymID
+        self.at = at
+    }
+}
+
 public struct BusyMark: Codable, Hashable, Sendable {
     public var machineID: UUID
     public var day: Date
@@ -437,12 +448,15 @@ public struct GymLog: Codable, Equatable, Sendable {
     public var templates: [PlanTemplate]
     /// The usual rest for heavy machines, light machines and exercises (since 1.11).
     public var rests: RestDefaults
+    /// The gym screen opened today with no set yet (since 1.20); moves into the visit at its first set.
+    public var arrived: Arrival?
 
     public init(machines: [Machine] = [], visits: [GymVisit] = [], busyMarks: [BusyMark] = [],
                 gyms: [GymPlace] = [], currentGymID: UUID? = nil, plans: [DayPlan] = [], homeIcon: String? = nil,
                 muscles: [MuscleGroup] = MuscleGroup.defaults, templates: [PlanTemplate] = [],
-                rests: RestDefaults = RestDefaults()) {
+                rests: RestDefaults = RestDefaults(), arrived: Arrival? = nil) {
         self.rests = rests
+        self.arrived = arrived
         self.muscles = muscles
         self.templates = templates
         self.machines = machines
@@ -470,6 +484,27 @@ public struct GymLog: Codable, Equatable, Sendable {
     /// After Finish there is none: the next set starts a second session that day.
     public func openVisit(on day: Date, gym: UUID? = nil, calendar: Calendar = .current) -> GymVisit? {
         visits.first { $0.gymID == gym && $0.finished == nil && calendar.isDate($0.date, inSameDayAs: day) }
+    }
+
+    /// Opening the gym screen starts the session's clock (since 1.20, his ask) — unless a session is already
+    /// going or one was finished today (a second session still starts with its first set). Saves no visit.
+    public mutating func arrive(gym: UUID?, at now: Date = Date(), calendar: Calendar = .current) {
+        if openVisit(on: now, gym: gym, calendar: calendar).map({ $0.setCount > 0 }) == true { return }
+        if visits(on: now, gym: gym, calendar: calendar).contains(where: { $0.finished != nil && $0.setCount > 0 }) { return }
+        if let a = arrived, a.gymID == gym, calendar.isDate(a.at, inSameDayAs: now) { return }
+        arrived = Arrival(gymID: gym, at: now)
+    }
+
+    /// Finish with no set: the session ends and nothing is saved (since 1.20).
+    public mutating func leave() { arrived = nil }
+
+    /// When the session going on this day at this gym began: its visit's start, or when the gym screen opened.
+    public func sessionStart(on day: Date, gym: UUID?, calendar: Calendar = .current) -> Date? {
+        if let v = openVisit(on: day, gym: gym, calendar: calendar), v.setCount > 0 {
+            return v.started ?? v.entries.flatMap(\.sets).compactMap(\.at).min()
+        }
+        if let a = arrived, a.gymID == gym, calendar.isDate(a.at, inSameDayAs: day) { return a.at }
+        return nil
     }
 
     /// Every session on this day at this gym, the earliest first.
@@ -729,6 +764,7 @@ public struct GymLog: Codable, Equatable, Sendable {
         guard var v = visits.first(where: { $0.id == visitID }) else { return }
         v.finished = now
         put(v)
+        if arrived?.gymID == v.gymID { arrived = nil }
         busyMarks.removeAll { calendar.isDate($0.day, inSameDayAs: v.date) }
         plans.removeAll { $0.gymID == v.gymID && calendar.isDate($0.day, inSameDayAs: v.date) }
     }
@@ -780,7 +816,15 @@ public struct GymLog: Codable, Equatable, Sendable {
         let gym = machine(machineID)?.gymID
         // A finished session stays closed: a set after Finish starts the day's next session (since 1.12).
         var v = openVisit(on: day, gym: gym, calendar: calendar) ?? GymVisit(gymID: gym, date: day)
-        if v.started == nil { v.started = now }
+        if v.started == nil {
+            // The clock started when the gym screen opened (since 1.20).
+            if let a = arrived, a.gymID == gym, calendar.isDate(a.at, inSameDayAs: day), a.at <= now {
+                v.started = a.at
+            } else {
+                v.started = now
+            }
+        }
+        if arrived?.gymID == gym { arrived = nil }
         var set = set
         set.at = now   // a prefilled set may carry last time's stamp
         if let i = v.entries.lastIndex(where: { $0.machineID == machineID }) {
@@ -1015,6 +1059,7 @@ public enum GymFile {
         var muscles: [MuscleGroup]?
         var templates: [PlanTemplate]?
         var rests: RestDefaults?
+        var arrived: Arrival?
     }
 
     public static func encode(_ log: GymLog) throws -> Data {
@@ -1024,7 +1069,8 @@ public enum GymFile {
         return try enc.encode(Envelope(version: 1, machines: log.machines, visits: log.visits, busy: log.busyMarks,
                                         gyms: log.gyms, currentGym: log.currentGymID, plan: nil,
                                         plans: log.plans, homeIcon: log.homeIcon,
-                                        muscles: log.muscles, templates: log.templates, rests: log.rests))
+                                        muscles: log.muscles, templates: log.templates, rests: log.rests,
+                                        arrived: log.arrived))
     }
 
     public static func decode(_ data: Data) throws -> GymLog {
@@ -1035,7 +1081,7 @@ public enum GymFile {
                          gyms: e.gyms ?? [], currentGymID: e.currentGym,
                          plans: e.plans ?? (e.plan.map { [$0] } ?? []), homeIcon: e.homeIcon,
                          muscles: e.muscles ?? MuscleGroup.defaults, templates: e.templates ?? [],
-                         rests: e.rests ?? RestDefaults())
+                         rests: e.rests ?? RestDefaults(), arrived: e.arrived)
         log.ensureGym()
         return log
     }

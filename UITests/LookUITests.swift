@@ -75,7 +75,10 @@ final class LookUITests: XCTestCase {
     /// His ask (5 Nov): show that a session is going. No line before the first set; after it,
     /// "Session going" at the top of the gym screen. Finish takes it away again.
     func testTheGymScreenSaysASessionIsGoing() {
-        XCTAssertFalse(any("gym-session-going").exists)
+        // Since 1.20 the session starts when the gym opens (his ask): the line is there before any set.
+        let first = any("gym-session-going")
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        XCTAssertTrue(first.label.contains("no sets yet"), first.label)
         app.buttons["machine-Leg press"].tap()
         app.buttons["gym-set-done"].tap()
         XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))
@@ -94,7 +97,10 @@ final class LookUITests: XCTestCase {
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         back.tap()
         XCTAssertTrue(app.buttons["open-gym"].waitForExistence(timeout: 5))
-        XCTAssertFalse(any("home-session-going").exists, "no line before the first set")
+        // Since 1.20 opening the gym (done in setUp) already started the session.
+        let early = any("home-session-going")
+        XCTAssertTrue(early.waitForExistence(timeout: 5))
+        XCTAssertTrue(early.label.contains("no sets yet"), early.label)
         app.buttons["open-gym"].tap()
         app.buttons["machine-Leg press"].tap()
         app.buttons["gym-set-done"].tap()
@@ -127,18 +133,33 @@ final class LookUITests: XCTestCase {
     // MARK: 1.19
 
     /// His report (5 Nov): opening a machine left no way out but Set done or Exercise done.
-    /// With no set yet the bottom button says "Back to machines" and logs nothing; after a set it says "Exercise done".
+    /// With no set yet the bottom button says "Back to gym" (his word, 1.20; "Back to machines" in 1.19) and logs nothing; after a set it says "Exercise done".
     func testAMachineCanBeLeftWithoutLoggingASet() {
         app.buttons["machine-Leg press"].tap()
         let bottom = app.buttons["machine-done-pill"]
         XCTAssertTrue(bottom.waitForExistence(timeout: 5))
-        XCTAssertEqual(bottom.label, "Back to machines")
+        XCTAssertEqual(bottom.label, "Back to gym")
         bottom.tap()
         XCTAssertTrue(app.buttons["machine-Leg press"].waitForExistence(timeout: 5))
-        XCTAssertFalse(any("gym-session-going").exists, "leaving without a set starts no session")
+        XCTAssertTrue(any("gym-session-going").label.contains("no sets yet"), "leaving without a set saves no set")
         app.buttons["machine-Leg press"].tap()
         app.buttons["gym-set-done"].tap()
         XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.buttons["machine-done-pill"].label, "Exercise done")
+    }
+
+    // MARK: 1.20
+
+    /// His ask (5 Nov): "Session going" from opening the gym. Finish with no set ends it and saves nothing.
+    func testFinishWithoutASetEndsTheSession() {
+        let finish = app.buttons["gym-finish"]
+        XCTAssertTrue(finish.waitForExistence(timeout: 5))
+        finish.tap()
+        XCTAssertFalse(any("gym-session-going").waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons["gym-finish"].exists)
+        XCTAssertFalse(any("gym-earlier-day").exists)
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.buttons["open-gym"].waitForExistence(timeout: 5))
+        XCTAssertFalse(any("home-session-going").exists)
     }
 }
