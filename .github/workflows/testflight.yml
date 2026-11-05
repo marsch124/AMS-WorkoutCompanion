@@ -5,8 +5,8 @@ name: TestFlight
 # whose tests already passed after its push (they are not run a second time).
 #
 # Signing is done by an App Store Connect API key held as three repository
-# secrets. The build number is the date and time in Sweden (202611021506 = 2 Nov 2026 15:06),
-# the same as an upload from the Mac, so it always goes up whichever way a build is sent.
+# secrets. The build number is short (since 1.19): CURRENT_PROJECT_VERSION in project.yml,
+# 1 for a new version, 2, 3 … for another build of the same version — the same as an upload from the Mac.
 on:
   workflow_dispatch:
 
@@ -62,7 +62,7 @@ jobs:
 
       - name: Which build this is
         run: |
-          BUILD=$(TZ=Europe/Stockholm date +%Y%m%d%H%M)
+          BUILD=$(grep CURRENT_PROJECT_VERSION project.yml | head -1 | cut -d'"' -f2)
           VERSION=$(grep MARKETING_VERSION project.yml | head -1 | cut -d'"' -f2)
           echo "Building $VERSION ($BUILD) from ${GITHUB_REF_NAME} @ ${GITHUB_SHA:0:7}"
           echo "BUILD=$BUILD" >> "$GITHUB_ENV"

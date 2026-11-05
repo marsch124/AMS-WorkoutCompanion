@@ -12,6 +12,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "1.18"
+    # Build number, short since 1.19 (his ask): 1 for each new version, then 2, 3 … for another build of it.
     CURRENT_PROJECT_VERSION: "1"
 packages:
   # The model — workouts, their phases and the clock, with no screen in it.

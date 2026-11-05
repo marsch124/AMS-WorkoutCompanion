@@ -37,9 +37,10 @@ the TestFlight app offers it.
 Or from a Mac with Xcode: archive (Release, `generic/platform=iOS`) and export with
 `tools/ExportOptions.plist`, which uploads. Version 1.1 went this way on 2 Nov 2026.
 
-- **Build number** = the date and time in Sweden, `YYYYMMDDHHMM` (202611021506 =
-  2 Nov 2026 15:06), both ways. Apple refuses a build number lower than one it already
-  has for the version, so the two ways must count the same.
+- **Build number** is short since 1.19 (Martin's ask, 5 Nov 2026): `CURRENT_PROJECT_VERSION`
+  in `project.yml` — **1** for each new version, then 2, 3 … for another build of the same
+  version. Both ways read it from there; do not pass it on the command line. TestFlight then
+  shows "1.19 (1)". Up to 1.18 the build number was the date and time (202611051430).
 - **Every build must be added to the tester group** in App Store Connect
   (TestFlight → the group → Builds → "+"). A group does not pick new builds up by itself.
 
