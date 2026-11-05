@@ -241,7 +241,7 @@ final class WorkoutCompanionUITests: XCTestCase {
             app.buttons["machine-Chest press"].tap()
             waitFor(app.staticTexts["gym-next-set"], label: "Set 1")
             app.buttons["gym-set-done"].tap()
-            XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 3))
+            XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))  // 3 s was too short on GitHub's slower Mac (5 Nov)
             goBack()
             XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
         }
