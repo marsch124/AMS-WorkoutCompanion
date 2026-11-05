@@ -207,13 +207,19 @@ struct GymScreen: View {
                 }
 
                 if let visit, visit.setCount > 0 {
-                    Button { finish(visit) } label: {
-                        MarkLabel(title: "Finish this session", mark: .check, size: 22, colour: Gym.ink)
+                    // Since 1.18 (his ask) the button carries the session's minutes, seen when scrolled down.
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        let minutes = SessionGoingLine.minutes(of: visit, now: context.date)
+                        Button { finish(visit) } label: {
+                            MarkLabel(title: minutes.map { "Finish this session · \($0) min" } ?? "Finish this session",
+                                      mark: .check, size: 22, colour: Gym.ink)
+                        }
+                        .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 52))
+                        .padding(.top, 6)
+                        .accessibilityLabel("Finish this session")
+                        .accessibilityValue(minutes.map { "\($0) min" } ?? "")
+                        .accessibilityIdentifier("gym-finish")
                     }
-                    .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 52))
-                    .padding(.top, 6)
-                    .accessibilityLabel("Finish this session")
-                    .accessibilityIdentifier("gym-finish")
                 }
 
                 let earlier = library.gym.visits(in: gymID).filter { $0.id != visit?.id }
@@ -592,11 +598,22 @@ private enum GymNaming { case new, rename }
 
 /// "Session going · 42 min · 3 machines · 7 sets" — shown while a session is open (since 1.17).
 /// The minutes count from the session's start (or its first set) and move on each minute.
-private struct SessionGoingLine: View {
+/// Since 1.18 also under the At the gym card on the Train page (identifier `home-session-going`).
+struct SessionGoingLine: View {
     let visit: GymVisit
+    var identifier = "gym-session-going"
     static let green = Color.pair("#15803d", "#86efac")
 
-    private var start: Date? { visit.started ?? visit.entries.flatMap(\.sets).compactMap(\.at).min() }
+    private var start: Date? { Self.start(of: visit) }
+
+    static func start(of visit: GymVisit) -> Date? {
+        visit.started ?? visit.entries.flatMap(\.sets).compactMap(\.at).min()
+    }
+
+    /// Whole minutes since the session began, or nil when it has no start yet.
+    static func minutes(of visit: GymVisit, now: Date) -> Int? {
+        start(of: visit).map { max(0, Int(now.timeIntervalSince($0) / 60)) }
+    }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -613,13 +630,13 @@ private struct SessionGoingLine: View {
             .padding(.vertical, 7)
             .background(Self.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("gym-session-going")
+            .accessibilityIdentifier(identifier)
         }
     }
 
     private func words(now: Date) -> String {
         var parts = ["Session going"]
-        if let start { parts.append("\(max(0, Int(now.timeIntervalSince(start) / 60))) min") }
+        if let m = Self.minutes(of: visit, now: now) { parts.append("\(m) min") }
         let m = visit.entries.filter { !$0.sets.isEmpty }.count
         parts.append(m == 1 ? "1 machine" : "\(m) machines")
         parts.append(visit.setCount == 1 ? "1 set" : "\(visit.setCount) sets")

@@ -85,4 +85,42 @@ final class LookUITests: XCTestCase {
         XCTAssertTrue(going.label.contains("Session going"), going.label)
         XCTAssertTrue(going.label.contains("1 set"), going.label)
     }
+
+    // MARK: 1.18
+
+    /// His ask (5 Nov): the Train page shows a session is going too, under the At the gym card.
+    func testTheTrainPageSaysASessionIsGoing() {
+        let back = app.navigationBars.buttons.firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        back.tap()
+        XCTAssertTrue(app.buttons["open-gym"].waitForExistence(timeout: 5))
+        XCTAssertFalse(any("home-session-going").exists, "no line before the first set")
+        app.buttons["open-gym"].tap()
+        app.buttons["machine-Leg press"].tap()
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))
+        app.buttons["machine-done-pill"].tap()
+        XCTAssertTrue(any("gym-session-going").waitForExistence(timeout: 5))
+        app.navigationBars.buttons.firstMatch.tap()
+        let going = any("home-session-going")
+        XCTAssertTrue(going.waitForExistence(timeout: 5))
+        XCTAssertTrue(going.label.contains("Session going"), going.label)
+        XCTAssertTrue(going.label.contains("min"), going.label)
+        // Tapping it opens the gym.
+        going.tap()
+        XCTAssertTrue(any("gym-session-going").waitForExistence(timeout: 5))
+    }
+
+    /// His ask (5 Nov): the Finish button, seen when scrolled down, carries the session's minutes.
+    func testTheFinishButtonShowsTheSessionMinutes() {
+        app.buttons["machine-Leg press"].tap()
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))
+        app.buttons["machine-done-pill"].tap()
+        let finish = app.buttons["gym-finish"]
+        XCTAssertTrue(finish.waitForExistence(timeout: 5))
+        XCTAssertEqual(finish.label, "Finish this session")
+        let minutes = finish.value as? String ?? ""
+        XCTAssertTrue(minutes.hasSuffix(" min"), "value was \"\(minutes)\"")
+    }
 }

@@ -87,6 +87,13 @@ struct HomeScreen: View {
                 VStack(spacing: 10) {
                     if library.backupReminderDue { BackupReminder() }
                     GymCard { showGym = true }
+                    // A gym session is going today (since 1.18, his ask): the same green line as on the gym screen.
+                    if let going = library.gym.openVisit(on: Date(), gym: library.gym.currentGym?.id), going.setCount > 0 {
+                        Button { showGym = true } label: {
+                            SessionGoingLine(visit: going, identifier: "home-session-going")
+                        }
+                        .buttonStyle(.plain)
+                    }
                     LazyVGrid(columns: columns, spacing: 10) {
                         ForEach(library.workouts) { w in
                             WorkoutCard(workout: w, start: { running = w }, edit: { editing = w })
