@@ -654,7 +654,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertTrue(on.waitForExistence(timeout: 5))
         on.tap()
         // The iPhone's own folder picker opens.
-        XCTAssertTrue(app.navigationBars.buttons["Cancel"].waitForExistence(timeout: 8)
+        XCTAssertTrue(app.navigationBars.buttons["Cancel"].waitForExistence(timeout: 20)  // 8 s ran out on GitHub (5 Nov)
                       || app.buttons["Cancel"].waitForExistence(timeout: 2))
     }
 
