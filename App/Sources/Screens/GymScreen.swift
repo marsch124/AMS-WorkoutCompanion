@@ -86,6 +86,8 @@ struct GymCard: View {
 struct GymScreen: View {
     @Environment(Library.self) private var library
     @State private var day = Date()
+    /// How tall the name band on a machine tile is, so the Busy pill sits just above it.
+    @State private var bandHeight: CGFloat = 44
     @State private var camera = false
     @State private var newMachine: Machine?
     @State private var opened: MachineRef?
@@ -529,8 +531,9 @@ struct GymScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("machine-\(m.name)")
-        // Top left of the photo, small (since 1.16; bottom right in 1.13 — the name band sits there now).
-        .overlay(alignment: .topLeading) {
+        // Martin's placement (1.13): bottom right of the photo, just above the name band.
+        // 1.16 moved it top left without asking; 1.16.1 put it back. A test guards it.
+        .overlay(alignment: .bottomTrailing) {
             Button {
                 library.changeGym { $0.setBusy(m.id, !busy, on: day) }
             } label: {
@@ -538,9 +541,11 @@ struct GymScreen: View {
                 BusyPill(on: busy).padding(6).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .padding(.bottom, bandHeight)
             .accessibilityLabel(busy ? "\(m.name) is busy" : "Mark \(m.name) busy")
             .accessibilityIdentifier("busy-\(m.name)")
         }
+        .onPreferenceChange(BandHeight.self) { if $0 > 0 { bandHeight = $0 } }
     }
 
     private func addMachine() {
@@ -802,6 +807,7 @@ private struct MachineTile: View {
                 .padding(.vertical, 5)
                 .padding(.leading, stripe == nil ? 0 : 3)
                 .background(bandFill.opacity(busy ? 1 : 0.82))
+                .background(GeometryReader { Color.clear.preference(key: BandHeight.self, value: $0.size.height) })
                 .accessibilityIdentifier("tile-band-\(machine.name)")
             }
             .overlay(alignment: .topTrailing) {
@@ -827,6 +833,12 @@ private struct MachineTile: View {
     }
 
     static let height: CGFloat = 132
+}
+
+/// The height of a tile's name band, passed up so the Busy pill can sit just above it.
+private struct BandHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 /// "Busy" on a machine's photo: full orange when marked, a light outline when not.

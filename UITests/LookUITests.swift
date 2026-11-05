@@ -23,6 +23,26 @@ final class LookUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Leg press is busy"].waitForExistence(timeout: 5))
     }
 
+    /// Martin's placement (asked for in 1.13, lost in 1.16): the Busy pill sits bottom right of
+    /// the photo, just above the name band — marked or not. This test stops it moving again.
+    func testBusyPillSitsBottomRightAboveTheNameBand() {
+        for state in ["not busy", "busy"] {
+            let tile = app.buttons["machine-Leg press"]
+            let pill = app.buttons["busy-Leg press"]
+            let band = any("tile-band-Leg press")
+            XCTAssertTrue(band.waitForExistence(timeout: 5))
+            let t = tile.frame, p = pill.frame, b = band.frame
+            XCTAssertGreaterThan(p.midX, t.midX, "\(state): pill should be on the right — \(p) in \(t)")
+            XCTAssertGreaterThan(p.midY, t.midY, "\(state): pill should be in the bottom half — \(p) in \(t)")
+            XCTAssertLessThanOrEqual(p.maxX, t.maxX + 1, "\(state): pill inside the tile")
+            XCTAssertLessThanOrEqual(p.maxY, b.minY + 1, "\(state): pill above the name band — \(p) band \(b)")
+            if state == "not busy" {
+                pill.tap()
+                XCTAssertTrue(app.buttons["Leg press is busy"].waitForExistence(timeout: 5))
+            }
+        }
+    }
+
     func testRestRingStartsOrange() {
         app.buttons["machine-Leg press"].tap()
         app.buttons["gym-set-done"].tap()
