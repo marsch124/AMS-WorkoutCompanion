@@ -10,6 +10,19 @@ on:
 
 jobs:
   tests:
+    # Two halves side by side (since 5 Nov 2026): the main screen tests (33) and all the
+    # others (29). One run took ~30 min on one Mac; each half gets its own GitHub Mac.
+    name: ${{ matrix.half.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        half:
+          - name: Model + main screen tests
+            model: true
+            pick: -only-testing:AMSWorkoutCompanionUITests/WorkoutCompanionUITests
+          - name: Other screen tests
+            model: false
+            pick: -skip-testing:AMSWorkoutCompanionUITests/WorkoutCompanionUITests
     runs-on: macos-15
     timeout-minutes: 75   # 60 screen tests ~17 min on his Mac; unsigned builds with the lock-screen widget hung before the first test (1.16), so it is signed ad hoc
     steps:
@@ -22,6 +35,7 @@ jobs:
           xcodebuild -version
 
       - name: Model tests
+        if: matrix.half.model
         run: swift test --package-path Core
 
       - name: Install XcodeGen
@@ -49,6 +63,7 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIM_UDID" \
             -derivedDataPath build \
             -resultBundlePath TestResults.xcresult \
+            ${{ matrix.half.pick }} \
             -test-timeouts-enabled YES \
             -maximum-test-execution-time-allowance 180 \
             TEST_RUNNER_CI=1 \
@@ -61,5 +76,5 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: TestResults
+          name: TestResults-${{ strategy.job-index }}
           path: TestResults.xcresult
