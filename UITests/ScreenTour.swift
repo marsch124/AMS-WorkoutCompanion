@@ -31,7 +31,7 @@ final class ScreenTour: XCTestCase {
         add(shot)
     }
 
-    /// Back one page: on a machine (no back arrow since 1.9) "Exercise done", else the back arrow.
+    /// Back one page: on a machine (no back arrow since 1.9) the bottom button ("Back to machines" before a set, then "Exercise done"), else the back arrow.
     func goBack() {
         let done = app.buttons["machine-done-pill"]
         if done.exists && done.isHittable { done.tap(); return }

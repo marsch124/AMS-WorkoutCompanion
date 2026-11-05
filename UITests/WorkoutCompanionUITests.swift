@@ -19,7 +19,7 @@ final class WorkoutCompanionUITests: XCTestCase {
     }
 
     /// Waits for an element's label, since the screen animates between phases.
-    /// Back one page: on a machine (no back arrow since 1.9) "Exercise done", else the back arrow.
+    /// Back one page: on a machine (no back arrow since 1.9) the bottom button ("Back to machines" before a set, then "Exercise done"), else the back arrow.
     func goBack() {
         let done = app.buttons["machine-done-pill"]
         if done.exists && done.isHittable { done.tap(); return }
@@ -108,9 +108,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.18 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.19 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.18"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.19"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {

@@ -137,15 +137,19 @@ struct MachineScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Button { moveOn(nil) } label: {   // back to the machines; the green Next goes on to the next planned one
-                Text("Exercise done")
+            // Back to the machines; the green Next goes on to the next planned one.
+            // With no set yet it says "Back to machines" and logs nothing (since 1.19, his ask); Escape on the Mac.
+            let leaving = today.isEmpty ? "Back to machines" : "Exercise done"
+            Button { moveOn(nil) } label: {
+                Text(leaving)
             }
             .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 50))
+            .keyboardShortcut(today.isEmpty ? .cancelAction : nil)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
             .background(Theme.bg.opacity(0.96).ignoresSafeArea(edges: .bottom))
-            .accessibilityLabel("Exercise done")
+            .accessibilityLabel(leaving)
             .accessibilityIdentifier("machine-done-pill")
         }
         .toolbar {

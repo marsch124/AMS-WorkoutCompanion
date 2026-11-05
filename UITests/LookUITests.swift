@@ -123,4 +123,22 @@ final class LookUITests: XCTestCase {
         let minutes = finish.value as? String ?? ""
         XCTAssertTrue(minutes.hasSuffix(" min"), "value was \"\(minutes)\"")
     }
+
+    // MARK: 1.19
+
+    /// His report (5 Nov): opening a machine left no way out but Set done or Exercise done.
+    /// With no set yet the bottom button says "Back to machines" and logs nothing; after a set it says "Exercise done".
+    func testAMachineCanBeLeftWithoutLoggingASet() {
+        app.buttons["machine-Leg press"].tap()
+        let bottom = app.buttons["machine-done-pill"]
+        XCTAssertTrue(bottom.waitForExistence(timeout: 5))
+        XCTAssertEqual(bottom.label, "Back to machines")
+        bottom.tap()
+        XCTAssertTrue(app.buttons["machine-Leg press"].waitForExistence(timeout: 5))
+        XCTAssertFalse(any("gym-session-going").exists, "leaving without a set starts no session")
+        app.buttons["machine-Leg press"].tap()
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.buttons["machine-done-pill"].label, "Exercise done")
+    }
 }
