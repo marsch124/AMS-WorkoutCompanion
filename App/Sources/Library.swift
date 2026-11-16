@@ -30,13 +30,15 @@ final class Library {
         workouts = []
         gym = GymLog()
         history = []
+        workoutsUnreadable = false
         gymUnreadable = false
         historyUnreadable = false
         if let data = try? Data(contentsOf: file) {
             if let list = try? WorkoutFile.decode(data) {
                 workouts = list
             } else {
-                // Never overwrite a file we cannot read: keep it aside first.
+                // Never overwrite a file we cannot read: keep it aside first, and save nothing over it (1.21).
+                workoutsUnreadable = true
                 let aside = folder.appendingPathComponent("workouts-unreadable-\(Int(Date().timeIntervalSince1970)).json")
                 try? fm.copyItem(at: file, to: aside)
             }
@@ -73,6 +75,18 @@ final class Library {
     /// The starter workouts still have to be written (a first launch, or a backup without workouts).
     private var needsFirstSave = false
 
+    /// True when workouts.json could not be read: it is kept aside and never overwritten (since 1.21 —
+    /// until then the next change saved an empty list over it and tidied the workouts' photos away).
+    private var workoutsUnreadable = false
+
+    /// What the red note at the top of Train says when a file could not be read (since 1.21); nil = all read.
+    var unreadableNote: String? {
+        if workoutsUnreadable { return "Your workouts could not be read" }
+        if gymUnreadable { return "Your gym log could not be read" }
+        if historyUnreadable { return "Your history could not be read" }
+        return nil
+    }
+
     /// True when history.json could not be read: it is kept aside and never overwritten.
     private var historyUnreadable = false
 
@@ -86,6 +100,10 @@ final class Library {
             let dir = fm.temporaryDirectory.appendingPathComponent("uitest", isDirectory: true)
             try? fm.removeItem(at: dir)
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            // -unreadable (1.21 test): a workouts file that cannot be read.
+            if ProcessInfo.processInfo.arguments.contains("-unreadable") {
+                try? Data("not a workouts file".utf8).write(to: dir.appendingPathComponent("workouts.json"))
+            }
             if ProcessInfo.processInfo.arguments.contains("-gymdemo") {
                 var demo = GymLog.demo()
                 // -gymextras (1.11): muscle groups on the demo machines, six more machines (so the search field
@@ -308,7 +326,7 @@ final class Library {
         let fm = FileManager.default
         try? fm.createDirectory(at: backupFolder, withIntermediateDirectories: true)
         let copies = weeklyCopies()
-        guard force || Backup.weeklyDue(newest: copies.first?.made, now: now),
+        guard force || (unreadableNote == nil && Backup.weeklyDue(newest: copies.first?.made, now: now)),
               !workouts.isEmpty || !gym.machines.isEmpty || !history.isEmpty,
               let data = try? Backup.encode(makeBackup(at: now)) else { return }
         try? data.write(to: backupFolder.appendingPathComponent(Backup.fileName(now)), options: .atomic)
@@ -406,7 +424,8 @@ final class Library {
     /// Once a day — at launch and when the app goes to the background — a backup in the chosen
     /// folder; only the newest 7 of the app's own backups there are kept.
     func autoBackupIfDue(now: Date = Date()) {
-        guard let url = autoFolder(), Backup.dailyDue(last: autoLast, now: now) else { return }
+        // While a file cannot be read, no automatic backup: it would push a good one out of the newest 7 (1.21).
+        guard unreadableNote == nil, let url = autoFolder(), Backup.dailyDue(last: autoLast, now: now) else { return }
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         guard let data = try? Backup.encode(makeBackup(at: now)),
@@ -437,27 +456,15 @@ final class Library {
         if fm.fileExists(atPath: photoFolder.path) {
             try fm.copyItem(at: photoFolder, to: aside.appendingPathComponent("Photos", isDirectory: true))
         }
-        // Then the backup's files and photos.
-        for name in Backup.fileNames {
-            let url = folder.appendingPathComponent(name)
-            if let data = backup.files[name] {
-                try data.write(to: url, options: .atomic)
-            } else {
-                try? fm.removeItem(at: url)
-            }
-        }
-        try? fm.removeItem(at: photoFolder)
-        try fm.createDirectory(at: photoFolder, withIntermediateDirectories: true)
-        for (name, data) in backup.photos where !name.contains("/") {
-            try data.write(to: photoFolder.appendingPathComponent(name), options: .atomic)
-        }
+        // Then the backup's files and photos — all or nothing (1.21): a failure leaves today's data in place.
+        try backup.install(in: folder)
         load()
     }
 
     // MARK: Saving
 
     private func persist() {
-        guard let data = try? WorkoutFile.encode(workouts) else { return }
+        guard !workoutsUnreadable, let data = try? WorkoutFile.encode(workouts) else { return }
         try? data.write(to: file, options: .atomic)
         removeUnusedPhotos()
     }
@@ -475,9 +482,9 @@ final class Library {
 
     /// Photos no workout or machine uses any more (replaced, removed, deleted) go.
     private func removeUnusedPhotos() {
-        // With an unreadable gym file we cannot know which photos its machines use: keep them all.
+        // With an unreadable gym or workouts file we cannot know which photos they use: keep them all.
         // While Undo is offered, a deleted machine's or workout's photo must stay.
-        guard !gymUnreadable, undoPoint == nil else { return }
+        guard !gymUnreadable, !workoutsUnreadable, undoPoint == nil else { return }
         let inUse = WorkoutFile.photosInUse(workouts).union(gym.photosInUse)
         let names = (try? FileManager.default.contentsOfDirectory(atPath: photoFolder.path)) ?? []
         for name in names where !inUse.contains(name) {

@@ -103,3 +103,42 @@ public struct Backup: Codable, Equatable, Sendable {
         made.sorted { $0.date > $1.date }.dropFirst(keep).map(\.name)
     }
 }
+
+extension Backup {
+    /// Puts this backup's files and photos into `folder`, all or nothing (since 1.21). Everything is
+    /// first written to a waiting folder; only when every file and photo is there are they put in place
+    /// (renames, which need no free space). A failure on the way leaves the folder exactly as it was.
+    public func install(in folder: URL, fileManager fm: FileManager = .default) throws {
+        // A waiting folder left by a restore that was cut short is of no use any more.
+        for name in (try? fm.contentsOfDirectory(atPath: folder.path)) ?? [] where name.hasPrefix(Backup.waitingPrefix) {
+            try? fm.removeItem(at: folder.appendingPathComponent(name))
+        }
+        let waiting = folder.appendingPathComponent(Backup.waitingPrefix + UUID().uuidString, isDirectory: true)
+        let waitingPhotos = waiting.appendingPathComponent("Photos", isDirectory: true)
+        do {
+            try fm.createDirectory(at: waitingPhotos, withIntermediateDirectories: true)
+            for name in Backup.fileNames {
+                if let data = files[name] { try data.write(to: waiting.appendingPathComponent(name), options: .atomic) }
+            }
+            for (name, data) in photos where !name.contains("/") {
+                try data.write(to: waitingPhotos.appendingPathComponent(name), options: .atomic)
+            }
+        } catch {
+            try? fm.removeItem(at: waiting)
+            throw error
+        }
+        // Everything is written: put it in place.
+        for name in Backup.fileNames {
+            let url = folder.appendingPathComponent(name)
+            try? fm.removeItem(at: url)
+            let ready = waiting.appendingPathComponent(name)
+            if fm.fileExists(atPath: ready.path) { try fm.moveItem(at: ready, to: url) }
+        }
+        let photoFolder = folder.appendingPathComponent("Photos", isDirectory: true)
+        try? fm.removeItem(at: photoFolder)
+        try fm.moveItem(at: waitingPhotos, to: photoFolder)
+        try? fm.removeItem(at: waiting)
+    }
+
+    static let waitingPrefix = "Restore waiting "
+}

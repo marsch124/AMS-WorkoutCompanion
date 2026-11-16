@@ -85,6 +85,7 @@ struct HomeScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 10) {
+                    if let words = library.unreadableNote { UnreadableNote(words: words) }
                     if library.backupReminderDue { BackupReminder() }
                     GymCard { showGym = true }
                     // A gym session is going today (since 1.18, his ask): the same green line as on the gym screen.
@@ -306,6 +307,40 @@ private struct UndoBar: View {
             try? await Task.sleep(for: .seconds(10))
             if !Task.isCancelled { library.forgetUndo(point.id) }
         }
+    }
+}
+
+/// A file could not be read (since 1.21): a red note at the top of Train, with the way to Backups.
+private struct UnreadableNote: View {
+    let words: String
+    private static let colour = IconColour.of(key: "red")!
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(words)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                    .accessibilityIdentifier("unreadable-note")
+                Text("Nothing is saved over them. Restore a backup to get them back.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 4)
+            NavigationLink { BackupScreen() } label: {
+                Text("Backups")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Self.colour.inkColor)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Self.colour.fillColor, in: Capsule())
+            }
+            .accessibilityIdentifier("unreadable-backups")
+        }
+        .padding(10)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Self.colour.fillColor, lineWidth: 1.5))
     }
 }
 
