@@ -1,0 +1,1030 @@
+<title>Workouts Tour</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Workouts Tour: chapter rail on the left, coach card + a pretend iPhone on the right. Same engine as the other AMS tours.
+   Based on AMS Workouts (WorkoutCompanion) 1.21 (build 1). Update this tour in the release that changes a taught screen. */
+:root {
+  --bg: #F4F6F7; --panel: #FFFFFF; --fg: #16232A; --muted: #5F7078; --line: #E2E8EA;
+  --accent: #4F46E5; --accent-soft: #E9E8FB; --good: #15803D; --good-soft: #E3F4E8; --warn: #C2410C;
+  --shadow: 0 18px 40px rgba(22,35,42,.2);
+  --pbg:#F4F6F7; --pcard:#FFFFFF; --pink:#16232A; --pmuted:#5F7078; --pline:#E2E8EA; --pfield:rgba(120,120,128,.14);
+  --ind:#4F46E5; --gt:#4F46E5; --band:#1E1B4B; --bz:#FF8C1A; --bz-ink:#4A2300; --bzt:#C2410C;
+  --plum:#9C3D8C; --plumt:#9C3D8C; --navy:#2A5194; --grn:#30D158; --grn-ink:#0B3A17; --sess:#15803D;
+  --yel:#FFD60A; --yel-ink:#3D3000; --wut:#A16207; --gold:#B7791F; --acc:#2F6FE0; --red:#DC3D43; --blue:#0A84FF; --pink2:#FF6FA8; --pink2-ink:#5A0F2E;
+  --f-display: "Avenir Next", "Helvetica Neue", system-ui, sans-serif;
+  --f-body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --f-phone: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg:#0E1416; --panel:#161F22; --fg:#E7EDEE; --muted:#94A6AC; --line:#26343A;
+  --accent:#9D97FF; --accent-soft:#23214A; --good:#86EFAC; --good-soft:#15301F; --warn:#FDBA74;
+  --shadow: 0 18px 40px rgba(0,0,0,.55);
+  --pbg:#0E1416; --pcard:#161F22; --pink:#E7EDEE; --pmuted:#94A6AC; --pline:#26343A; --pfield:rgba(120,120,128,.3);
+  --gt:#9D97FF; --bzt:#FDBA74; --plumt:#E29BD6; --sess:#86EFAC; --wut:#FCD34D; --gold:#F6C453;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg:#0E1416; --panel:#161F22; --fg:#E7EDEE; --muted:#94A6AC; --line:#26343A;
+  --accent:#9D97FF; --accent-soft:#23214A; --good:#86EFAC; --good-soft:#15301F; --warn:#FDBA74;
+  --shadow: 0 18px 40px rgba(0,0,0,.55);
+  --pbg:#0E1416; --pcard:#161F22; --pink:#E7EDEE; --pmuted:#94A6AC; --pline:#26343A; --pfield:rgba(120,120,128,.3);
+  --gt:#9D97FF; --bzt:#FDBA74; --plumt:#E29BD6; --sess:#86EFAC; --wut:#FCD34D; --gold:#F6C453;
+  color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.45; margin: 0 }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: 230px minmax(0,1fr); gap: 22px; }
+svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none }
+svg.g { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none }
+
+/* Rail */
+.rail { display: flex; flex-direction: column; gap: 4px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.brand h1 { font-family: var(--f-display); font-size: 19px; line-height: 1.1; margin: 0; text-wrap: balance }
+.brand small { color: var(--muted); font-size: 12px }
+.logo { width: 40px; height: 40px; border-radius: 10px; background: #4F46E5; color: #fff; display: grid; place-items: center; flex: none }
+.chap { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; border: 0; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.chap:hover { background: var(--accent-soft) }
+.chap:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.chap .n { color: var(--muted); font-size: 12px; margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap }
+.chap.cur { background: var(--accent-soft); color: var(--accent); font-weight: 600 }
+.chap.done .n { color: var(--good) }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 10px 2px 2px }
+.bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s }
+.railnote { color: var(--muted); font-size: 12px; margin: 4px 2px }
+
+/* Coach */
+.main { display: grid; grid-template-columns: minmax(0,1fr); gap: 14px; min-width: 0; align-content: start }
+.topnote { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 13.5px }
+.coach { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px 16px; align-items: center; }
+.coach .eyebrow { grid-column: 1 / -1; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 600; display: flex; gap: 8px; align-items: center }
+.coach .eyebrow .kind { color: var(--muted); font-weight: 500 }
+.coach h2 { font-family: var(--f-display); font-size: 23px; line-height: 1.2; margin: 0; text-wrap: balance }
+.coach p { margin: 4px 0 0; color: var(--fg); max-width: 62ch }
+.coach .btns { display: flex; gap: 8px; align-items: center }
+.btn { font: inherit; font-weight: 600; border-radius: 9px; padding: 8px 16px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer }
+.btn.main-b { background: #4F46E5; border-color: #4F46E5; color: #fff }
+.btn.main-b:disabled { opacity: .45; cursor: default }
+.btn.ghost { border-color: transparent; color: var(--muted) }
+.answers { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px }
+.ans { font: inherit; padding: 8px 14px; border-radius: 9px; border: 1.5px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; text-align: left }
+.ans:hover { border-color: var(--accent) }
+.ans.right { border-color: var(--good); background: var(--good-soft); color: var(--good); font-weight: 600 }
+.ans.wrong { border-color: var(--warn); color: var(--warn); text-decoration: line-through }
+.feedback { grid-column: 1 / -1; font-weight: 600; color: var(--good); min-height: 1.4em; margin: 0 }
+.feedback.no { color: var(--warn) }
+
+/* Stage = pretend iPhone, 390 x 760, scaled to fit */
+.stagebox { position: relative; width: min(100%, 390px); aspect-ratio: 390 / 760; border-radius: 40px; overflow: hidden; box-shadow: 0 0 0 6px #1f1f23, var(--shadow); justify-self: center; background: var(--pbg) }
+.stage { position: absolute; left: 0; top: 0; width: 390px; height: 760px; transform-origin: 0 0; font-family: var(--f-phone); font-size: 15px; line-height: 1.3; color: var(--pink); background: var(--pbg); overflow: hidden; -webkit-user-select: none; user-select: none }
+:where(.stage button) { font: inherit; color: inherit }
+:where(.stage input) { font: inherit; color: var(--pink); -webkit-user-select: text; user-select: text }
+.sbar { position: absolute; left: 0; right: 0; top: 0; height: 44px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 30px 6px 34px; font-weight: 600; font-size: 15px; z-index: 40; pointer-events: none; background: linear-gradient(var(--pbg) 70%, transparent) }
+.sbar .bat { width: 25px; height: 12px; border: 1.5px solid var(--pink); border-radius: 4px; position: relative; opacity: .8 }
+.sbar .bat::after { content: ""; position: absolute; left: 1.5px; top: 1.5px; bottom: 1.5px; width: 70%; background: var(--pink); border-radius: 2px }
+.scr { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; padding: 46px 16px 84px; scrollbar-width: none }
+.scr::-webkit-scrollbar { display: none }
+.sp { flex: 1 }
+.tr { color: var(--gt) }
+
+/* Tab bar: flat, three items, like the app */
+.tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: var(--pcard); border-top: 1px solid var(--pline); display: flex; align-items: flex-start; padding-top: 6px; z-index: 30 }
+.tabs button { flex: 1; border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; color: var(--pmuted); cursor: pointer; padding: 0 }
+.tabs button svg { width: 24px; height: 24px }
+.tabs button.on { font-weight: 600 }
+
+/* Navigation */
+.ltop { display: flex; align-items: center; min-height: 40px }
+.nbk { display: flex; align-items: center; border: 0; background: none; color: var(--acc); font-size: 16px; padding: 4px 0; cursor: pointer; min-height: 40px }
+.nbk svg { width: 20px; height: 20px }
+.ltitle { margin: 0 0 8px; font-size: 32px; line-height: 1.12; font-weight: 700 }
+.inl { display: flex; align-items: center; min-height: 40px; margin-bottom: 4px }
+.inl b { flex: 1; text-align: center; font-size: 17px }
+.inl .l, .inl .r { width: 80px; display: flex }
+.inl .r { justify-content: flex-end }
+.ib { border: 0; background: none; padding: 6px; cursor: pointer; display: grid; place-items: center; color: var(--gt); border-radius: 10px }
+.ib svg { width: 22px; height: 22px }
+.cap { color: var(--pmuted); font-size: 12.5px; margin: 4px 0 }
+
+/* Train */
+.gcard { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: var(--ind); color: #fff; border-radius: 18px; padding: 18px 10px 18px 12px; cursor: pointer; text-align: left; margin-bottom: 10px }
+.gcard b { display: block; font-size: 22px; line-height: 1.15 }
+.gcard small { display: block; font-size: 15px; opacity: .85; white-space: nowrap }
+.gcard svg.g { width: 34px; height: 34px }
+.sess { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; border-radius: 10px; padding: 7px 10px; background: rgba(21,128,61,.12); color: var(--sess); font-weight: 600; font-size: 14px; text-align: left; margin: 0 0 10px }
+.sess i { width: 9px; height: 9px; border-radius: 50%; background: var(--sess); flex: none }
+button.sess { cursor: pointer }
+.wgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+.wt { position: relative }
+.wtb { display: flex; flex-direction: column; width: 100%; min-height: 128px; border: 0; border-radius: 18px; padding: 12px; text-align: left; cursor: pointer }
+.wtb svg.g { width: 30px; height: 30px }
+.wtb b { font-size: 17px; margin-top: auto; line-height: 1.2 }
+.wtb .row2 { display: flex; align-items: flex-end; gap: 6px; font-size: 12px; opacity: .9 }
+.wtb .pl { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none }
+.wtb .pl svg { width: 13px; height: 13px; fill: currentColor; stroke: none }
+.wt .pen { position: absolute; right: 6px; top: 6px; width: 40px; height: 40px; display: grid; place-items: center; border: 0; background: none; cursor: pointer }
+.wt .pen svg { width: 17px; height: 17px }
+.newt { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 128px; width: 100%; border: 1.5px dashed var(--acc); border-radius: 18px; background: rgba(47,111,224,.06); color: var(--acc); font-weight: 600; font-size: 15px; cursor: pointer }
+.newt svg { width: 30px; height: 30px }
+.note2 { display: flex; align-items: center; gap: 10px; background: var(--pcard); border: 1.5px solid var(--red); border-radius: 14px; padding: 10px; margin-bottom: 10px }
+.note2 b { display: block; font-size: 15px }
+.note2 small { display: block; color: var(--pmuted); font-size: 12.5px; line-height: 1.3 }
+.capb { border: 0; border-radius: 16px; padding: 6px 12px; font-weight: 700; font-size: 15px; cursor: pointer; flex: none }
+
+/* Gym */
+.gmenu { display: inline-flex; align-items: center; gap: 6px; border: 0; background: rgba(79,70,229,.12); border-radius: 18px; padding: 6px 10px; color: var(--gt); font-weight: 600; font-size: 17px; cursor: pointer }
+.gmenu svg { width: 12px; height: 12px; stroke-width: 2.4 }
+.intro { color: var(--pmuted); font-size: 15px; margin: 8px 0 }
+.donel { display: flex; align-items: flex-start; gap: 8px; color: var(--gt); font-weight: 600; font-size: 15px; margin: 0 0 10px }
+.donel svg { width: 16px; height: 16px; margin-top: 2px }
+.h3 { font-size: 17px; font-weight: 600; margin: 4px 0 6px; color: var(--gt) }
+.h3.bz { color: var(--bzt) }
+.h3 .link { float: right; border: 0; background: none; color: var(--gt); font-weight: 600; font-size: 15px; cursor: pointer }
+.acts { display: flex; gap: 8px; margin: 2px 0 10px }
+.act { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; border: 0; border-radius: 14px; min-height: 44px; padding: 6px; background: rgba(79,70,229,.14); color: var(--gt); font-weight: 600; font-size: 13px; line-height: 1.15; text-align: left; cursor: pointer }
+.act.main { background: var(--ind); color: #fff }
+.act svg { width: 16px; height: 16px }
+.plan { background: var(--pcard); border: 1px solid rgba(79,70,229,.5); border-radius: 14px; overflow: hidden }
+.prow { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 7px 12px; text-align: left; cursor: pointer }
+.prow + .prow { border-top: 1px solid var(--pline) }
+.prow.nx { background: rgba(79,70,229,.08) }
+.num { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; background: rgba(79,70,229,.14); color: var(--gt); flex: none }
+.num.nx { background: var(--ind); color: #fff }
+.prow .nm { font-size: 16px }
+.prow .nm.sk { color: var(--pmuted); text-decoration: line-through }
+.prow small { display: block; font-size: 12px; color: var(--gt) }
+.prow small.bz { color: var(--bzt) } .prow small.dn { color: var(--pmuted) }
+.mgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
+.mt { position: relative; border-radius: 14px }
+.mtb { position: relative; display: block; width: 100%; height: 132px; border: 1px solid var(--pline); border-radius: 14px; overflow: hidden; padding: 0; background: rgba(79,70,229,.1); cursor: pointer; text-align: left; color: var(--gt) }
+.mt.dn .mtb { border: 2px solid var(--ind) } .mt.bz .mtb { border: 2px solid var(--bz) }
+.mtb .ph { position: absolute; inset: 0 0 44px 0; display: grid; place-items: center }
+.mtb .ph svg { width: 56px; height: 56px }
+.mtb .band { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(30,27,75,.82); color: #fff; padding: 5px 8px; height: 44px }
+.mt.bz .band { background: var(--bz); color: var(--bz-ink) }
+.band b { display: block; font-size: 14.5px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.band span { display: block; font-size: 12px; opacity: .88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.mtb .stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 5px }
+.mt .tk2 { position: absolute; right: 6px; top: 6px; width: 26px; height: 26px; border-radius: 50%; background: var(--ind); color: #fff; display: grid; place-items: center }
+.mt .tk2 svg { width: 14px; height: 14px; stroke-width: 2.4 }
+.busyp { position: absolute; right: 6px; bottom: 50px; display: flex; align-items: center; gap: 2px; border: 1px solid var(--bz); background: var(--pcard); color: var(--bzt); border-radius: 12px; height: 22px; padding: 0 6px; font-size: 11px; font-weight: 600; cursor: pointer }
+.busyp.on { background: var(--bz); color: var(--bz-ink); border-color: var(--bz) }
+.busyp svg { width: 11px; height: 11px }
+.nmt { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 142px; width: 100%; border: 1.5px dashed var(--ind); border-radius: 14px; background: rgba(79,70,229,.08); color: var(--gt); font-weight: 600; font-size: 15px; cursor: pointer; text-align: center }
+.nmt svg { width: 34px; height: 34px }
+.bigb { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 52px; border: 0; border-radius: 17px; background: var(--ind); color: #fff; font-weight: 700; font-size: 20px; font-family: ui-rounded, "SF Pro Rounded", var(--f-phone); cursor: pointer }
+.bigb svg { width: 22px; height: 22px; stroke-width: 2.3 }
+.bigb.soft { background: var(--pcard); color: var(--pink); border: 1px solid var(--pline) }
+.bigb.nav { background: var(--navy) }
+.vlist { background: var(--pcard); border: 1px solid var(--pline); border-radius: 14px; overflow: hidden }
+.vrow { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 8px 12px; text-align: left; cursor: pointer }
+.vrow + .vrow { border-top: 1px solid var(--pline) }
+.vrow b { display: block; font-size: 16px }
+.vrow small { display: block; font-size: 14px; color: var(--pmuted) }
+.vrow svg { width: 14px; height: 14px; color: var(--pmuted) }
+
+/* Machine */
+.ph2 { height: 90px; border-radius: 10px; background: rgba(79,70,229,.1); color: var(--gt); display: grid; place-items: center }
+.ph2 svg { width: 38px; height: 38px }
+.setl { font-weight: 600; font-size: 14.5px; color: var(--gt); margin: 6px 0 2px }
+.lastl { color: var(--pmuted); font-size: 14.5px; margin: 2px 0 }
+.sugg { display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(79,70,229,.12); font-size: 14.5px; margin: 8px 0 }
+.sugg svg { width: 20px; height: 20px; color: var(--gt) }
+.sets { background: rgba(79,70,229,.09); border: 1px solid rgba(79,70,229,.35); border-radius: 14px; overflow: hidden; margin: 8px 0 }
+.srow { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 7px 12px; text-align: left; cursor: pointer; font-size: 16px }
+.srow + .srow { border-top: 1px solid var(--pline) }
+.srow .lb { color: var(--pmuted) } .srow .lb.w { color: var(--wut); display: flex; align-items: center; gap: 4px }
+.srow .lb svg { width: 15px; height: 15px }
+.srow b { font-weight: 600 } .srow b.w { font-weight: 400; color: var(--pmuted) }
+.srow .up { width: 16px; height: 16px; color: var(--gold); stroke-width: 2.4 }
+.tkc { width: 20px; height: 20px; border-radius: 50%; background: var(--ind); color: #fff; display: grid; place-items: center; flex: none }
+.tkc.w { background: var(--yel); color: var(--yel-ink) }
+.tkc svg { width: 11px; height: 11px; stroke-width: 3 }
+.entry { background: var(--pcard); border: 1px solid rgba(79,70,229,.5); border-radius: 16px; padding: 12px; margin: 8px 0 }
+.eh { display: flex; align-items: center; gap: 8px; margin-bottom: 8px }
+.eh b { font-size: 17px; color: var(--gt); flex: 1 }
+.eh b.w { color: var(--wut) }
+.wpill { display: flex; align-items: center; gap: 4px; border: 1px solid var(--yel); background: none; color: var(--wut); border-radius: 15px; height: 30px; padding: 0 10px; font-weight: 600; font-size: 14px; cursor: pointer }
+.wpill.on { background: var(--yel); color: var(--yel-ink) }
+.wpill svg { width: 15px; height: 15px }
+.nb { display: flex; align-items: center; gap: 4px; font-weight: 600; font-size: 14px; color: var(--gt) }
+.nb svg { width: 18px; height: 18px }
+.stp { display: flex; align-items: center; gap: 10px; margin: 8px 0 }
+.rb { width: 50px; height: 50px; border-radius: 50%; border: 0; background: rgba(79,70,229,.12); color: var(--gt); display: grid; place-items: center; cursor: pointer; flex: none }
+.rb svg { width: 22px; height: 22px }
+.stp .mid { flex: 1; display: flex; align-items: baseline; justify-content: center; gap: 6px }
+.stp input { width: 90px; border: 0; background: none; text-align: right; font-size: 34px; font-weight: 700; font-family: ui-rounded, "SF Pro Rounded", var(--f-phone); padding: 0; outline-offset: 2px }
+.stp .u { font-size: 17px; font-weight: 600; color: var(--pmuted) }
+.btnrow { display: flex; gap: 8px; margin-top: 10px }
+.setdone { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 58px; border: 0; border-radius: 19px; background: var(--ind); color: #fff; font-weight: 700; font-size: 22px; font-family: ui-rounded, "SF Pro Rounded", var(--f-phone); cursor: pointer }
+.setdone svg { width: 24px; height: 24px; stroke-width: 2.4 }
+.nextb { width: 118px; min-height: 58px; border: 0; border-radius: 19px; background: var(--grn); color: var(--grn-ink); font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; padding: 0 6px }
+.nextb span { font-size: 20px; font-family: ui-rounded, "SF Pro Rounded", var(--f-phone); display: flex; align-items: center; gap: 2px }
+.nextb span svg { width: 14px; height: 14px; stroke-width: 2.6 }
+.nextb small { font-size: 11px; font-weight: 600; max-width: 100% ; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.restc { background: var(--pcard); border-radius: 16px; padding: 12px; margin: 8px 0; text-align: center }
+.ringw { position: relative; width: 180px; height: 180px; margin: 0 auto }
+.ringw svg { width: 180px; height: 180px; transform: rotate(-90deg) }
+.ringw .c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center }
+.ringw .c small { font-size: 12px; font-weight: 700; color: var(--pmuted); letter-spacing: .04em }
+.ringw .c b { font-size: 52px; line-height: 1; font-weight: 700; font-family: ui-rounded, "SF Pro Rounded", var(--f-phone); font-variant-numeric: tabular-nums }
+.restc .nx { color: var(--pmuted); font-size: 14.5px; margin: 8px 0 2px }
+.restc .lk { color: var(--gt); font-size: 13px }
+.rbtns { display: flex; gap: 10px; margin-top: 10px }
+.rbtns button { flex: 1; min-height: 48px; border-radius: 15px; border: 0; font-weight: 700; font-size: 20px; font-family: ui-rounded, "SF Pro Rounded", var(--f-phone); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px }
+.rbtns .soft { background: var(--pcard); border: 1px solid var(--pline); color: var(--pink); font-weight: 600 }
+.rbtns .ind { background: var(--ind); color: #fff }
+.rbtns svg { width: 16px; height: 16px; stroke-width: 2.4 }
+.ntr { display: flex; align-items: center; gap: 10px; width: 100%; border: 1px solid var(--pline); background: var(--pcard); border-radius: 14px; padding: 10px; text-align: left; cursor: pointer; margin: 8px 0 }
+.ntr svg { width: 22px; height: 22px; color: var(--gt); flex: none }
+.ntr b { display: block; font-size: 14.5px }
+.ntr b.q { color: var(--gt) }
+.ntr small { display: block; font-size: 12px; color: var(--pmuted) }
+.pillbar { position: absolute; left: 0; right: 0; bottom: 64px; padding: 8px 16px; background: color-mix(in srgb, var(--pbg) 96%, transparent); z-index: 25 }
+.pillbar .bigb { min-height: 50px }
+
+/* History, Settings, Backups */
+.chips { display: flex; gap: 6px; margin: 4px 0 10px; overflow: hidden }
+.chip { border: 0; border-radius: 16px; padding: 6px 12px; font-weight: 600; font-size: 14.5px; cursor: pointer; white-space: nowrap }
+.card { background: var(--pcard); border: 1px solid var(--pline); border-radius: 14px; overflow: hidden }
+.srow2 { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 7px 10px; text-align: left; cursor: pointer; font-size: 16px; font-weight: 600 }
+.srow2 + .srow2 { border-top: 1px solid var(--pline) }
+.sq { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; flex: none }
+.sq svg { width: 18px; height: 18px }
+.segc { display: flex; padding: 2px; border-radius: 9px; background: var(--pfield); margin: 4px 0 8px }
+.segc button { flex: 1; border: 0; background: none; border-radius: 7px; min-height: 28px; font-weight: 500; font-size: 14px; cursor: pointer }
+.segc button.on { background: var(--pcard); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.15) }
+.tiles3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px }
+.st { border-radius: 14px; padding: 8px 10px; min-height: 64px }
+.st b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.2 }
+.st small { font-size: 12.5px; font-weight: 600; opacity: .92 }
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 90px; padding: 6px 4px 0 }
+.bars i { flex: 1; background: rgba(156,61,140,.35); border-radius: 3px 3px 0 0 }
+.bars i.cur { background: var(--plum) }
+.lst { background: var(--pcard); border-radius: 12px; overflow: hidden; margin: 0 0 14px }
+.lrow { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 0 14px; border: 0; background: none; text-align: left; cursor: pointer; font-size: 17px }
+.lrow + .lrow { border-top: 1px solid var(--pline) }
+.lrow svg { width: 14px; height: 14px; color: var(--pmuted) }
+.lrow.link { color: var(--acc) }
+.lh { font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; margin: 12px 14px 5px; color: var(--pmuted) }
+.lf { font-size: 12.5px; color: var(--pmuted); margin: -8px 14px 14px; line-height: 1.3 }
+.msg { font-size: 15px; padding: 10px 14px }
+
+/* Sheets, alerts, overlays */
+.dim { position: absolute; inset: 0; background: rgba(0,0,0,.35); z-index: 50 }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 34px; border-radius: 22px 22px 0 0; background: var(--pbg); z-index: 55; overflow: hidden; box-shadow: 0 -8px 30px rgba(0,0,0,.3) }
+.sheet.half { top: 330px }
+.sheet.small { top: 440px }
+.sheet .scr { inset: 38px 0 0 0; padding: 4px 16px 80px }
+.stitle { text-align: center; font-weight: 700; font-size: 17px; min-height: 36px; display: grid; place-items: center }
+.foot { position: absolute; left: 0; right: 0; bottom: 0; background: color-mix(in srgb, var(--pbg) 96%, transparent); padding: 8px 16px 18px; z-index: 5; display: flex; gap: 12px; justify-content: flex-end }
+.fb { border: 0; border-radius: 20px; min-height: 40px; padding: 0 22px; font-weight: 600; font-size: 17px; cursor: pointer }
+.fb.c { background: rgba(120,120,128,.18); color: var(--pink) }
+.fb.s { background: var(--ind); color: #fff; font-weight: 700 }
+.field { width: 100%; min-height: 44px; border: 0; border-radius: 10px; background: var(--pcard); padding: 0 14px; font-size: 17px; outline-offset: 1px }
+.field.big { font-size: 20px; font-weight: 600 }
+.need { color: var(--red); font-size: 12.5px; margin: 4px 14px 0 }
+.seg3 { display: flex; padding: 2px; border-radius: 9px; background: var(--pfield); margin: 0 }
+.seg3 button { flex: 1; border: 0; background: none; border-radius: 7px; min-height: 30px; font-weight: 500; font-size: 14px; cursor: pointer }
+.seg3 button.on { background: var(--pcard); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.15) }
+.trow { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 17px }
+.trow + .trow { border-top: 1px solid var(--pline) }
+.trow .v { margin-left: auto; color: var(--gt); font-variant-numeric: tabular-nums }
+.tg { position: relative; width: 44px; height: 26px; border-radius: 13px; background: rgba(120,120,128,.4); flex: none; margin-left: auto }
+.tg::after { content: ""; position: absolute; left: 2px; top: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff }
+.tg.on { background: var(--ind) } .tg.on::after { left: 20px }
+.sm { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px }
+.sm .b { margin-left: auto; display: flex; gap: 6px }
+.sm .b button { width: 32px; height: 32px; border-radius: 8px; border: 0; background: var(--pfield); cursor: pointer; display: grid; place-items: center }
+.sm .b svg { width: 16px; height: 16px }
+.cam { position: absolute; inset: 0; background: #0b0b0d; z-index: 85; color: #fff }
+.cam .shut { position: absolute; left: 50%; bottom: 60px; width: 70px; height: 70px; margin-left: -35px; border-radius: 50%; border: 4px solid #fff; background: none }
+.cam .skip { position: absolute; top: 110px; left: 50%; transform: translateX(-50%); border: 0; border-radius: 22px; background: var(--ind); color: #fff; font-weight: 700; font-size: 17px; height: 44px; padding: 0 20px; cursor: pointer }
+.cam p { position: absolute; top: 300px; left: 0; right: 0; text-align: center; color: #aaa; margin: 0; font-size: 13px }
+.overlay { position: absolute; inset: 0; z-index: 70; display: grid; place-items: center; background: rgba(0,0,0,.4); padding: 24px }
+.overlay .box { background: var(--pcard); border-radius: 16px; width: 100%; max-width: 300px; text-align: center; overflow: hidden }
+.overlay .box h4 { margin: 0; padding: 16px 16px 4px; font-size: 17px }
+.overlay .box p { margin: 0; padding: 0 16px 14px; font-size: 13px; color: var(--pmuted); white-space: pre-line }
+.overlay .box .bt { display: flex; border-top: 1px solid var(--pline) }
+.overlay .box .bt button { flex: 1; border: 0; background: none; min-height: 44px; font-size: 17px; color: var(--acc); cursor: pointer }
+.overlay .box .bt button + button { border-left: 1px solid var(--pline); font-weight: 600; color: var(--red) }
+.undob { position: absolute; left: 12px; right: 12px; bottom: 72px; z-index: 66; display: flex; align-items: center; gap: 10px; background: #292929; border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: 8px 8px 8px 14px; color: #fff; font-weight: 600; font-size: 14.5px }
+.undob button { border: 0; border-radius: 16px; background: var(--acc); color: #fff; font-weight: 700; font-size: 14.5px; padding: 7px 14px; cursor: pointer }
+.menu { position: absolute; z-index: 70; left: 50px; background: var(--pcard); border: 1px solid var(--pline); border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.3); min-width: 210px; overflow: hidden }
+.menu button { display: flex; width: 100%; border: 0; background: none; text-align: left; padding: 11px 14px; font-size: 16px; cursor: pointer; justify-content: space-between }
+.menu button + button { border-top: 1px solid var(--pline) }
+.menu button.rd { color: var(--red) }
+.toast { position: absolute; left: 50%; bottom: 130px; transform: translateX(-50%); background: #2F3B41; color: #fff; font-weight: 600; font-size: 13px; padding: 7px 14px; border-radius: 18px; z-index: 90; animation: pop .3s; max-width: 340px; text-align: center }
+.ssh { padding: 10px 16px }
+.ssh .fn { display: flex; align-items: center; gap: 10px; background: var(--pcard); border-radius: 12px; padding: 10px; font-weight: 600; font-size: 15px; margin: 6px 0 }
+.ssh .fn svg { width: 24px; height: 24px; color: var(--navy) }
+.ssh .acts2 { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 10px }
+.ssh .acts2 button { border: 0; background: var(--pcard); border-radius: 12px; min-height: 64px; font-size: 13px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px }
+.ssh .acts2 svg { width: 24px; height: 24px; color: var(--acc) }
+.xb { border: 0; background: var(--pfield); border-radius: 50%; width: 30px; height: 30px; cursor: pointer; display: grid; place-items: center; position: absolute; right: 14px; top: 12px }
+.xb svg { width: 16px; height: 16px }
+.sumh { text-align: center; padding: 8px 0 }
+.sumh svg { width: 56px; height: 56px; color: var(--gt) }
+.sumh b { display: block; font-size: 22px }
+.bestrow { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px }
+.bestrow svg { width: 20px; height: 20px; color: var(--gt) }
+.bestrow b { margin-left: auto; color: var(--gt) }
+
+/* Highlight: no position here (it would break absolutely placed boxes) */
+.target { z-index: 2; animation: ring 1.6s ease-in-out infinite; border-radius: 9px }
+@keyframes ring { 0%,100% { box-shadow: 0 0 0 2px #E6B53F, 0 0 0 6px rgba(230,181,63,.35) } 50% { box-shadow: 0 0 0 2px #E6B53F, 0 0 0 11px rgba(230,181,63,0) } }
+@keyframes pop { from { transform: translate(-50%, 8px); opacity: .3 } to { transform: translate(-50%, 0); opacity: 1 } }
+
+/* Finish */
+.finish { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px }
+.finish h3 { font-family: var(--f-display); margin: 0 0 8px; font-size: 19px }
+.finish label { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; border-top: 1px solid var(--line); cursor: pointer }
+.finish input { width: 18px; height: 18px; accent-color: #4F46E5; margin-top: 2px; flex: none }
+
+@media (min-width: 1020px) {
+  .main { grid-template-columns: minmax(0,1fr) 402px; align-items: start }
+  .topnote, .finish { grid-column: 1 / -1 }
+  .coach { grid-column: 1; grid-template-columns: minmax(0,1fr); position: sticky; top: 16px }
+  .stagebox { grid-column: 2; grid-row: 2 }
+  .coach { grid-row: 2 }
+}
+@media (max-width: 820px) {
+  .wrap { grid-template-columns: minmax(0,1fr) }
+  .rail { position: static; flex-direction: row; flex-wrap: wrap; gap: 4px }
+  .brand { width: 100% }
+  .chap .n { display: none }
+  .railnote, .bar { width: 100% }
+  .coach { grid-template-columns: minmax(0,1fr) }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }
+</style>
+
+<div class="wrap">
+  <nav class="rail" id="rail" aria-label="Chapters"></nav>
+  <main class="main">
+    <p class="topnote">Practice copy, nothing changes in your real app.</p>
+    <section class="coach" id="coach" aria-live="polite"></section>
+    <div class="stagebox" id="stagebox"><div class="stage" id="stage"></div></div>
+    <section class="finish" id="finish" hidden></section>
+  </main>
+</div>
+<script>
+/* ---------- Icons: simple hand-drawn line shapes, 24-pt grid, stroke 1.9, round ends, no fill. ---------- */
+const ICON = {
+  kettle: 'M8.5 8.5V7a3.5 3.5 0 0 1 7 0v1.5 M12 8.5c-4 0-6.5 2.8-6.5 6.2 0 3 2.3 5 6.5 5s6.5-2 6.5-5c0-3.4-2.5-6.2-6.5-6.2Z',
+  history: 'M5 20v-7 M10 20V8 M15 20v-6 M20 20V4',
+  gear: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z M12 3v3 M12 18v3 M3 12h3 M18 12h3 M5.6 5.6l2.1 2.1 M16.3 16.3l2.1 2.1 M5.6 18.4l2.1-2.1 M16.3 7.7l2.1-2.1',
+  dumb: 'M3 10v4 M6 8v8 M18 8v8 M21 10v4 M6 12h12',
+  camera: 'M4 8h3l1.5-2h7L17 8h3v11H4Z M12 10.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4Z',
+  watch: 'M5 15a7 7 0 1 0 14 0 7 7 0 1 0-14 0 M12 8V5 M9.5 3h5 M12 11.5V15 M17.5 6l1.2 1.2',
+  trophy: 'M7.5 3.5h9v5a4.5 4.5 0 0 1-9 0Z M7.5 5H4.5v1.5a3 3 0 0 0 3.3 3 M16.5 5h3v1.5a3 3 0 0 1-3.3 3 M12 13v3.5 M9.5 16.5h5l1 4h-7Z',
+  note: 'M6 4h11a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6Z M9 4v16 M12 8h3 M12 11.5h3',
+  box: 'M4 8l8-4 8 4v8l-8 4-8-4Z M4 8l8 4 8-4 M12 12v8',
+  yoga: 'M12 4.2a1.4 1.4 0 1 0 0 .01 M12 8v6 M6.5 10.5 12 8l5.5 2.5 M12 14l-3.5 6 M12 14l3.5 6',
+  check: 'M5 12.5l5 5 9-10.5', cross: 'M7 7l10 10M17 7 7 17', plus: 'M12 5v14M5 12h14', minus: 'M5 12h14',
+  chevR: 'M9 6l6 6-6 6', chevL: 'M15 6l-6 6 6 6', chevD: 'M7 10l5 5 5-5',
+  pen: 'M4 20l4-1 10-10-3-3L5 16Z M13.5 6.5l3 3',
+  plusC: 'M3.5 12a8.5 8.5 0 1 0 17 0 8.5 8.5 0 1 0-17 0 M12 8v8 M8 12h8',
+  search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14ZM20 20l-4-4',
+  list: 'M5 6h14 M5 12h14 M5 18h9', play: 'M8 5.5v13l11-6.5Z', skip: 'M6 6l8 6-8 6Z M18 6v12',
+  up: 'M12 19V6 M6.5 11.5 12 6l5.5 5.5', flame: 'M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2.2-4.5.2 1.2.8 2 1.6 2.4C10.4 8 10.5 5.5 12 3Z',
+  bookm: 'M7 4h10v16l-5-3.5L7 20Z', grip: 'M5 9h14 M5 15h14', share: 'M12 15V4 M8 8l4-4 4 4 M5 12v7h14v-7',
+  doc: 'M7 3.5h7l4 4v13H7Z M14 3.5v4h4 M9.5 12h6 M9.5 15.5h6', photo: 'M4 6h16v12H4Z M4 16l5-5 4 4 2-2 5 5',
+  mail: 'M4 6h16v12H4Z M4 7l8 6 8-6', air: 'M4.5 12a7.5 7.5 0 1 0 15 0 7.5 7.5 0 1 0-15 0 M8.5 12a3.5 3.5 0 1 0 7 0 3.5 3.5 0 1 0-7 0',
+  files: 'M4 7h6l2 2h8v10H4Z', phone: 'M8 3.5h8a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 19V5A1.5 1.5 0 0 1 8 3.5Z M11 17.8h2',
+  home: 'M4 11 12 4l8 7 M6 10v9.5h12V10 M10 19.5v-5h4v5', door: 'M4 20.5h16 M6 20.5V4.8A1.3 1.3 0 0 1 7.3 3.5h7.4A1.3 1.3 0 0 1 16 4.8v15.7 M12.5 12.5h1.2',
+  lock: 'M6 11h12v9H6Z M8.5 11V8a3.5 3.5 0 0 1 7 0v3'
+};
+const icon = (n, cls = 'i') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n]}"/></svg>`;
+const ico = (n, px) => `<svg class="g" width="${px}" height="${px}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n]}"/></svg>`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- The pretend app: made-up gym, machines, numbers and dates only ---------- */
+const DOT = ' \u00B7 ';
+const MACH = {
+  chest: { id: 'chest', name: 'Chest press', setting: 'Seat 4, handles 2', stripe: '#DC3D43', logs: 'weights', last: { date: '12 Nov', kg: 30, reps: [12, 12, 12] }, rest: 90, step: 2.5, top: 12 },
+  leg: { id: 'leg', name: 'Leg press', setting: 'Back rest 3', stripe: '#30D158', logs: 'weights', last: { date: '12 Nov', kg: 50, reps: [12, 11, 10] }, rest: 90, step: 2.5, top: 12 },
+  lat: { id: 'lat', name: 'Lat pulldown', setting: 'Knee pad 5', stripe: '#0A84FF', logs: 'weights', last: { date: '12 Nov', kg: 30, reps: [10, 10, 9] }, rest: 90, step: 2.5, top: 12 },
+  tread: { id: 'tread', name: 'Treadmill', setting: '', stripe: '', logs: 'time', lastText: 'Last: 25 min' + DOT + 'level 8' }
+};
+const BASE = ['chest', 'leg', 'lat', 'tread'];
+const WORKOUTS = [
+  { name: 'Push-ups', sum: '5 \u00D7 20' + DOT + 'rest 1:30', fill: '#FF8C1A', ink: '#4A2300', ic: 'kettle' },
+  { name: 'Intervals', sum: '8 \u00D7 0:40 work / 0:20 rest' + DOT + '8:00', fill: '#30D158', ink: '#0B3A17', ic: 'watch' },
+  { name: "Doctor's exercises", sum: 'No exercises yet', fill: '#FF6FA8', ink: '#5A0F2E', ic: 'yoga' }
+];
+const OLD_VISITS = [
+  { title: 'Thu, 12 Nov 2026', detail: '07:40' + DOT + '3 machines' + DOT + '9 sets' },
+  { title: 'Mon, 9 Nov 2026', detail: '18:05' + DOT + '2 machines' + DOT + '4 sets' },
+  { title: 'Thu, 5 Nov 2026', detail: '07:35' + DOT + '3 machines' + DOT + '8 sets' }
+];
+const mkGym = o => Object.assign({ on: false, doneN: 0, min: 0, plan: null, skipped: [], busy: [], sets: {}, extra: [], nt: {}, menu: null, newVisit: null }, o || {});
+const START = () => ({ tab: 'train', page: null, spage: null, sheet: null, alert: null, g: mkGym(),
+  mc: { id: 'chest', kg: 32.5, reps: 10, warm: false, nb: false }, rest: null, undo: null,
+  mf: { name: '', logs: 'weights', needs: false }, nt: { kg: 32.5, reps: 10, note: '' }, se: { i: 0, kg: 30, reps: 12, warm: false },
+  sm: { title: '', notes: '' }, pd: [], period: 'week', weekShows: 'sessions', unread: false, msg: '', toast: '' });
+let S = START();
+const set = o => { S = Object.assign(START(), o); };      // full reset, then what the step needs
+const timers = [];
+const later = (fn, ms) => { const h = setTimeout(fn, ms); timers.push(h); return h; };
+const clearTimers = () => { while (timers.length) clearTimeout(timers.pop()); };
+
+const numS = n => String(Math.round(n * 100) / 100);
+const wt = kg => kg <= 0 ? 'Body weight' : numS(kg) + ' kg';
+const setTxt = (s, m) => (m && m.logs === 'reps') ? s.reps + ' reps' : wt(s.kg) + ' \u00D7 ' + s.reps;
+const allM = () => BASE.map(id => MACH[id]).concat(S.g.extra);
+const mOf = id => allM().find(m => m.id === id);
+const lastTxt = m => m.logs === 'time' ? m.lastText : m.last ? 'Last: ' + wt(m.last.kg) : 'New';
+const clock = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const setsOf = id => S.g.sets[id] || [];
+const totalSets = () => Object.values(S.g.sets).reduce((n, a) => n + a.length, 0);
+const doneMachines = () => Object.keys(S.g.sets).filter(id => S.g.sets[id].length);
+
+function nextSet(id) {        // the numbers offered for the next set, as the app's rules say
+  const m = mOf(id), today = setsOf(id);
+  if (today.length) { const l = today[today.length - 1]; return { kg: l.kg, reps: l.reps, reason: null }; }
+  if (m.logs === 'reps') return { kg: 0, reps: 10, reason: null };
+  if (!m.last) return { kg: 20, reps: 10, reason: null };
+  const top = m.top || 12;
+  if (m.last.reps.every(r => r >= top)) { const up = m.last.kg + (m.step || 2.5);
+    return { kg: up, reps: top - 2, reason: 'Try ' + wt(up) + ' \u2014 every set last time reached ' + top + ' reps' }; }
+  return { kg: m.last.kg, reps: m.last.reps[0], reason: null };
+}
+function upNextId(except) {
+  const g = S.g; if (!g.plan) return null;
+  return g.plan.find(id => id !== except && !g.skipped.includes(id) && !setsOf(id).length && !g.busy.includes(id) && mOf(id)) || null;
+}
+function beats(s, i, m) {
+  if (s.warm || !m.last) return false;
+  const place = setsOf(m.id).slice(0, i).filter(x => !x.warm).length, lr = m.last.reps[place];
+  if (lr == null) return false;
+  return s.kg > m.last.kg || (s.kg === m.last.kg && s.reps > lr);
+}
+
+/* ---------- Tab bar, Train ---------- */
+const TABS = [['train', 'Train', 'kettle', 'var(--acc)'], ['history', 'History', 'history', 'var(--plumt)'], ['settings', 'Settings', 'gear', 'var(--acc)']];
+function tabBar() {
+  return `<div class="tabs" data-t="tabbar">${TABS.map(([id, nm, ic, col]) => `<button data-act="tab" data-id="${id}" data-t="tab-${id}" class="${S.tab === id ? 'on' : ''}" style="${S.tab === id ? 'color:' + col : ''}">${icon(ic)}${nm}</button>`).join('')}</div>`;
+}
+function sessionLine(id, btn) {
+  const g = S.g, n = totalSets(), mc = doneMachines().length;
+  const words = ['Session going', g.min + ' min'].concat(n === 0 ? ['no sets yet'] : [mc === 1 ? '1 machine' : mc + ' machines', n === 1 ? '1 set' : n + ' sets']).join(DOT);
+  return btn ? `<button class="sess" data-act="open-gym" data-t="${id}"><i></i>${words}</button>` : `<div class="sess" data-t="${id}"><i></i>${words}</div>`;
+}
+function trainHTML() {
+  const g = S.g, n = totalSets(), mc = doneMachines().length, cnt = allM().length;
+  const summary = n > 0 ? 'Today: ' + mc + ' machine' + (mc === 1 ? '' : 's') + DOT + n + ' set' + (n === 1 ? '' : 's') : cnt + ' machines';
+  const unread = S.unread ? `<div class="note2" data-t="unread-note"><div class="sp"><b>Your workouts could not be read</b><small>Nothing is saved over them. Restore a backup to get them back.</small></div><button class="capb" data-act="unread-backups" data-t="unread-backups" style="background:var(--red);color:#fff">Backups</button></div>` : '';
+  return `<div class="scr" data-keep="scr"><div class="ltop"><span class="sp"></span><button class="ib" style="color:var(--acc)" data-act="soon" aria-label="New workout">${ico('plusC', 26)}</button></div>
+    <h1 class="ltitle" data-t="train-title">Workout Companion</h1>
+    ${unread}
+    <button class="gcard" data-act="open-gym" data-t="gym-card">${ico('dumb', 34)}<span class="sp"><b>At the gym</b><small>${summary}</small></span>${ico('chevR', 16)}</button>
+    ${g.on ? sessionLine('train-session', true) : ''}
+    <div class="wgrid">${WORKOUTS.map(w => `<div class="wt"><button class="wtb" data-act="soon" style="background:${w.fill};color:${w.ink}">${ico(w.ic, 30)}<b>${esc(w.name)}</b><span class="row2"><span class="sp">${esc(w.sum)}</span><span class="pl" style="background:${w.ink};color:${w.fill}">${icon('play', 'g')}</span></span></button><button class="pen" data-act="soon" style="color:${w.ink}" aria-label="Edit">${ico('pen', 17)}</button></div>`).join('')}
+      <button class="newt" data-act="soon">${ico('plusC', 30)}New workout</button></div></div>`;
+}
+
+/* ---------- Gym screen ---------- */
+function tileHTML(m, busy) {
+  const n = setsOf(m.id).length, done = n > 0;
+  const status = busy ? 'Busy \u2014 come back later' : done ? (m.logs === 'time' ? 'Done today' : n + ' set' + (n === 1 ? '' : 's') + ' done') : lastTxt(m);
+  return `<div class="mt${busy ? ' bz' : ''}${done && !busy ? ' dn' : ''}" data-t="tile-${m.id}"><button class="mtb" data-act="open-machine" data-id="${m.id}">
+      <span class="ph">${ico('dumb', 56)}</span>${m.stripe ? `<span class="stripe" style="background:${m.stripe}"></span>` : ''}
+      <span class="band"><b>${esc(m.name || 'Untitled')}</b><span>${esc(status)}</span></span></button>
+    ${done ? `<span class="tk2">${icon('check', 'g')}</span>` : ''}
+    <button class="busyp${busy ? ' on' : ''}" data-act="busy" data-id="${m.id}" data-t="busy-${m.id}" aria-label="${busy ? esc(m.name) + ' is busy' : 'Mark ' + esc(m.name) + ' busy'}">${ico('watch', 11)}Busy</button></div>`;
+}
+function planRow(i, id) {
+  const g = S.g, m = mOf(id); if (!m) return '';
+  const done = setsOf(id).length > 0, skipped = g.skipped.includes(id), busy = g.busy.includes(id), nx = upNextId() === id;
+  const st = done ? 'Done' : skipped ? 'Skipped today' : busy ? 'Busy' : nx ? 'Up next' : '';
+  return `<button class="prow${nx ? ' nx' : ''}" data-act="open-machine" data-id="${id}" data-hold="${id}" data-t="plan-${i + 1}"><span class="num${nx ? ' nx' : ''}">${i + 1}</span>
+    <span class="sp"><span class="nm${skipped ? ' sk' : ''}"${nx ? ' style="font-weight:600"' : ''}>${esc(m.name)}</span>${st ? `<small class="${busy && !done ? 'bz' : done ? 'dn' : ''}">${st}</small>` : ''}</span>
+    ${done ? `<span style="color:var(--gt)">${ico('check', 16)}</span>` : `<span style="color:var(--pmuted)">${ico('chevR', 14)}</span>`}</button>`;
+}
+function gymHTML() {
+  const g = S.g, plan = g.plan, busyM = g.busy.map(mOf).filter(Boolean), machines = allM();
+  const intro = machines.length === 0 ? 'At each machine: take a photo, give it a name, then log your sets.' : !plan ? "Tap the machine you'll use next \u2014 or plan today's order." : 'Follow the plan, or tap any machine that is free.';
+  const doneLine = !g.on && g.doneN > 0 ? `<div class="donel" data-t="session-done">${ico('check', 16)}<span>${g.doneN === 1 ? 'Session done. Tap a machine to start a second session.' : g.doneN + ' sessions done. Tap a machine to start another.'}</span></div>` : '';
+  let planSec = '';
+  if (plan) {
+    planSec = `<div class="h3">Today's plan<button class="link" data-act="plan-open" data-t="plan-change">Change</button></div><div class="plan" data-t="plan-list">${plan.map((id, i) => planRow(i, id)).join('')}</div><p class="cap">Touch and hold a machine: later, skip today or swap.</p>`;
+  } else {
+    planSec = `<div class="acts" data-t="plan-buttons"><button class="act" data-act="plan-open" data-t="plan-btn">${ico('list', 16)}<span>Plan today</span></button>
+      <button class="act main" data-act="repeat" data-t="repeat">${ico('play', 16)}<span>Repeat last visit</span></button>
+      <button class="act" data-act="soon" data-t="tpl-btn">${ico('bookm', 16)}<span>Save as template</span></button></div>`;
+  }
+  const others = machines.filter(m => !g.busy.includes(m.id));
+  const earlier = (g.newVisit ? [g.newVisit] : []).concat(OLD_VISITS);
+  return `<div class="scr" data-keep="scr"><button class="nbk" data-act="gym-back" data-t="page-back">${ico('chevL', 20)}Workout Companion</button>
+    <h1 class="ltitle" data-t="gym-title">At the gym</h1>
+    <button class="gmenu" data-act="soon" data-t="gym-menu">${esc('My gym')}${ico('chevD', 12)}</button>
+    <p class="intro" data-t="gym-intro">${intro}</p>${doneLine}
+    ${g.on ? sessionLine('session-line', false) : ''}
+    ${planSec}
+    ${busyM.length ? `<div class="h3 bz" data-t="come-back">Come back to</div><div class="mgrid">${busyM.map(m => tileHTML(m, true)).join('')}</div>` : ''}
+    ${(busyM.length || plan) && busyM.length < machines.length ? `<div class="h3" style="margin-top:8px">${busyM.length ? 'Other machines' : 'All machines'}</div>` : ''}
+    <div class="mgrid">${others.map(m => tileHTML(m, false)).join('')}<button class="nmt" data-act="new-machine" data-t="new-machine">${ico('camera', 34)}<span>New machine<br>or exercise</span></button></div>
+    ${g.on ? `<button class="bigb" style="margin-top:12px" data-act="finish" data-t="finish" aria-label="Finish this session">${ico('check', 22)}Finish this session${DOT}${g.min} min</button>` : ''}
+    <div class="h3" style="margin-top:14px" data-t="earlier">Earlier visits${DOT}My gym</div>
+    <div class="vlist">${earlier.map((v, i) => `<button class="vrow" data-act="soon" data-t="visit-${i + 1}"><span class="sp"><b>${esc(v.title)}</b><small>${esc(v.detail)}</small></span>${ico('chevR', 14)}</button>`).join('')}</div></div>
+    ${g.menu ? menuHTML() : ''}`;
+}
+function menuHTML() {
+  const id = S.g.menu.id, sk = S.g.skipped.includes(id);
+  return `<div class="menu" style="top:${S.g.menu.y}px" data-t="hold-menu"><button data-act="m-later" data-id="${id}" data-t="m-later">Later</button><button data-act="m-skip" data-id="${id}" data-t="m-skip">${sk ? "Back in today's plan" : 'Skip today'}</button><button data-act="m-swap" data-t="m-swap">Swap for ${ico('chevR', 14)}</button><button class="rd" data-act="m-remove" data-id="${id}" data-t="m-remove">Remove from plan</button></div>`;
+}
+
+/* ---------- Machine screen ---------- */
+function machineHTML() {
+  const mc = S.mc, m = mOf(mc.id), g = S.g, today = setsOf(m.id), isReps = m.logs === 'reps', nx = nextSet(m.id);
+  const upId = upNextId(m.id), upm = upId ? mOf(upId) : null, nt = g.nt[m.id];
+  const lastLine = m.last ? 'Last time, ' + m.last.date + ': ' + wt(m.last.kg) + ' \u00D7 ' + m.last.reps.join(', ') : 'First time on this machine.';
+  const sugg = !today.length && nx.reason ? `<div class="sugg" data-t="suggest">${ico('trophy', 20)}<span>${esc(nx.reason)}</span></div>` : '';
+  const rows = today.length ? `<div class="sets" data-t="sets-done">${today.map((s, i) => `<button class="srow" data-act="set-open" data-id="${i}" data-t="set-${i + 1}">${s.warm ? `<span class="lb w">${ico('flame', 15)}Warm-up</span>` : `<span class="lb">Set ${i + 1}</span>`}<span class="sp"></span>${beats(s, i, m) ? ico('up', 16).replace('class="g"', 'class="g up"') : ''}<b class="${s.warm ? 'w' : ''}">${esc(setTxt(s, m))}</b><span class="tkc${s.warm ? ' w' : ''}">${icon('check', 'g')}</span></button>`).join('')}</div>` : '';
+  const nextBtn = today.length ? `<button class="nextb" data-act="machine-next" data-t="next-btn" aria-label="Done with this machine"><span>Next${ico('chevR', 14)}</span>${upm ? `<small>${esc(upm.name)}</small>` : ''}</button>` : '';
+  const entry = `<div class="entry" data-t="entry"><div class="eh"><b class="${mc.warm ? 'w' : ''}" data-t="set-head">${mc.warm ? 'Warm-up set' : 'Set ' + (today.length + 1)}</b>
+      <button class="wpill${mc.warm ? ' on' : ''}" data-act="warm" data-t="warmup">${ico('flame', 15)}Warm-up</button>${mc.nb ? `<span class="nb">${ico('trophy', 18)}New best</span>` : ''}</div>
+    ${isReps ? '' : `<div class="stp"><button class="rb" data-act="kg-minus" data-t="kg-minus" aria-label="Less kg">${ico('minus', 22)}</button><div class="mid"><input data-in="kg" data-t="kg-field" value="${numS(mc.kg)}" inputmode="decimal" autocomplete="off"><span class="u">kg</span></div><button class="rb" data-act="kg-plus" data-t="kg-plus" aria-label="More kg">${ico('plus', 22)}</button></div>`}
+    <div class="stp"><button class="rb" data-act="reps-minus" data-t="reps-minus" aria-label="Less reps">${ico('minus', 22)}</button><div class="mid"><input data-in="reps" data-t="reps-field" value="${mc.reps}" inputmode="numeric" autocomplete="off"><span class="u">reps</span></div><button class="rb" data-act="reps-plus" aria-label="More reps">${ico('plus', 22)}</button></div>
+    <div class="btnrow"><button class="setdone" data-act="set-done" data-t="set-done">${ico('check', 24)}Set done</button>${nextBtn}</div>
+    ${today.length ? '' : `<p class="cap" data-t="entry-cap">${isReps ? 'Filled in from last time \u2014 your own body weight, reps only.' : mc.kg <= 0 ? '0 kg means body weight.' : 'Filled in from last time \u2014 change only what is different.'}</p>`}</div>`;
+  const card = S.rest ? restHTML(m, nx) : entry;
+  const ntRow = today.length ? `<button class="ntr" data-act="nt-open" data-t="nt-row">${ico('note', 22)}<span class="sp">${nt && nt.set ? `<b>Next time: ${esc(setTxt(nt.set, m))}</b>` : '<b class="q">How did it feel? Next time\u2026</b>'}${nt && nt.note ? `<small>${esc(nt.note)}</small>` : ''}</span><span style="color:var(--gt)">${ico('pen', 16)}</span></button>` : '';
+  return `<div class="scr" data-keep="scr" style="padding-bottom:140px"><div class="inl"><span class="l"></span><b>${esc(m.name)}</b><span class="r"><button class="ib" data-act="soon" aria-label="Edit machine">${ico('pen', 22)}</button></span></div>
+    <div class="ph2">${ico('dumb', 38)}</div>${m.setting ? `<div class="setl" data-t="setting">${esc(m.setting)}</div>` : ''}
+    <div class="lastl" data-t="last-time">${esc(lastLine)}</div>${sugg}${rows}${card}${ntRow}</div>
+    <div class="pillbar"><button class="bigb" data-act="machine-back" data-t="machine-pill">${today.length ? 'Exercise done' : 'Back to gym'}</button></div>`;
+}
+const RING = 2 * Math.PI * 80;
+const ringKey = f => f > 0.5 ? '#FF8C1A' : f > 0.2 ? '#FFD60A' : '#30D158';
+function restHTML(m, nx) {
+  const r = S.rest, f = Math.max(0, r.left) / Math.max(1, r.len);
+  return `<div class="restc" data-t="rest-card"><div class="ringw"><svg viewBox="0 0 180 180"><circle cx="90" cy="90" r="80" fill="none" stroke="var(--pline)" stroke-width="14"/><circle id="ringArc" cx="90" cy="90" r="80" fill="none" stroke="${ringKey(f)}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${RING.toFixed(1)}" stroke-dashoffset="${(RING * (1 - f)).toFixed(1)}"/></svg>
+    <div class="c"><small>REST</small><b id="restTime">${clock(r.left)}</b></div></div>
+    <div class="nx">Next: set ${setsOf(m.id).length + 1}${DOT}${esc(setTxt({ kg: nx.kg, reps: nx.reps }, m))}</div><div class="lk">Also on your lock screen</div>
+    <div class="rbtns"><button class="soft" data-act="rest-more" data-t="rest-more">+15 s</button><button class="ind" data-act="rest-skip" data-t="rest-skip">${ico('skip', 16)}Skip rest</button></div></div>`;
+}
+
+/* ---------- History, Settings, Backups ---------- */
+function historyHTML() {
+  const wk = S.period === 'week', t = wk ? [['Sessions', 2, '#9C3D8C', '#fff'], ['Minutes', 91, '#30D158', '#0B3A17'], ['Exercises', 5, '#FF8C1A', '#4A2300'], ['Sets', 18, '#0A84FF', '#fff'], ['Lifted', '3120 kg', '#4F46E5', '#fff']]
+    : [['Sessions', 5, '#9C3D8C', '#fff'], ['Minutes', 214, '#30D158', '#0B3A17'], ['Exercises', 14, '#FF8C1A', '#4A2300'], ['Sets', 46, '#0A84FF', '#fff'], ['Lifted', '8240 kg', '#4F46E5', '#fff']];
+  const ses = [2, 1, 2, 0, 1, 2, 1, 2, 1, 0, 2, 2], min = [90, 40, 85, 0, 45, 88, 50, 95, 48, 0, 92, 91], arr = S.weekShows === 'sessions' ? ses : min, mx = Math.max(...arr);
+  const row = (ic, fill, ink, h, d, line) => `<button class="vrow" data-act="soon"><span class="sq" style="background:${fill};color:${ink}">${ico(ic, 18)}</span><span class="sp"><b>${h}</b><small>${d}</small><small style="font-size:12px">${line}</small></span>${ico('chevR', 14)}</button>`;
+  return `<div class="scr" data-keep="scr"><div class="inl"><span class="l"></span><b>History</b><span class="r"></span></div>
+    <div class="chips"><span class="chip" style="background:#9C3D8C;color:#fff">All</span><span class="chip" style="background:rgba(79,70,229,.14);color:var(--gt)">At the gym</span><span class="chip" style="background:rgba(255,140,26,.18);color:var(--bzt)">Push-ups</span></div>
+    <div class="card" style="margin-bottom:10px"><button class="srow2" data-act="soon"><span class="sq" style="background:#FFD60A;color:#3D3000">${ico('trophy', 18)}</span><span class="sp">Records</span>${ico('chevR', 14)}</button><button class="srow2" data-act="soon"><span class="sq" style="background:#0A84FF;color:#fff">${ico('note', 18)}</span><span class="sp">Search my notes</span>${ico('chevR', 14)}</button></div>
+    <div class="h3" style="color:var(--plumt)" data-t="stats-head">${wk ? 'This week' : 'This month'}</div>
+    <div class="segc" data-t="period"><button class="${wk ? 'on' : ''}" data-act="period" data-id="week" data-t="period-week">This week</button><button class="${wk ? '' : 'on'}" data-act="period" data-id="month" data-t="period-month">This month</button></div>
+    <div class="tiles3" data-t="stat-tiles">${t.map(x => `<div class="st" style="background:${x[2]};color:${x[3]}"><b>${x[1]}</b><small>${x[0]}</small></div>`).join('')}</div>
+    <div class="segc" style="margin-top:12px"><button class="${S.weekShows === 'sessions' ? 'on' : ''}" data-act="weekshow" data-id="sessions">Sessions</button><button class="${S.weekShows === 'minutes' ? 'on' : ''}" data-act="weekshow" data-id="minutes">Minutes</button></div>
+    <div class="card"><div class="bars">${arr.map((v, i) => `<i class="${i === 11 ? 'cur' : ''}" style="height:${Math.max(3, Math.round(80 * v / mx))}px"></i>`).join('')}</div></div>
+    <div class="h3" style="color:var(--plumt);margin-top:12px">Sessions</div>
+    <div class="vlist">${row('dumb', '#4F46E5', '#fff', 'At the gym' + DOT + 'My gym', '3 machines' + DOT + '9 sets' + DOT + '3120 kg', 'Thu, 12 Nov' + DOT + '52 min')}${row('kettle', '#FF8C1A', '#4A2300', 'Push-ups', '5 of 5 sets \u00D7 20 reps', 'Tue, 10 Nov' + DOT + '8 min')}${row('dumb', '#4F46E5', '#fff', 'At the gym' + DOT + 'My gym', '2 machines' + DOT + '4 sets' + DOT + '1620 kg', 'Mon, 9 Nov' + DOT + '39 min')}</div></div>${tabBar()}`;
+}
+function settingsHTML() {
+  const L = (txt, act, t) => `<button class="lrow" data-act="${act || 'soon'}"${t ? ` data-t="${t}"` : ''}><span class="sp">${txt}</span>${ico('chevR', 14)}</button>`;
+  return `<div class="scr" data-keep="scr" style="background:var(--pbg)"><div class="inl"><span class="l"></span><b>Settings</b><span class="r"></span></div>
+    <div class="lst" data-t="set-list1">${L('How it works')}${L("What's new")}</div>
+    <div class="lst" data-t="set-list2">${L('Backups', 'row-backups', 'row-backups')}${L('Muscle groups')}${L('Plan templates')}${L('Rest times')}${L('Check my data')}</div>
+    <div class="lst"><div class="lrow" style="cursor:default"><span class="sp">Version</span><span style="color:var(--pmuted)" data-t="version">1.21 (1)</span></div></div>
+    <p class="cap" style="text-align:center">AMS WorkoutCompanion</p></div>${tabBar()}`;
+}
+function backupsHTML(from) {
+  return `<div class="scr" data-keep="scr"><div class="inl"><span class="l"><button class="nbk" data-act="page-back" data-t="page-back">${ico('chevL', 20)}${from}</button></span><b>Backups</b><span class="r"></span></div>
+    <div class="lst" style="padding:8px 12px"><button class="bigb bn" data-act="backup-now" data-t="backup-now" style="background:var(--navy);min-height:50px">${ico('check', 22)}Back up now</button></div>
+    <div class="lst"><button class="lrow link" data-act="restore-file" data-t="restore-file">Restore from a file\u2026</button></div>
+    <p class="lf">One file with all workouts, the gym log, history and every photo. Save it to Files or iCloud Drive \u2014 it stays safe even if the app is deleted.</p>
+    <div class="lh" style="color:var(--navy)">Automatic</div>
+    <div class="lst"><button class="lrow link" data-act="soon">Back up automatically\u2026</button></div>
+    <p class="lf">Choose a folder once \u2014 best in iCloud Drive. Then the app saves a backup there by itself once a day, when you open or leave it. The newest 7 stay.</p>
+    ${S.msg ? `<div class="lst"><div class="msg" data-t="backup-message">${esc(S.msg)}</div></div>` : ''}
+    <div class="lh" style="color:var(--navy)">On this iPhone</div>
+    <div class="lst"><button class="lrow" data-act="soon"><span style="color:var(--navy)">${ico('box', 20)}</span><span class="sp">Tuesday, 10 November, 08:12</span><span style="color:var(--acc);font-size:14px">Restore</span></button><button class="lrow link" data-act="keep-copy">Keep a copy now</button></div>
+    <p class="lf">Once a week the app keeps a copy here by itself; the newest 4 stay. They go if the app is deleted \u2014 so also keep one in Files.</p></div>${tabBar()}`;
+}
+
+/* ---------- Sheets ---------- */
+const foot = (cancelAct, cancelT, saveAct, saveT, saveTxt, cancelTxt) => `<div class="foot"><button class="fb c" data-act="${cancelAct}" data-t="${cancelT}">${cancelTxt || 'Cancel'}</button><button class="fb s" data-act="${saveAct}" data-t="${saveT}">${saveTxt || 'Save'}</button></div>`;
+function planSheet() {
+  const pd = S.pd, ms = allM().filter(m => m.logs !== 'time' || true);
+  return `<div class="dim"></div><div class="sheet" data-t="plan-sheet"><div class="stitle">Plan today</div><div class="scr" data-keep="scr">
+    ${pd.length ? `<div class="lh">Today's order</div><div class="lst">${pd.map((id, i) => { const m = mOf(id); return `<div class="sm" data-t="pd-row-${i + 1}"><span class="num nx" style="background:var(--ind);color:#fff">${i + 1}</span><span>${esc(m.name)}</span><span class="b"><button data-act="pd-minus" data-id="${id}" data-t="plan-minus-${i + 1}" aria-label="Take out" style="background:var(--red);color:#fff">${ico('minus', 16)}</button><button data-act="soon" aria-label="Move">${ico('grip', 16)}</button></span></div>`; }).join('')}</div>
+      <p class="lf">Drag the handles to change the order; the red minus takes a machine out.</p>
+      <div class="lst" style="background:none"><button class="fb s" style="width:100%;border-radius:10px;min-height:36px;font-size:16px" data-act="soon">Save as template\u2026</button></div>` : ''}
+    <div class="lh">${pd.length ? 'Add or take out' : 'Machines'}</div><div class="lst">${ms.map(m => { const n = pd.indexOf(m.id); return `<button class="lrow" data-act="pd-toggle" data-id="${m.id}" data-t="pm-${m.id}"><span class="num" style="${n < 0 ? 'background:none;border:1.5px solid var(--ind);color:transparent' : 'background:var(--ind);color:#fff'}">${n < 0 ? '' : n + 1}</span><span class="sp">${esc(m.name)}</span></button>`; }).join('')}</div>
+    <p class="lf">Tap the machines in the order you want them; tap again to take one out. You can still use any machine at the gym.</p>
+    ${pd.length ? `<div class="lst"><button class="lrow" style="color:var(--red)" data-act="pd-clear">Clear the plan</button></div>` : ''}</div>
+    ${foot('sheet-cancel', 'sheet-cancel', 'plan-save', 'plan-save')}</div>`;
+}
+function mformSheet() {
+  const f = S.mf, ex = f.logs === 'reps', tm = f.logs === 'time';
+  const ttl = ex ? 'New exercise' : 'New machine';
+  const foots = { time: 'Minutes, level and incline \u2014 for a treadmill, rowing machine or bike. A plank: Time, with level and incline off.', reps: 'Reps per set, no weight \u2014 push-ups, sit-ups, pull-ups.', weights: 'Weight and reps per set.' };
+  return `<div class="dim"></div><div class="sheet" data-t="mform-sheet"><div class="stitle">${ttl}</div><div class="scr" data-keep="scr">
+    <div class="lst"><div class="ph2" style="height:80px;border-radius:0">${ico('dumb', 34)}</div><div class="lrow" style="cursor:default"><span class="sp">Icon</span>${ico('chevR', 14)}</div><div class="lrow link" style="cursor:default">${ico('camera', 20)}Take photo</div><div class="lrow link" style="cursor:default">${ico('photo', 20)}Choose from Photos</div></div>
+    <div class="lh">Name</div><input class="field big${f.needs ? '' : ''}" data-in="mname" data-t="mf-name" placeholder="For example: Chest press" value="${esc(f.name)}" autocomplete="off">
+    ${f.needs ? '<div class="need" data-t="need-name">Give it a name first.</div>' : ''}
+    <div class="lh">How it is set up</div><div class="lst"><div class="lrow" style="color:var(--pmuted);cursor:default">For example: Seat 4, handles 2</div></div><p class="lf">Shown each time you use the machine.</p>
+    <div class="lst"><div class="lrow" style="cursor:default"><span class="sp">Muscle group</span><span style="color:var(--gt)">Not chosen</span></div></div>
+    <div class="lh">What you log</div><div class="seg3" data-t="logs"><button class="${f.logs === 'weights' ? 'on' : ''}" data-act="mf-logs" data-id="weights">Weight \u00D7 reps</button><button class="${tm ? 'on' : ''}" data-act="mf-logs" data-id="time">Time</button><button class="${ex ? 'on' : ''}" data-act="mf-logs" data-id="reps" data-t="logs-reps">Reps only</button></div>
+    <p class="lf" style="margin-top:6px" data-t="logs-foot">${foots[f.logs]}</p>
+    ${tm ? `<div class="lh">On this machine</div><div class="lst"><div class="trow">Has a level<span class="tg on"></span></div><div class="trow">Has an incline<span class="tg on"></span></div></div>` :
+      `<div class="lh">${ex ? 'This exercise' : 'On this machine'}</div><div class="lst">${ex ? '' : '<div class="trow">Heavy machine<span class="tg"></span></div>'}<div class="trow">Rest<span class="v" data-t="rest-val">Usual${DOT}${ex ? '1:00' : '1:30'}</span></div>${ex ? '' : '<div class="trow">Weight step<span class="v">2.5 kg</span></div><div class="trow">More weight at<span class="v">12 reps</span></div>'}</div>`}
+    ${tm ? '' : `<div class="lh">Superset</div><div class="lst"><div class="trow">Superset with<span class="v">None</span></div></div>`}
+    <div class="lh">Instructions</div><div class="lst"><div class="lrow link" style="cursor:default">Take photo of the instructions</div></div></div>
+    ${foot('sheet-cancel', 'sheet-cancel', 'mf-save', 'mf-save')}</div>`;
+}
+function ntSheet() {
+  const m = mOf(S.mc.id), n = S.nt;
+  return `<div class="dim"></div><div class="sheet" data-t="nt-sheet"><div class="stitle">Next time</div><div class="scr" data-keep="scr">
+    <div class="lst"><div class="trow">A plan for next time<span class="tg on"></span></div>
+    <div class="sm"><span>Weight: ${wt(n.kg)}</span><span class="b"><button data-act="nt-kg-minus" aria-label="Less">${ico('minus', 16)}</button><button data-act="nt-kg-plus" data-t="nt-kg-plus" aria-label="More">${ico('plus', 16)}</button></span></div>
+    <div class="sm"><span>Reps: ${n.reps}</span><span class="b"><button data-act="nt-reps-minus" aria-label="Less">${ico('minus', 16)}</button><button data-act="nt-reps-plus" aria-label="More">${ico('plus', 16)}</button></span></div></div>
+    <p class="lf">Next time this machine starts with these numbers.</p>
+    <div class="lh">How did it feel?</div><input class="field" data-in="note" data-t="nt-note" placeholder="For example: easy \u2014 go up next time" value="${esc(n.note)}" autocomplete="off"></div>
+    ${foot('sheet-cancel', 'sheet-cancel', 'nt-save', 'nt-save')}</div>`;
+}
+function seSheet() {
+  const s = S.se;
+  return `<div class="dim"></div><div class="sheet half" data-t="se-sheet"><div class="stitle">Set ${s.i + 1}</div><div class="scr" data-keep="scr" style="padding-top:4px">
+    <div class="lst"><div class="trow">Weight<span class="v" style="color:var(--pink)">${numS(s.kg)}</span><span style="color:var(--pmuted)">kg</span></div>
+    <div class="sm"><span>Reps: ${s.reps}</span><span class="b"><button data-act="se-reps-minus" aria-label="Less">${ico('minus', 16)}</button><button data-act="se-reps-plus" aria-label="More">${ico('plus', 16)}</button></span></div>
+    <div class="trow">Warm-up<span class="tg${s.warm ? ' on' : ''}" style="cursor:pointer" data-act="se-warm"></span></div></div>
+    <p class="lf">A warm-up is kept, but never counts as a best or for more weight next time.</p>
+    <div class="lst"><button class="lrow" style="color:var(--red)" data-act="se-remove" data-t="se-remove">Remove set</button></div></div>
+    ${foot('sheet-cancel', 'sheet-cancel', 'se-save', 'se-save')}</div>`;
+}
+function summarySheet() {
+  const g = S.g, ids = doneMachines(), n = totalSets();
+  const kg = ids.reduce((t, id) => t + setsOf(id).filter(s => !s.warm).reduce((a, s) => a + s.kg * s.reps, 0), 0);
+  const bests = ids.filter(id => { const m = mOf(id); return m.last && Math.max(...setsOf(id).filter(s => !s.warm).map(s => s.kg)) > m.last.kg; });
+  return `<div class="dim"></div><div class="sheet" data-t="sum-sheet"><div class="stitle">Session done</div><div class="scr" data-keep="scr">
+    <div class="sumh">${ico(bests.length ? 'trophy' : 'dumb', 56)}<b>Well done</b></div>
+    <div class="lh">Title and notes</div><div class="lst" style="padding:0 0 0 0"><input class="field big" style="font-size:17px;font-weight:600" data-in="stitle" data-t="sum-title" placeholder="Tuesday at My gym" value="${esc(S.sm.title)}" autocomplete="off"><div class="lrow" style="color:var(--pmuted);cursor:default;border-top:1px solid var(--pline)">Notes \u2014 how it went, what to remember</div></div>
+    <div class="lh">Photos of this session</div><div class="lst"><div class="lrow link" style="cursor:default">Take photo</div><div class="lrow link" style="cursor:default">Choose from Photos</div></div>
+    <div class="lst" data-t="sum-numbers"><div class="trow">Machines<span class="v" style="color:var(--pink);font-weight:600">${ids.length}</span></div><div class="trow">Sets<span class="v" style="color:var(--pink);font-weight:600">${n}</span></div><div class="trow">Time<span class="v" style="color:var(--pink);font-weight:600">${g.min} min</span></div><div class="trow">Lifted in all<span class="v" style="color:var(--pink);font-weight:600">${numS(kg)} kg</span></div></div>
+    ${bests.length ? `<div class="lh">New bests</div><div class="lst" data-t="sum-bests">${bests.map(id => `<div class="bestrow">${ico('trophy', 20)}<span>${esc(mOf(id).name)}</span><b>${wt(Math.max(...setsOf(id).filter(s => !s.warm).map(s => s.kg)))}</b></div>`).join('')}</div>` : ''}</div>
+    ${foot('sum-undo', 'sum-undo', 'sum-done', 'sum-done', 'Done', 'Undo Finish')}</div>`;
+}
+function cameraSheet() { return `<div class="cam"><button class="skip" data-act="camera-skip" data-t="camera-skip">Skip photo</button><p>Camera (practice copy: no picture is taken)</p><button class="shut" data-act="camera-skip" aria-label="Take photo"></button></div>`; }
+function shareSheet() {
+  return `<div class="dim"></div><div class="sheet small" data-t="share-sheet"><button class="xb" data-act="sheet-cancel" data-t="sheet-cancel" aria-label="Close">${ico('cross', 16)}</button><div class="ssh" style="padding-top:18px"><div class="stitle" style="justify-content:start;font-size:15px">Share</div><div class="fn">${ico('doc', 24)}Workouts backup 2026-11-17 1530.json</div>
+    <div class="acts2"><button data-act="soon">${ico('air', 24)}AirDrop</button><button data-act="soon">${ico('mail', 24)}Mail</button><button data-act="soon">${ico('files', 24)}Save to Files</button></div><p class="cap" style="margin-top:12px">The iPhone's share sheet, shown here only as a stand-in.</p></div></div>`;
+}
+function pickerSheet() {
+  return `<div class="dim"></div><div class="sheet half" data-t="picker-sheet"><div class="stitle">Files</div><div class="scr" data-keep="scr" style="padding-top:2px"><div class="lst"><button class="lrow" data-act="file" data-id="bad" data-t="file-bad">${ico('doc', 20)}<span class="sp">Holiday plan.json</span></button><button class="lrow" data-act="file" data-id="good" data-t="file-good">${ico('doc', 20)}<span class="sp">Workouts backup 2026-11-12 1530.json</span></button></div><p class="lf">A stand-in for the iPhone's file picker. Only .json files can be chosen.</p></div>
+    ${`<div class="foot"><button class="fb c" data-act="sheet-cancel" data-t="sheet-cancel">Cancel</button></div>`}</div>`;
+}
+function alertHTML() {
+  return `<div class="overlay"><div class="box" data-t="restore-alert"><h4>Restore the backup from 12 Nov 2026, 15:30?</h4><p>3 workouts${DOT}12 machines${DOT}40 gym visits${DOT}25 other sessions${DOT}30 photos.\n\nIt replaces what is on this iPhone now. Today's data is kept aside first.</p><div class="bt"><button data-act="restore-cancel" data-t="alert-cancel">Cancel</button><button data-act="restore-go" data-t="restore-go">Restore</button></div></div></div>`;
+}
+
+/* ---------- Stage ---------- */
+function renderStage() {
+  const st = document.getElementById('stage');
+  const pk = () => S.tab + ':' + (S.tab === 'train' ? (S.page || '') : S.tab === 'settings' ? (S.spage || '') : '');
+  const keyOf = e => e.closest('.sheet') ? 'sh:' + S.sheet : 'pg:' + pk(), prevKeys = renderStage.keys || {};
+  const scrolls = renderStage.scrolls = renderStage.scrolls || {};
+  st.querySelectorAll('[data-keep]').forEach(e => { if (e.dataset.k) scrolls[e.dataset.k] = e.scrollTop; });
+  const ae = document.activeElement, inId = ae && st.contains(ae) ? ae.dataset.in : null, sel = inId ? [ae.selectionStart, ae.selectionEnd] : null;
+  let body;
+  if (S.tab === 'train') body = S.page === 'gym' ? gymHTML() : S.page === 'machine' ? machineHTML() : S.page === 'backups' ? backupsHTML('Workout Companion') : trainHTML();
+  else if (S.tab === 'history') body = historyHTML();
+  else body = S.spage === 'backups' ? backupsHTML('Settings') : settingsHTML();
+  if (S.tab === 'train' || S.spage === 'backups') { if (!/class="tabs"/.test(body)) body += tabBar(); }
+  const sh = { plan: planSheet, mform: mformSheet, nextTime: ntSheet, setEdit: seSheet, summary: summarySheet, camera: cameraSheet, share: shareSheet, picker: pickerSheet }[S.sheet];
+  const over = (sh ? sh() : '') + (S.alert ? alertHTML() : '');
+  const undo = S.undo ? `<div class="undob" data-t="undo-bar"><span class="sp">${esc(S.undo.label)}</span><button data-act="undo" data-t="undo-btn">Undo</button></div>` : '';
+  st.innerHTML = `<div class="sbar"><span>9:41</span><span class="bat"></span></div>${body}${undo}${over}${S.toast ? `<div class="toast">${esc(S.toast)}</div>` : ''}`;
+  renderStage.keys = {};
+  st.querySelectorAll('[data-keep]').forEach(e => { const k = keyOf(e); e.dataset.k = k; renderStage.keys[k] = 1; e.scrollTop = prevKeys[k] ? (scrolls[k] || 0) : 0; });
+  if (inId) { const nf = st.querySelector(`[data-in="${inId}"]`); if (nf) { nf.focus(); try { nf.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
+  markTarget();
+}
+let toastH = null;
+function toast(t) { S.toast = t; renderStage(); clearTimeout(toastH); toastH = setTimeout(() => { S.toast = ''; renderStage(); }, 2400); }
+const soon = () => toast('Practice copy: not drawn here.');
+
+/* ---------- Timers: the rest (ten times faster here) and the Undo bar (10 seconds, as in the app) ---------- */
+const SPEED = 10;
+let lastTick = Date.now();
+function startRest(left, len, practice) { S.rest = { left, len: len || left, practice: !!practice }; lastTick = Date.now(); }
+setInterval(() => {
+  const now = Date.now(), dt = (now - lastTick) / 1000; lastTick = now;
+  const r = S.rest; if (!r) return;
+  r.left -= dt * SPEED;
+  if (r.left <= 0) {
+    if (r.practice && !solved) { r.left = r.len; toast('The rest ran out. It starts again here, for practice.'); return; }
+    S.rest = null; renderStage(); emit('rest-over'); return;
+  }
+  const f = r.left / Math.max(1, r.len), arc = document.getElementById('ringArc'), tm = document.getElementById('restTime');
+  if (arc) { arc.setAttribute('stroke', ringKey(f)); arc.setAttribute('stroke-dashoffset', (RING * (1 - f)).toFixed(1)); }
+  if (tm) tm.textContent = clock(r.left);
+}, 200);
+let undoSeq = 0;
+function startUndo(label, restore, practice) {
+  const id = ++undoSeq; S.undo = { id, label, restore, practice: !!practice };
+  later(() => {
+    if (!S.undo || S.undo.id !== id) return;
+    if (S.undo.practice && !solved) { startUndo(label, restore, true); toast('The bar lasts 10 seconds and has gone. Here it is again, for practice.'); }
+    else { S.undo = null; renderStage(); }
+  }, 10000);
+  renderStage();
+}
+
+/* ---------- Actions inside the pretend iPhone ---------- */
+const stage = document.getElementById('stage');
+let holdT = null, held = false, ptype = 'mouse';
+stage.addEventListener('pointerdown', ev => {
+  held = false; ptype = ev.pointerType; if (ev.button !== 0) return;
+  const el = ev.target.closest('[data-hold]'); if (!el) return;
+  const y = ev.clientY - stage.getBoundingClientRect().top;
+  holdT = setTimeout(() => { held = true; openMenu(el.dataset.hold, y); }, 520);
+});
+['pointerup', 'pointerleave', 'pointercancel'].forEach(n => stage.addEventListener(n, () => { clearTimeout(holdT); }));
+stage.addEventListener('contextmenu', ev => { const el = ev.target.closest('[data-hold]'); if (!el) return; ev.preventDefault(); clearTimeout(holdT); held = ptype !== 'mouse'; openMenu(el.dataset.hold, ev.clientY - stage.getBoundingClientRect().top); });
+function openMenu(id, y) { const sc = stage.getBoundingClientRect().height / 760; S.g.menu = { id, y: Math.max(60, Math.min(520, y / sc)) }; renderStage(); emit('menu-open'); }
+const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; };
+stage.addEventListener('input', ev => {
+  const k = ev.target.dataset.in; if (!k) return; const v = ev.target.value;
+  if (k === 'mname') { S.mf.name = v; S.mf.needs = false; if (v.trim()) emit('mname', v); renderStage(); }
+  else if (k === 'kg') { S.mc.kg = num(v); emit('kg', S.mc.kg); if (S.sheet == null && !S.rest) { const c = document.querySelector('#stage [data-t="entry-cap"]'); if (c && !setsOf(S.mc.id).length) c.textContent = S.mc.kg <= 0 ? '0 kg means body weight.' : 'Filled in from last time \u2014 change only what is different.'; } }
+  else if (k === 'reps') S.mc.reps = Math.max(0, Math.round(num(v)));
+  else if (k === 'note') { S.nt.note = v; if (v.trim()) emit('note-typed'); }
+  else if (k === 'stitle') { S.sm.title = v; if (v.trim()) emit('title-typed'); }
+});
+stage.addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter') return; const k = ev.target.dataset && ev.target.dataset.in; if (k) ev.target.blur();
+});
+stage.addEventListener('click', ev => {
+  if (held) { held = false; return; }
+  const el = ev.target.closest('[data-act]');
+  if (!el) { if (S.g.menu) { S.g.menu = null; renderStage(); } return; }
+  act(el.dataset.act, el.dataset.id, el);
+});
+function openMachine(id) {
+  const g = S.g; if (id === 'tread') { soon(); return; }
+  g.busy = g.busy.filter(x => x !== id);                       // at the machine it is free: the Busy mark has done its job
+  const n = nextSet(id); S.mc = { id, kg: n.kg, reps: n.reps, warm: false, nb: false }; S.page = 'machine'; S.rest = null;
+  renderStage(); emit('open-machine', id);
+}
+function act(a, id, el) {
+  const g = S.g;
+  if (g.menu && !/^m-/.test(a)) g.menu = null;
+  switch (a) {
+    case 'soon': soon(); break;
+    case 'tab': { if (S.tab !== id) { if (id === 'settings') S.spage = null; if (id === 'history') { S.period = 'week'; S.weekShows = 'sessions'; } }
+      S.tab = id; renderStage(); emit('tab', id); break; }
+    case 'open-gym': S.page = 'gym'; if (!(g.doneN > 0)) g.on = true; renderStage(); emit('open-gym'); break;
+    case 'gym-back': S.page = null; renderStage(); break;
+    case 'repeat': g.plan = ['chest', 'leg', 'lat']; g.skipped = []; renderStage(); emit('repeat'); break;
+    case 'plan-open': S.pd = (g.plan || []).slice(); S.sheet = 'plan'; renderStage(); emit('plan-open'); break;
+    case 'pd-toggle': { const i = S.pd.indexOf(id); if (i < 0) S.pd.push(id); else S.pd.splice(i, 1); renderStage(); break; }
+    case 'pd-minus': S.pd = S.pd.filter(x => x !== id); renderStage(); emit('plan-minus'); break;
+    case 'pd-clear': S.pd = []; renderStage(); break;
+    case 'plan-save': g.plan = S.pd.length ? S.pd.slice() : null; g.skipped = g.skipped.filter(x => g.plan && g.plan.includes(x)); S.sheet = null; renderStage(); emit('plan-save'); break;
+    case 'sheet-cancel': S.sheet = null; renderStage(); break;
+    case 'm-later': { const p = g.plan; if (p && p.includes(id)) { g.plan = p.filter(x => x !== id).concat([id]); } g.menu = null; renderStage(); break; }
+    case 'm-skip': { const sk = g.skipped.includes(id); g.skipped = sk ? g.skipped.filter(x => x !== id) : g.skipped.concat([id]); g.menu = null; renderStage(); emit('skipped', !sk); break; }
+    case 'm-swap': g.menu = null; soon(); break;
+    case 'm-remove': { g.plan = g.plan.filter(x => x !== id); if (!g.plan.length) g.plan = null; g.skipped = g.skipped.filter(x => x !== id); g.menu = null; renderStage(); break; }
+    case 'busy': { const on = !g.busy.includes(id); g.busy = on ? g.busy.concat([id]) : g.busy.filter(x => x !== id); renderStage(); emit('busy', on); break; }
+    case 'open-machine': openMachine(id); break;
+    case 'machine-back': S.page = 'gym'; S.rest = null; renderStage(); break;
+    case 'machine-next': { const nx = upNextId(S.mc.id); S.rest = null; if (nx) openMachine(nx); else { S.page = 'gym'; renderStage(); } emit('next-machine', nx); break; }
+    case 'kg-minus': S.mc.kg = Math.max(0, S.mc.kg - (mOf(S.mc.id).step || 2.5)); renderStage(); emit('kg', S.mc.kg); break;
+    case 'kg-plus': S.mc.kg += (mOf(S.mc.id).step || 2.5); renderStage(); emit('kg', S.mc.kg); break;
+    case 'reps-minus': S.mc.reps = Math.max(1, S.mc.reps - 1); renderStage(); break;
+    case 'reps-plus': S.mc.reps += 1; renderStage(); break;
+    case 'warm': S.mc.warm = !S.mc.warm; renderStage(); emit('warm', S.mc.warm); break;
+    case 'set-done': { const mc = S.mc, m = mOf(mc.id), isReps = m.logs === 'reps', s = { kg: isReps ? 0 : Math.max(0, mc.kg), reps: Math.max(1, mc.reps), warm: mc.warm };
+      const before = m.last ? m.last.kg : null;
+      (g.sets[mc.id] = g.sets[mc.id] || []).push(s);
+      mc.nb = !s.warm && before != null && s.kg > before; mc.warm = false; if (!g.min) g.min = 4;
+      const len = m.rest == null ? (isReps ? 60 : 90) : m.rest; startRest(len, len); renderStage(); emit('set-done', s); break; }
+    case 'rest-more': if (S.rest) { S.rest.left += 15; S.rest.len += 15; } renderStage(); emit('rest-more'); break;
+    case 'rest-skip': S.rest = null; renderStage(); emit('rest-skip'); break;
+    case 'nt-open': { const m = mOf(S.mc.id), t = g.nt[m.id], l = setsOf(m.id).slice(-1)[0];
+      S.nt = { kg: t && t.set ? t.set.kg : l.kg, reps: t && t.set ? t.set.reps : l.reps, note: t ? t.note : '' }; S.sheet = 'nextTime'; renderStage(); emit('nt-open'); break; }
+    case 'nt-kg-minus': S.nt.kg = Math.max(0, S.nt.kg - 2.5); renderStage(); break;
+    case 'nt-kg-plus': S.nt.kg += 2.5; renderStage(); break;
+    case 'nt-reps-minus': S.nt.reps = Math.max(1, S.nt.reps - 1); renderStage(); break;
+    case 'nt-reps-plus': S.nt.reps += 1; renderStage(); break;
+    case 'nt-save': g.nt[S.mc.id] = { set: { kg: S.nt.kg, reps: S.nt.reps }, note: S.nt.note.trim() }; S.sheet = null; renderStage(); emit('nt-saved'); break;
+    case 'set-open': { const s = setsOf(S.mc.id)[+id]; S.se = { i: +id, kg: s.kg, reps: s.reps, warm: !!s.warm }; S.sheet = 'setEdit'; renderStage(); emit('se-open'); break; }
+    case 'se-reps-minus': S.se.reps = Math.max(1, S.se.reps - 1); renderStage(); break;
+    case 'se-reps-plus': S.se.reps += 1; renderStage(); break;
+    case 'se-warm': S.se.warm = !S.se.warm; renderStage(); break;
+    case 'se-save': { const s = setsOf(S.mc.id)[S.se.i]; s.kg = S.se.kg; s.reps = S.se.reps; s.warm = S.se.warm; S.sheet = null; renderStage(); break; }
+    case 'se-remove': { const id2 = S.mc.id, i = S.se.i, arr = setsOf(id2), gone = arr[i], prpractice = true;
+      arr.splice(i, 1); S.sheet = null; startUndo('Set ' + (i + 1) + ' removed', () => { setsOf(id2).splice(i, 0, gone); }, false); emit('set-removed'); break; }
+    case 'undo': if (S.undo) { S.undo.restore(); S.undo = null; renderStage(); emit('undo'); } break;
+    case 'new-machine': S.sheet = 'camera'; renderStage(); emit('camera-open'); break;
+    case 'camera-skip': S.mf = { name: '', logs: 'weights', needs: false }; S.sheet = 'mform'; renderStage(); emit('camera-skip'); break;
+    case 'mf-logs': S.mf.logs = id; renderStage(); emit('mlogs', id); break;
+    case 'mf-save': { const f = S.mf; if (!f.name.trim()) { f.needs = true; renderStage(); emit('mf-needs'); break; }
+      g.extra.push({ id: 'new' + g.extra.length, name: f.name.trim(), setting: '', stripe: '', logs: f.logs, last: null, rest: null, step: 2.5, top: 12, lastText: 'New' }); S.sheet = null; renderStage(); emit('mf-saved'); break; }
+    case 'finish': if (totalSets() > 0) { g.on = false; g.doneN = 1; S.sm = { title: '', notes: '' }; S.sheet = 'summary'; renderStage(); emit('finish'); }
+      else { g.on = false; renderStage(); emit('leave'); } break;
+    case 'sum-undo': g.on = true; g.doneN = 0; S.sheet = null; renderStage(); break;
+    case 'sum-done': { const t = S.sm.title.trim(), ids = doneMachines();
+      g.newVisit = { title: t || 'Tue, 17 Nov 2026', detail: (t ? '17 Nov' + DOT : '') + '17:20' + DOT + ids.length + ' machine' + (ids.length === 1 ? '' : 's') + DOT + totalSets() + ' sets' };
+      S.sheet = null; renderStage(); emit('summary-done'); break; }
+    case 'period': S.period = id; renderStage(); emit('period', id); break;
+    case 'weekshow': S.weekShows = id; renderStage(); break;
+    case 'row-backups': S.spage = 'backups'; renderStage(); emit('backups-open'); break;
+    case 'unread-backups': S.page = 'backups'; renderStage(); emit('backups-open'); break;
+    case 'page-back': if (S.tab === 'train') S.page = S.page === 'backups' ? null : null; else S.spage = null; renderStage(); break;
+    case 'backup-now': S.sheet = 'share'; renderStage(); emit('backup-now'); break;
+    case 'restore-file': S.sheet = 'picker'; renderStage(); emit('picker-open'); break;
+    case 'file': S.sheet = null; if (id === 'bad') { S.msg = 'This file is not a Workouts backup, or it is damaged. Nothing was changed.'; renderStage(); } else { S.alert = 'restore'; renderStage(); } emit('file', id); break;
+    case 'restore-cancel': S.alert = null; renderStage(); emit('restore-answer', 'cancel'); break;
+    case 'restore-go': S.alert = null; S.msg = 'Restored: 3 workouts' + DOT + '12 machines' + DOT + '40 gym visits' + DOT + '25 other sessions' + DOT + '30 photos.'; renderStage(); emit('restore-answer', 'restore'); break;
+    case 'keep-copy': S.msg = 'Copy kept on this iPhone.'; renderStage(); break;
+    default: break;
+  }
+}
+
+/* ---------- Lessons (see, try, check). Every step's setup does a full reset of what that step needs. ---------- */
+const PLAN = () => ['chest', 'leg', 'lat'];
+const gymP = (o, x) => set(Object.assign({ page: 'gym', g: mkGym(Object.assign({ on: true }, o || {})) }, x || {}));
+const mach = (id, o, x) => { set(Object.assign({ page: 'machine', g: mkGym(Object.assign({ on: true }, o || {})), mc: { id, kg: 0, reps: 10, warm: false, nb: false } }, x || {})); const n = nextSet(id); S.mc.kg = n.kg; S.mc.reps = n.reps; };
+const ST = (kg, reps, warm) => ({ kg, reps, warm: !!warm });
+const chestOne = () => ({ chest: [ST(32.5, 10)] });
+const chestThree = () => ({ chest: [ST(32.5, 10), ST(32.5, 10), ST(32.5, 9)] });
+const sessionWithSets = () => ({ min: 38, sets: { chest: chestThree().chest, leg: [ST(50, 12), ST(50, 11)] } });
+const LESSONS = [
+  { title: 'The first screen', icon: 'kettle', steps: [
+    { kind: 'look', head: 'Train, top to bottom', text: 'The app opens on Train, headed "Workout Companion". At the top is the wide indigo "At the gym" tile. Below it your workouts are full-colour tiles in two columns, and a dashed "New workout" tile. The three the app starts with are Push-ups, Intervals and Doctor\u2019s exercises.', target: 'gym-card', setup: () => set({}) },
+    { kind: 'look', head: 'Three tabs', text: 'Train, History and Settings sit in the bar at the bottom. Settings is a tab, so it has no Done button.', target: 'tabbar', setup: () => set({}) },
+    { kind: 'try', head: 'Switch tab', text: 'You are on the gym screen, a page inside Train. Tap "History".', target: 'tab-history', setup: () => gymP(), wait: 'tab', when: d => d === 'history', ok: 'History opens fresh, with its own numbers. Train waits underneath.' },
+    { kind: 'try', head: 'Back to Train', text: 'Now tap "Train".', target: 'tab-train', setup: () => { gymP(); S.tab = 'history'; }, wait: 'tab', when: d => d === 'train', ok: 'You are back on the gym screen, exactly where you left it. Train keeps its place; History and Settings open fresh each time you choose them.' },
+  ]},
+  { title: 'Starting at the gym', icon: 'dumb', steps: [
+    { kind: 'try', head: 'Open the gym', text: 'Tap the indigo "At the gym" tile.', target: 'gym-card', setup: () => set({}), wait: 'open-gym', ok: 'The gym screen opens, and the session\u2019s clock starts from this moment.' },
+    { kind: 'look', head: 'The session has begun', text: 'From the moment you open the gym today, a green line says "Session going \u00B7 0 min \u00B7 no sets yet". The minutes move on by themselves in the real app; here they stand still. At the bottom of the screen "Finish this session" is there from the start too.', target: 'session-line', setup: () => gymP() },
+    { kind: 'look', head: 'Plan, repeat, template', text: 'With no plan yet there are three buttons: "Plan today", "Repeat last visit" (full colour) and "Save as template". The last two show only when you have an earlier visit. Under them each machine is a tile: its photo, its name, "Last: 30 kg" on a band, and a stripe in the colour of its muscle group.', target: 'plan-buttons', setup: () => gymP() },
+    { kind: 'try', head: 'Repeat last visit', text: 'Tap "Repeat last visit".', target: 'repeat', setup: () => gymP(), wait: 'repeat', ok: 'Today\u2019s plan lists the machines of your last visit in the same order, numbered, with "Up next" under the first. You can still tap any machine you like.' },
+    { kind: 'try', head: 'Change the plan', text: 'Tap "Change". Take "Lat pulldown" out with its red minus, then press "Save".', target: 'plan-change', setup: () => gymP({ plan: PLAN() }), wait: 'plan-save', on: { 'plan-open': 'plan-minus-3', 'plan-minus': 'plan-save' }, ok: 'The plan now has two machines. In "Plan today" you drag the handles to change the order, and Cancel leaves the plan as it was.' },
+    { kind: 'try', head: 'Skip a machine today', text: 'Touch and hold "Leg press" (on a Mac, right-click it). In the menu choose "Skip today".', target: 'plan-2', setup: () => gymP({ plan: PLAN() }), wait: 'skipped', when: d => d === true, on: { 'menu-open': 'm-skip' }, ok: 'It is struck through and says "Skipped today". The menu also has Later, Swap for\u2026 and Remove from plan.' },
+  ]},
+  { title: 'At a machine', icon: 'dumb', steps: [
+    { kind: 'try', head: 'Someone is on it', text: 'Leg press is taken. Tap the small "Busy" pill on its tile.', target: 'busy-leg', setup: () => gymP(), wait: 'busy', when: d => d === true, ok: 'The tile turns orange and moves up under "Come back to". Tap Busy again to take the mark away. Finish clears every Busy mark.' },
+    { kind: 'try', head: 'Open a free machine', text: 'Chest press is free. Tap its tile.', target: 'tile-chest', setup: () => gymP(), wait: 'open-machine', when: d => d === 'chest', ok: 'The machine screen opens. Opening a machine also takes its Busy mark away.' },
+    { kind: 'look', head: 'Last time, and a suggestion', text: 'At the top: the setting you wrote ("Seat 4, handles 2") and "Last time, 12 Nov: 30 kg \u00D7 12, 12, 12". Every set reached 12 reps, so the app suggests more: "Try 32.5 kg \u2014 every set last time reached 12 reps". Below, the weight and reps are already filled in for you.', target: 'suggest', setup: () => mach('chest') },
+    { kind: 'try', head: 'Change what is different', text: 'You would rather stay at 30 kg today. Tap the minus beside "kg".', target: 'kg-minus', setup: () => mach('chest'), wait: 'kg', when: d => d === 30, ok: '30 kg. The minus and plus move the weight by the machine\u2019s step (usually 2.5 kg) and the reps by 1. Tap a number to type it; 0 kg means body weight.' },
+    { kind: 'try', head: 'Warm-up', text: 'Tap the "Warm-up" pill above the weight.', target: 'warmup', setup: () => mach('chest'), wait: 'warm', when: d => d === true, ok: 'The heading says "Warm-up set". The pill switches itself off after that one set. A warm-up counts as a set in the statistics, but never as a New best, a record, or a reason for more weight.' },
+    { kind: 'check', head: 'Quick check', text: 'Every set last time reached 12 reps. What does the machine offer for the next set?', answers: ['32.5 kg \u00D7 10: one weight step more, with two reps fewer', 'The same 30 kg \u00D7 12', 'The same weight, one more rep'], right: 0, ok: 'Right. You can change it with minus and plus; "More weight at" and the weight step are set per machine.' },
+  ]},
+  { title: 'Rest, next time and fixes', icon: 'watch', steps: [
+    { kind: 'try', head: 'Set done', text: 'The numbers are filled in: 32.5 kg \u00D7 10. Tap "Set done".', target: 'set-done', setup: () => mach('chest', { plan: PLAN() }), wait: 'set-done', ok: 'Set 1 is saved, with a tick. The gold arrow means it beat the same set last time (32.5 kg against 30 kg). The rest starts: usually 1:30, 2:00 on a heavy machine, 1:00 on an exercise without a machine.' },
+    { kind: 'try', head: 'More rest', text: 'This is the rest: a ring and the countdown, with the next set under it. In this practice copy the rest runs ten times faster than in the real app. Tap "+15 s".', target: 'rest-more', setup: () => { mach('chest', { plan: PLAN(), min: 6, sets: chestOne() }); S.mc.nb = true; startRest(75, 90, true); }, wait: 'rest-more', ok: '15 seconds added. The ring is orange while more than half is left, yellow past the middle and green in the last fifth. The same countdown shows on the lock screen.' },
+    { kind: 'try', head: 'Skip the rest', text: 'Ready sooner? Tap "Skip rest". (The practice rest runs ten times faster.)', target: 'rest-skip', setup: () => { mach('chest', { plan: PLAN(), min: 6, sets: chestOne() }); S.mc.nb = true; startRest(60, 90, true); }, wait: 'rest-skip', ok: 'Back to the set card: "Set 2" is filled in with the set you just did. Now a green "Next \u203A" sits beside Set done, with the next planned machine under it.' },
+    { kind: 'try', head: 'How did it feel?', text: 'After the first set a row appears under the card. Tap "How did it feel? Next time\u2026".', target: 'nt-row', setup: () => { mach('chest', { plan: PLAN(), min: 6, sets: chestOne() }); S.mc.nb = true; }, wait: 'nt-open', ok: 'The "Next time" page opens.' },
+    { kind: 'try', head: 'A plan and a note', text: 'Type a short note, for example "Easy - go up next time", then press "Save". Plus and minus would change next time\u2019s weight and reps first. Nothing is kept until Save.', target: 'nt-note', setup: () => { mach('chest', { plan: PLAN(), min: 6, sets: chestOne() }); S.mc.nb = true; S.sheet = 'nextTime'; }, wait: 'nt-saved', on: { 'note-typed': 'nt-save' }, robot: { type: 'Easy - go up next time' }, ok: 'The row now reads "Next time: 32.5 kg \u00D7 10" with your note under it. Next time the machine starts with those numbers ("Your plan from last time") and shows your note under "Last time".' },
+    { kind: 'try', head: 'Fix a set', text: 'Tap "Set 1", then press "Remove set". (You can also change its weight, reps or warm-up there.)', target: 'set-1', setup: () => mach('chest', { plan: PLAN(), min: 8, sets: { chest: [ST(32.5, 10), ST(32.5, 10)] } }), wait: 'set-removed', on: { 'se-open': 'se-remove' }, ok: 'The set is gone, and a dark bar at the bottom says what happened.' },
+    { kind: 'try', head: 'Undo', text: 'Press "Undo" in the dark bar. It stays for 10 seconds, as in the real app, then the deletion stands.', hint: 'If the 10 seconds run out here, the bar comes back by itself so you can try again. In the real app it does not.', target: 'undo-btn', setup: () => { const s1 = ST(32.5, 10); mach('chest', { plan: PLAN(), min: 8, sets: { chest: [ST(32.5, 10)] } }); startUndo('Set 1 removed', () => { setsOf('chest').splice(0, 0, s1); }, true); }, wait: 'undo', ok: 'Set 1 is back. Undo works the same after deleting a machine, a workout, or a whole session.' },
+    { kind: 'try', head: 'On to the next machine', text: 'You have done your three sets. Tap the green "Next \u203A".', target: 'next-btn', setup: () => mach('chest', { plan: PLAN(), min: 20, sets: chestThree() }), wait: 'next-machine', when: d => d === 'leg', ok: 'Leg press opens, the next machine in your plan. Before your first set the big button at the bottom says "Back to gym" and saves nothing; after a set it says "Exercise done".' },
+  ]},
+  { title: 'A new machine or exercise', icon: 'camera', steps: [
+    { kind: 'try', head: 'Add a tile', text: 'At the end of the machines is a dashed tile. Tap "New machine or exercise".', target: 'new-machine', setup: () => gymP(), wait: 'camera-open', ok: 'On the iPhone the camera opens first, as at a real machine.' },
+    { kind: 'try', head: 'No photo needed', text: 'Push-ups have nothing to photograph. Tap "Skip photo".', target: 'camera-skip', setup: () => gymP({}, { sheet: 'camera' }), wait: 'camera-skip', ok: 'The form opens without a photo. The tile will show a hand-drawn strength mark instead.' },
+    { kind: 'try', head: 'Save with no name', text: 'The form has Cancel and Save at the bottom. Press "Save" without typing anything.', target: 'mf-save', setup: () => gymP({}, { sheet: 'mform' }), wait: 'mf-needs', ok: 'It does not save. It says "Give it a name first." in red under Name.' },
+    { kind: 'try', head: 'Name it', text: 'Type "Push-ups" in the Name field.', target: 'mf-name', setup: () => gymP({}, { sheet: 'mform', mf: { name: '', logs: 'weights', needs: true } }), wait: 'mname', robot: { type: 'Push-ups' }, ok: 'The red line goes as soon as you type. Under it you can also write how the machine is set up, for example "Seat 4, handles 2".' },
+    { kind: 'try', head: 'What you log', text: 'Push-ups have no weight. Under "What you log" tap "Reps only".', target: 'logs-reps', setup: () => gymP({}, { sheet: 'mform', mf: { name: 'Push-ups', logs: 'weights', needs: false } }), wait: 'mlogs', when: d => d === 'reps', ok: 'The form is now headed "New exercise", with its own Rest (usual 1:00) and no weight step. "Time" is for a treadmill, rowing machine or bike; a plank is Time with level and incline off.' },
+    { kind: 'try', head: 'Save it', text: 'Press "Save".', target: 'mf-save', setup: () => gymP({}, { sheet: 'mform', mf: { name: 'Push-ups', logs: 'reps', needs: false } }), wait: 'mf-saved', ok: 'Saving only defines it: you stay on the gym screen and its tile is there ("New"). Tap it when you want to log a set.' },
+  ]},
+  { title: 'Finishing and History', icon: 'trophy', steps: [
+    { kind: 'try', head: 'Finish this session', text: 'You have done two machines. Scroll down if needed and press "Finish this session".', target: 'finish', setup: () => gymP(sessionWithSets()), wait: 'finish', ok: 'The "Session done" page shows what the visit came to: machines, sets, time, kilograms lifted and the New bests. Tapped by mistake? "Undo Finish" beside Done puts the session back as it was.' },
+    { kind: 'try', head: 'Title and Done', text: 'Type a title, for example "Chest day", then press "Done". The suggestion in grey is "Tuesday at My gym".', target: 'sum-title', setup: () => gymP(Object.assign(sessionWithSets(), { on: false, doneN: 1 }), { sheet: 'summary' }), wait: 'summary-done', on: { 'title-typed': 'sum-done' }, robot: { type: 'Chest day' }, ok: 'The visit joins "Earlier visits" with its title. The gym screen says "Session done. Tap a machine to start a second session." Photos and notes can be added here or later.' },
+    { kind: 'try', head: 'Finish with no sets', text: 'You opened the gym but did nothing. Press "Finish this session".', target: 'finish', setup: () => gymP(), wait: 'leave', ok: 'The session simply ends and nothing is saved. On a machine, "Back to gym" before a first set also saves nothing.' },
+    { kind: 'try', head: 'History', text: 'Every finished session is kept in History. Tap "History".', target: 'tab-history', setup: () => set({}), wait: 'tab', when: d => d === 'history', ok: 'History shows this week in tiles, a week picture, then the sessions, newest first.' },
+    { kind: 'try', head: 'Week or month', text: 'Tap "This month".', target: 'period-month', setup: () => set({ tab: 'history' }), wait: 'period', when: d => d === 'month', ok: 'The tiles change to the month. At the top are the rows Records and "Search my notes"; lower down come muscle groups, streaks and badges. The numbers here are made up.' },
+    { kind: 'check', head: 'Quick check', text: 'You tapped "Finish this session" by mistake. What now?', answers: ['Press "Undo Finish" on the Session done page', 'Start a new session and copy the sets again', 'Nothing can be done'], right: 0, ok: 'Right. The session goes on as if you had never tapped Finish: the plan and Busy marks come back, and the title, notes and photos stay.' },
+  ]},
+  { title: 'Settings and backup', icon: 'gear', steps: [
+    { kind: 'try', head: 'Settings', text: 'Tap "Settings". It lists How it works, What\u2019s new, Backups, Muscle groups, Plan templates, Rest times, Check my data and the version.', target: 'tab-settings', setup: () => set({}), wait: 'tab', when: d => d === 'settings', ok: 'The guide to the whole app ("How it works") and every version ("What\u2019s new") are here. Only Backups is drawn in this practice copy.' },
+    { kind: 'try', head: 'Backups', text: 'Tap "Backups".', target: 'row-backups', setup: () => set({ tab: 'settings' }), wait: 'backups-open', ok: 'The Backups page: Back up now, Restore from a file, an automatic backup to a folder, and weekly copies kept on the iPhone.' },
+    { kind: 'try', head: 'Back up now', text: 'Press the navy "Back up now" button.', target: 'backup-now', setup: () => set({ tab: 'settings', spage: 'backups' }), wait: 'backup-now', ok: 'One file with all workouts, the gym log, History and every photo is made, and the share sheet opens: save it to Files or iCloud Drive, or send it by AirDrop. A file in iCloud Drive stays safe even if the app is deleted.' },
+    { kind: 'try', head: 'A file that is not a backup', text: 'Press "Restore from a file\u2026" and choose "Holiday plan.json".', target: 'restore-file', setup: () => set({ tab: 'settings', spage: 'backups' }), wait: 'file', when: d => d === 'bad', on: { 'picker-open': 'file-bad' }, ok: 'The app reads the file first and refuses it, in the same words as the real app. Nothing was changed.' },
+    { kind: 'try', head: 'A real backup', text: 'Press "Restore from a file\u2026" again and choose "Workouts backup 2026-11-12 1530.json". Then answer the question.', target: 'restore-file', setup: () => set({ tab: 'settings', spage: 'backups' }), wait: 'restore-answer', on: { 'picker-open': 'file-good', file: 'alert-cancel' }, ok: 'The app shows the backup\u2019s date and what it holds, and asks first. Restore replaces what is on the iPhone, after keeping today\u2019s data aside in a "Before restore" folder. It is all or nothing: if anything goes wrong on the way, everything stays as it was.' },
+    { kind: 'try', head: 'A file that cannot be read', text: 'If your workouts, gym log or History could not be read, a red note appears at the top of Train. Tap its "Backups" button.', target: 'unread-backups', setup: () => set({ unread: true }), wait: 'backups-open', ok: 'The app never saves over a file it cannot read, and it keeps every photo. The unreadable file is kept aside. Restoring a backup brings your data back.' },
+    { kind: 'check', head: 'Quick check', text: 'The workouts file cannot be read. What does the app do with it?', answers: ['Saves an empty list over it', 'Keeps it aside and never saves over it', 'Deletes it and starts again'], right: 1, ok: 'Right. That is why a red note offers Backups, and why the automatic backup is not made while a file is unreadable.' },
+  ]},
+];
+
+/* ---------- Tour engine (reusable) ---------- */
+let ci = 0, si = 0, solved = false, targetOff = false;
+const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } };
+let doneChapters = new Set(JSON.parse(store.get('workoutstour-done') || '[]'));
+
+function emit(name, data) {
+  const st = LESSONS[ci]?.steps[si]; if (!st || solved || st.kind !== 'try') return;
+  if (st.on && st.on[name]) { markTarget(st.on[name]); }
+  if ((st.wait === name || st.alt === name) && (!st.when || st.when(data))) succeed(st.ok);
+}
+function succeed(msg) {
+  solved = true; targetOff = true; const fb = document.getElementById('fb'); if (fb) { fb.textContent = '\u2713 ' + msg; fb.className = 'feedback'; }
+  const nx = document.getElementById('next'); if (nx) { nx.disabled = false; nx.focus({ preventScroll: true }); }
+  markTarget();
+}
+let curTarget = null;
+function markTarget(t) {
+  if (t !== undefined) curTarget = t;
+  document.querySelectorAll('.target').forEach(e => e.classList.remove('target'));
+  if (!curTarget || targetOff) return;
+  const q = n => document.querySelector(`#stage [data-t="${CSS.escape(n)}"]`);
+  // If the thing to tap is out of sight (a stray tap closed a page), point at the way back to it.
+  const first = LESSONS[ci] && LESSONS[ci].steps[si] && LESSONS[ci].steps[si].target;
+  const el = q(curTarget) || (first && first !== curTarget ? q(first) : null)
+    || (S.alert ? q('alert-cancel') : S.sheet ? q('sheet-cancel') : S.page === 'machine' ? q('machine-pill') : (S.page || S.spage) ? q('page-back') : S.tab !== 'train' ? q('tab-train') : null);
+  if (el) {
+    el.classList.add('target');
+    const sc = el.closest('.scr');
+    if (sc) { const r = el.getBoundingClientRect(), s = sc.getBoundingClientRect(), k = document.getElementById('stagebox').clientWidth / 390;
+      if (r.top < s.top + 40 * k || r.bottom > s.bottom - 110 * k) sc.scrollTop += (r.top - s.top - 120 * k) / k; }
+  }
+}
+function renderRail() {
+  const total = LESSONS.reduce((n, l) => n + l.steps.length, 0);
+  const before = LESSONS.slice(0, ci).reduce((n, l) => n + l.steps.length, 0) + si;
+  document.getElementById('rail').innerHTML = `<div class="brand"><span class="logo">${icon('kettle')}</span><div><h1>Workouts Tour</h1><small>Learn the app in about 15 minutes</small></div></div>
+    ${LESSONS.map((l, i) => `<button class="chap ${i === ci ? 'cur' : ''} ${doneChapters.has(i) ? 'done' : ''}" data-ch="${i}">${icon(l.icon)}<span>${l.title}</span><span class="n">${doneChapters.has(i) ? '\u2713' : l.steps.length + ' steps'}</span></button>`).join('')}
+    <button class="chap ${ci === LESSONS.length ? 'cur' : ''}" data-ch="${LESSONS.length}">${icon('phone')}<span>Now on your iPhone</span></button>
+    <div class="bar"><i style="width:${Math.round(100 * Math.min(before, total) / total)}%"></i></div>
+    <p class="railnote">Practice copy, nothing changes in your real app. Based on AMS Workouts 1.21.</p>`;
+}
+document.getElementById('rail').addEventListener('click', e => { const b = e.target.closest('[data-ch]'); if (b) goChapter(+b.dataset.ch); });
+
+function goChapter(i) {
+  ci = i; si = 0; clearTimers(); S = START();
+  const L = LESSONS[i]; if (L && L.setup) L.setup();
+  renderStep();
+}
+function renderStep() {
+  renderRail();
+  const coach = document.getElementById('coach'), fin = document.getElementById('finish');
+  if (ci >= LESSONS.length) { renderFinish(); coach.hidden = true; return; }
+  coach.hidden = false; fin.hidden = true;
+  const L = LESSONS[ci], st = L.steps[si];
+  solved = st.kind === 'look'; targetOff = false;
+  clearTimers(); clearTimeout(toastH);
+  if (st.setup) st.setup();
+  S.toast = '';
+  const kindName = { look: 'Look', try: 'Try it', check: 'Check' }[st.kind];
+  coach.innerHTML = `<div class="eyebrow">${icon(L.icon)} ${esc(L.title)} <span class="kind">\u00B7 ${kindName} \u00B7 step ${si + 1} of ${L.steps.length}</span></div>
+    <div><h2>${esc(st.head)}</h2><p>${esc(st.text)}</p>${st.hint ? `<p style="color:var(--muted);font-size:13px">${esc(st.hint)}</p>` : ''}</div>
+    <div class="btns">${ci + si > 0 ? '<button class="btn ghost" id="back">Back</button>' : ''}<button class="btn main-b" id="next" ${solved ? '' : 'disabled'}>${si === L.steps.length - 1 ? 'Finish chapter' : 'Next'}</button></div>
+    ${st.kind === 'check' ? `<div class="answers">${st.answers.map((a, i) => `<button class="ans" data-a="${i}">${esc(a)}</button>`).join('')}</div>` : ''}
+    <p class="feedback" id="fb"></p>`;
+  curTarget = st.target || null;
+  renderStage();
+  if (st.kind === 'check') coach.querySelectorAll('.ans').forEach(b => b.onclick = () => {
+    const fb = document.getElementById('fb');
+    if (+b.dataset.a === st.right) { coach.querySelectorAll('.ans').forEach(x => x.disabled = true); b.classList.add('right'); succeed(st.ok); }
+    else { b.classList.add('wrong'); fb.textContent = 'Not quite. Try another answer.'; fb.className = 'feedback no'; }
+  });
+  document.getElementById('next').onclick = next;
+  const bk = document.getElementById('back'); if (bk) bk.onclick = back;
+}
+function next() {
+  const L = LESSONS[ci];
+  if (si < L.steps.length - 1) { si++; renderStep(); return; }
+  doneChapters.add(ci); store.set('workoutstour-done', JSON.stringify([...doneChapters]));
+  goChapter(ci + 1);
+}
+function back() { if (si > 0) { si--; renderStep(); } else if (ci > 0) { goChapter(ci - 1); } }
+
+function renderFinish() {
+  const fin = document.getElementById('finish'); fin.hidden = false;
+  clearTimers(); S = START(); curTarget = null; renderStage();
+  const items = ['Open Workouts on your iPhone. On Train, tap the indigo "At the gym" tile and find the green "Session going" line at the top and "Finish this session" at the bottom.',
+    'Tap "Repeat last visit" (or "Plan today"). Then touch and hold a machine in the plan and choose "Skip today".',
+    'Open a machine. Read "Last time", check the weight and reps are filled in, tap "Set done", watch the rest ring, tap "+15 s", then "Skip rest".',
+    'Under the sets tap "How did it feel? Next time\u2026", choose next time\u2019s numbers, type a note and press Save.',
+    'Tap "New machine or exercise", then "Skip photo" (or take a photo), give it a name and press Save. Check that you stay on the gym screen.',
+    'Tap "Finish this session", type a title and press Done. Then open the History tab and find the session.',
+    'Open Settings \u2192 Backups and press "Back up now": save the file to Files or iCloud Drive. Then open Settings \u2192 Check my data and see "All good".'];
+  let ticks = JSON.parse(store.get('workoutstour-real') || '[]');
+  fin.innerHTML = `<h3>Now on your iPhone</h3>${items.map((t, i) => `<label><input type="checkbox" id="real-${i}" ${ticks.includes(i) ? 'checked' : ''}><span>${esc(t)}</span></label>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn main-b" id="again">Start the tour again</button></div>`;
+  fin.querySelectorAll('input').forEach((c, i) => c.onchange = () => { ticks = ticks.filter(x => x !== i); if (c.checked) ticks.push(i); store.set('workoutstour-real', JSON.stringify(ticks)); });
+  document.getElementById('again').onclick = () => goChapter(0);
+}
+
+/* Fit the 390 x 760 pretend iPhone into its box */
+function fit() { const box = document.getElementById('stagebox'); document.getElementById('stage').style.transform = `scale(${box.clientWidth / 390})`; }
+new ResizeObserver(fit).observe(document.getElementById('stagebox'));
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (S.alert) { act('restore-cancel'); return; }
+    if (S.sheet === 'summary') { act('sum-undo'); return; }
+    if (S.sheet && ['plan', 'mform', 'nextTime', 'setEdit', 'share', 'picker'].includes(S.sheet)) { S.sheet = null; renderStage(); return; }
+  }
+  if (e.key === 'Enter' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') { const n = document.getElementById('next'); if (n && !n.disabled && document.activeElement !== n) n.click(); }
+});
+goChapter(0); fit();
+</script>
