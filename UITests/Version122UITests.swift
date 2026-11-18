@@ -16,10 +16,13 @@ final class Version122UITests: XCTestCase {
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     func testClockAndDoneList() {
-        XCTAssertTrue(any("gym-session-going").waitForExistence(timeout: 5))
-        XCTAssertTrue(any("gym-session-going").label.contains("0:0"), any("gym-session-going").label)
         XCTAssertFalse(any("gym-done-list").exists, "no list before the first set")
 
+        // Since 1.23 the clock starts at the first machine, so open one and come back first.
+        app.buttons["machine-Leg press"].tap()
+        app.buttons["machine-done-pill"].tap()
+        XCTAssertTrue(any("gym-session-going").waitForExistence(timeout: 5))
+        XCTAssertTrue(any("gym-session-going").label.contains("0:0"), any("gym-session-going").label)
         app.buttons["machine-Leg press"].tap()
         app.buttons["gym-set-done"].tap()
         XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))

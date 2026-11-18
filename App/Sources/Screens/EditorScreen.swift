@@ -11,6 +11,9 @@ struct EditorScreen: View {
     let onDone: () -> Void
     @State private var askDelete = false
     @State private var needsName = false
+    @State private var mine = IntervalPreset.mine()
+    @State private var askPresetName = false
+    @State private var presetName = ""
 
     init(workout: Workout, isNew: Bool, onDone: @escaping () -> Void) {
         _draft = State(initialValue: workout)
@@ -62,6 +65,9 @@ struct EditorScreen: View {
                     NumberRow(title: "Rest between sets", value: $draft.restSeconds, range: 0...600, step: 15, isTime: true, id: "editor-rest")
                 }
             case .intervals:
+                Section {
+                    presetMenu
+                }
                 Section {
                     NumberRow(title: "Rounds", value: $draft.rounds, range: 1...99, step: 1, id: "editor-rounds")
                     NumberRow(title: "Work", value: $draft.workSeconds, range: 5...900, step: 5, isTime: true, id: "editor-work")
@@ -116,6 +122,68 @@ struct EditorScreen: View {
                 library.delete(draft)
                 onDone()
             }
+        }
+    }
+
+    private func slug(_ name: String) -> String {
+        name.lowercased().replacingOccurrences(of: " ", with: "-")
+    }
+
+    private func apply(_ p: IntervalPreset) {
+        draft.rounds = p.rounds
+        draft.workSeconds = p.workSeconds
+        draft.offSeconds = p.offSeconds
+        if draft.name.trimmingCharacters(in: .whitespaces).isEmpty { draft.name = p.name }
+    }
+
+    /// Ready-made interval patterns and his own (since 1.23).
+    @ViewBuilder private var presetMenu: some View {
+        Menu {
+            ForEach(IntervalPreset.builtIn) { p in
+                Button("\(p.name) · \(p.summary)") { apply(p) }
+                    .accessibilityIdentifier("preset-\(slug(p.name))")
+            }
+            if !mine.isEmpty {
+                Divider()
+                ForEach(mine) { p in
+                    Button("\(p.name) · \(p.summary)") { apply(p) }
+                        .accessibilityIdentifier("preset-\(slug(p.name))")
+                }
+                Menu("Remove my preset") {
+                    ForEach(mine) { p in
+                        Button(p.name, role: .destructive) {
+                            mine.removeAll { $0.id == p.id }
+                            IntervalPreset.saveMine(mine)
+                        }
+                        .accessibilityIdentifier("preset-remove-\(slug(p.name))")
+                    }
+                }
+            }
+        } label: {
+            HStack {
+                Text("Presets").foregroundStyle(Theme.ink)
+                Spacer()
+                Text("Choose").foregroundStyle(Theme.accent)
+            }
+        }
+        .accessibilityIdentifier("preset-menu")
+        Button("Save as preset") {
+            presetName = ""
+            askPresetName = true
+        }
+        .accessibilityIdentifier("preset-save")
+        .alert("Save as preset", isPresented: $askPresetName) {
+            TextField("Name", text: $presetName)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                let name = presetName.trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty else { return }
+                mine.append(IntervalPreset(name: name, rounds: draft.rounds,
+                                           workSeconds: draft.workSeconds, offSeconds: draft.offSeconds))
+                IntervalPreset.saveMine(mine)
+            }
+        } message: {
+            Text("\(draft.rounds) × \(draft.workSeconds) s / \(draft.offSeconds) s")
         }
     }
 

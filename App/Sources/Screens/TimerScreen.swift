@@ -264,13 +264,23 @@ struct TimerScreen: View {
         }
     }
 
-    /// A tick and a tap at 3, 2, 1.
+    /// A tick and a tap at 3, 2, 1. With the spoken countdown on, the voice says the numbers
+    /// (and Halfway / Ten seconds in long work rounds) and the tick sound stays quiet.
     private func beepIfDue() {
         guard !session.isPaused, let left = session.remaining(at: now) else { return }
         let s = Int(left.rounded(.up))
-        if (1...3).contains(s), s != lastBeep {
+        guard s != lastBeep else { return }
+        let word: String? = Cues.shared.sounds.spokenCountdown
+            ? session.current.flatMap { phase in
+                phase.seconds.flatMap { SpokenCue.word(secondsLeft: s, phaseLength: $0, isWork: !phase.isRest) }
+            }
+            : nil
+        if (1...3).contains(s) {
             lastBeep = s
-            Cues.shared.countdown()
+            Cues.shared.countdown(spoken: word)
+        } else if let word {
+            lastBeep = s
+            Cues.shared.speak(word)
         }
     }
 }

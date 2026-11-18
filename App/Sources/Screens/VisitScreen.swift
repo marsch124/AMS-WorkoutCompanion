@@ -44,13 +44,17 @@ struct VisitScreen: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("visit-bests")
                     }
-                    if visit.title != nil || visit.notes != nil {
+                    if visit.title != nil || visit.notes != nil || visit.feel != nil {
                         VStack(alignment: .leading, spacing: 4) {
                             if let t = visit.title {
                                 Text(t).font(.headline).foregroundStyle(Gym.tint).accessibilityIdentifier("visit-title")
                             }
                             if let n = visit.notes {
                                 Text(n).font(.subheadline).foregroundStyle(Theme.ink).accessibilityIdentifier("visit-notes")
+                            }
+                            if let f = visit.feel {
+                                Text("Felt: \(f.title)").font(.subheadline.weight(.semibold)).foregroundStyle(Gym.tint)
+                                    .accessibilityIdentifier("visit-feel")
                             }
                         }
                         .padding(12)

@@ -30,6 +30,9 @@ struct MachineScreen: View {
     @State private var newBest = false
     /// The next set is a warm-up (since 1.11); off again after that set.
     @State private var warmup = false
+    /// A hold against the clock — a plank (since 1.23): its seconds, and the countdown while it runs.
+    @State private var holdSeconds = 30
+    @State private var holdEnd: Date?
     @FocusState private var typing: Bool
 
     private let clock = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
@@ -40,6 +43,7 @@ struct MachineScreen: View {
     private var isTime: Bool { machine?.logs == .time }
     /// Push-ups, sit-ups: reps only, no weight (since 1.6).
     private var isReps: Bool { machine?.logs == .reps }
+    private var isHold: Bool { machine?.isHold == true }
     private func said(_ s: GymSet) -> String { library.gym.text(s, machine: machineID) }
     private var step: Double { machine?.weightStep ?? GymLog.step }
     private var upNext: Machine? {
@@ -114,7 +118,11 @@ struct MachineScreen: View {
 
                 if !today.isEmpty { setsDone }
 
-                if let restEnd {
+                if !today.isEmpty, !isTime { effortRow }
+
+                if let holdEnd {
+                    hold(until: holdEnd)
+                } else if let restEnd {
                     rest(until: restEnd)
                 } else if isTime {
                     timeEntry
@@ -124,6 +132,7 @@ struct MachineScreen: View {
 
                 if !today.isEmpty {
                     nextTimeRow
+                    painRow
                 }
 
                 history
@@ -187,6 +196,16 @@ struct MachineScreen: View {
         }
         .onReceive(clock) { t in
             now = t
+            if let end = holdEnd {
+                // The hold counts down, ticks at 3, 2, 1 and saves itself at zero (since 1.23).
+                let left = end.timeIntervalSince(t)
+                if left <= 0 {
+                    holdEnd = nil
+                    timeDone()
+                } else if left < 3.2, Int(left.rounded(.up)) != Int((left + 0.25).rounded(.up)) {
+                    Cues.shared.countdown()
+                }
+            }
             if let end = restEnd {
                 let left = end.timeIntervalSince(t)
                 if left <= 0 {
@@ -255,6 +274,13 @@ struct MachineScreen: View {
                         .foregroundStyle(Theme.ink)
                         .accessibilityIdentifier("gym-last-note")
                 }
+                if last.entry.pain == true {
+                    // Pain was flagged here last time (since 1.23).
+                    Text("Pain flagged last time — go easy.")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.problem)
+                        .accessibilityIdentifier("gym-last-pain")
+                }
             }
         } else {
             Text("First time on this machine.")
@@ -280,6 +306,9 @@ struct MachineScreen: View {
                             // More than the same set last time (since 1.16).
                             AppMarkView(.up, size: 16, colour: Gym.better)
                         }
+                        if let effort = s.effort {
+                            Text(effort.title).font(.caption.weight(.semibold)).foregroundStyle(Gym.tint)
+                        }
                         Text(said(s)).fontWeight(s.isWarmup ? .regular : .semibold).foregroundStyle(s.isWarmup ? Theme.muted : Theme.ink)
                         // A tick in a filled circle (since 1.16; before, a bare tick).
                         ControlMarkView(.check, size: 11, colour: s.isWarmup ? Warmup.swatch.inkColor : Gym.ink)
@@ -292,7 +321,7 @@ struct MachineScreen: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(s.isWarmup ? "Warm-up" : "Set \(i + 1)"), \(said(s))\(beats(s, i) ? ", more than last time" : "")")
+                .accessibilityLabel("\(s.isWarmup ? "Warm-up" : "Set \(i + 1)"), \(said(s))\(s.effort.map { ", \($0.title.lowercased())" } ?? "")\(beats(s, i) ? ", more than last time" : "")")
                 .accessibilityIdentifier("gym-set-\(i + 1)")
                 if i < today.count - 1 { Divider().padding(.leading, 12) }
             }
@@ -340,6 +369,14 @@ struct MachineScreen: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("gym-new-best")
                 }
+            }
+            // The same set last time, faintly (since 1.23): "Last time: 40 kg × 10 · hard".
+            if !warmup, let line = library.gym.lastSetLine(machineID, place: today.filter { !$0.isWarmup }.count, excluding: visit.id) {
+                Text(line)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.muted.opacity(0.85))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("gym-last-set")
             }
             if !isReps {
                 Stepper2(title: "kg", id: "gym-weight",
@@ -452,11 +489,33 @@ struct MachineScreen: View {
                 .foregroundStyle(Gym.tint)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("gym-next-set")
-            Stepper2(title: "min", id: "gym-minutes",
-                     minus: { minutes = max(1, minutes - 1) }, plus: { minutes += 1 }) {
-                TextField("0", value: $minutes, format: .number.precision(.fractionLength(0...1)))
-                    .keyboardType(.decimalPad)
-                    .focused($typing)
+            if isHold {
+                // A hold is entered in seconds and can count down by itself (since 1.23).
+                Stepper2(title: "sec", id: "gym-seconds",
+                         minus: { holdSeconds = max(5, holdSeconds - 5) }, plus: { holdSeconds += 5 }) {
+                    TextField("0", value: $holdSeconds, format: .number)
+                        .keyboardType(.numberPad)
+                        .focused($typing)
+                }
+                Button {
+                    typing = false
+                    holdSeconds = max(5, holdSeconds)
+                    restEnd = nil
+                    holdEnd = Date().addingTimeInterval(Double(holdSeconds))
+                    now = Date()
+                    Cues.shared.go("Go")
+                } label: {
+                    MarkLabel(title: "Start countdown", mark: .play, size: 22, colour: Gym.ink)
+                }
+                .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
+                .accessibilityIdentifier("gym-hold-start")
+            } else {
+                Stepper2(title: "min", id: "gym-minutes",
+                         minus: { minutes = max(1, minutes - 1) }, plus: { minutes += 1 }) {
+                    TextField("0", value: $minutes, format: .number.precision(.fractionLength(0...1)))
+                        .keyboardType(.decimalPad)
+                        .focused($typing)
+                }
             }
             if machine?.hasLevel != false {
                 Stepper2(title: "level", id: "gym-level",
@@ -475,14 +534,23 @@ struct MachineScreen: View {
                 }
             }
             HStack(spacing: 8) {
-                Button(action: timeDone) {
-                    MarkLabel(title: "Done", mark: .check, size: 24, colour: Gym.ink)
+                if isHold {
+                    Button(action: timeDone) {
+                        MarkLabel(title: "Done without countdown", mark: .check, size: 18, colour: Gym.tint)
+                    }
+                    .buttonStyle(SoftButtonStyle(height: 48))
+                    .accessibilityIdentifier("gym-set-done")
+                } else {
+                    Button(action: timeDone) {
+                        MarkLabel(title: "Done", mark: .check, size: 24, colour: Gym.ink)
+                    }
+                    .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
+                    .accessibilityIdentifier("gym-set-done")
                 }
-                .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
-                .accessibilityIdentifier("gym-set-done")
             }
             if today.isEmpty {
-                Text("Level and incline can be switched off for this machine with the pencil.")
+                Text(isHold ? "A hold, like a plank: the countdown saves it by itself when the time is up."
+                     : "Level and incline can be switched off for this machine with the pencil. With both off it becomes a hold in seconds, with a countdown.")
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
             }
@@ -490,6 +558,78 @@ struct MachineScreen: View {
         .padding(12)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Gym.fill.opacity(0.5), lineWidth: 1))
+    }
+
+    /// The hold counting down (since 1.23): a ring, the seconds, and Stop, which saves nothing.
+    private func hold(until end: Date) -> some View {
+        let left = max(0, end.timeIntervalSince(now))
+        return VStack(spacing: 10) {
+            ZStack {
+                Ring(fractionLeft: left / Double(max(1, holdSeconds)), colour: Gym.fill, width: 14)
+                VStack(spacing: 0) {
+                    Text("HOLD").font(.caption.weight(.bold)).foregroundStyle(Theme.muted)
+                    Text(Clock.text(Int(left.rounded(.up))))
+                        .font(.system(size: 52, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.ink)
+                        .accessibilityIdentifier("gym-hold")
+                }
+            }
+            .frame(width: 180, height: 180)
+            Button("Stop") { holdEnd = nil }
+                .buttonStyle(SoftButtonStyle(height: 48))
+                .accessibilityIdentifier("gym-hold-stop")
+            Text("Stop saves nothing. At zero the hold is saved and the rest begins.")
+                .font(.caption)
+                .foregroundStyle(Theme.muted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(12)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// How the last set felt (since 1.23): Easy, OK or Hard — the same again takes it away.
+    private var effortRow: some View {
+        HStack(spacing: 8) {
+            Text("Last set felt")
+                .font(.subheadline)
+                .foregroundStyle(Theme.muted)
+                .fixedSize()
+            ChoicePills(options: Effort.allCases.map { ($0, $0.title, $0.rawValue) }, chosen: today.last?.effort,
+                        id: "gym-effort", fill: Gym.fill, ink: Gym.ink, tint: Gym.tint) { e in
+                library.changeGym { $0.effort(visit: visit.id, machine: machineID, set: today.count - 1, e) }
+            }
+        }
+    }
+
+    /// Pain on this machine today (since 1.23): shown next time, and no more weight is suggested then.
+    private var painRow: some View {
+        let on = entryToday?.pain == true
+        return HStack(spacing: 10) {
+            Button {
+                library.changeGym { $0.pain(visit: visit.id, machine: machineID, !on) }
+            } label: {
+                Text("Pain here")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(on ? Color.white : Theme.problem)
+                    .padding(.horizontal, 14)
+                    .frame(height: 32)
+                    .background(on ? Theme.problem : Color.clear, in: Capsule())
+                    .overlay(Capsule().stroke(Theme.problem, lineWidth: 1))
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(on ? "Pain flagged" : "Pain here")
+            .accessibilityAddTraits(on ? .isSelected : [])
+            .accessibilityIdentifier("gym-pain")
+            if on {
+                Text("Flagged — shown next time, and no more weight is suggested.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+            }
+            Spacer(minLength: 0)
+        }
+        .animation(nil, value: on)
     }
 
     /// How it felt, and what to do next time — shown here the next time as "Last time".
@@ -575,6 +715,8 @@ struct MachineScreen: View {
     private func prefill() {
         let n = next.set
         if let seconds = n.seconds {
+            // A hold's first time: 30 seconds, not a treadmill's 20 minutes.
+            holdSeconds = isHold && today.isEmpty && library.gym.last(machineID, excluding: visit.id) == nil ? 30 : seconds
             minutes = Double(seconds) / 60
             level = n.level ?? 0
             incline = n.incline ?? 0
@@ -586,12 +728,18 @@ struct MachineScreen: View {
 
     private func timeDone() {
         typing = false
-        let set = GymSet(seconds: max(1, Int((minutes * 60).rounded())),
+        let set = GymSet(seconds: isHold ? max(1, holdSeconds) : max(1, Int((minutes * 60).rounded())),
                          level: machine?.hasLevel == false ? nil : level,
                          incline: machine?.hasIncline == false ? nil : incline)
         library.changeGym { $0.add(set, machine: machineID, on: day) }
         Cues.shared.tap()
         Cues.shared.finished("Done")
+        if isHold {
+            // A hold rests like a set (since 1.23).
+            restLength = Double(library.gym.rest(for: machine))
+            restEnd = restLength > 0 ? Date().addingTimeInterval(restLength) : nil
+            now = Date()
+        }
     }
 
     private func setDone() {

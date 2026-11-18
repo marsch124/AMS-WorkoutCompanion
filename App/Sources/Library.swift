@@ -227,6 +227,8 @@ final class Library {
         change(&log)
         gym = log
         persistGym()
+        // The session on the lock screen follows every change (since 1.23).
+        SessionLive.sync(gym)
     }
 
     // MARK: History

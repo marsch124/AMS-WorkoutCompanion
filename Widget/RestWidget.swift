@@ -9,7 +9,10 @@ import WorkoutCore
 /// the countdown, a bar filling up, and the next set. When the time is up it says "Go".
 @main
 struct RestWidgetBundle: WidgetBundle {
-    var body: some Widget { RestLiveActivity() }
+    var body: some Widget {
+        RestLiveActivity()
+        SessionLiveActivity()
+    }
 }
 
 private extension Color {
@@ -137,5 +140,90 @@ private struct LockScreenRest: View {
             RestBar(card: card, over: over, tint: card.tint)
         }
         .padding(14)
+    }
+}
+
+// MARK: The gym session (since 1.23)
+
+/// The gym session on the lock screen and in the Dynamic Island: the clock counting up, the gym,
+/// machines and sets so far. After 20 minutes without a set it stands still and says "Paused".
+struct SessionLiveActivity: Widget {
+    static let green = Color.pair(0x15803d, 0x86efac)
+    static let islandGreen = Color(red: 0.53, green: 0.94, blue: 0.67)
+
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: SessionActivityAttributes.self) { context in
+            let card = context.state.card
+            let paused = card.paused || context.isStale
+            HStack(alignment: .center, spacing: 10) {
+                IconMark(.hand("gym"), size: 26, colour: Self.green)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(paused ? "Gym session · paused" : "Gym session · \(card.gym)")
+                        .font(.headline)
+                        .lineLimit(1)
+                    Text(card.machine.map { "\(card.line) · \($0)" } ?? card.line)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 6)
+                SessionClock(card: card, paused: paused, font: .title)
+                    .foregroundStyle(Self.green)
+                    .frame(maxWidth: 120, alignment: .trailing)
+            }
+            .padding(14)
+            .activityBackgroundTint(nil)
+        } dynamicIsland: { context in
+            let card = context.state.card
+            let paused = card.paused || context.isStale
+            return DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) {
+                    HStack(spacing: 6) {
+                        IconMark(.hand("gym"), size: 20, colour: Self.islandGreen)
+                        Text(paused ? "Paused" : "Gym session").font(.headline).lineLimit(1)
+                    }
+                    .padding(.leading, 4)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    SessionClock(card: card, paused: paused, font: .title2)
+                        .foregroundStyle(Self.islandGreen)
+                        .padding(.trailing, 4)
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    Text(card.machine.map { "\(card.line) · \($0)" } ?? card.line)
+                        .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 4)
+                }
+            } compactLeading: {
+                IconMark(.hand("gym"), size: 16, colour: Self.islandGreen)
+            } compactTrailing: {
+                SessionClock(card: card, paused: paused, font: .subheadline)
+                    .foregroundStyle(Self.islandGreen)
+                    .frame(maxWidth: 56)
+            } minimal: {
+                IconMark(.hand("gym"), size: 16, colour: Self.islandGreen)
+            }
+            .keylineTint(Self.islandGreen)
+        }
+    }
+}
+
+/// "0:42:15" counting up, or standing still while paused.
+private struct SessionClock: View {
+    let card: SessionCard
+    let paused: Bool
+    let font: Font
+
+    var body: some View {
+        Group {
+            if paused {
+                Text(GymVisit.clock(card.paused ? card.seconds : Int((card.pauseAt ?? card.start).timeIntervalSince(card.start))))
+            } else {
+                Text(card.start, style: .timer)
+                    .multilineTextAlignment(.trailing)
+            }
+        }
+        .font(font.weight(.semibold).monospacedDigit())
     }
 }

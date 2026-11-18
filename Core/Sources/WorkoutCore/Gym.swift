@@ -4,6 +4,8 @@ import Foundation
 public struct GymPlace: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
     public var name: String
+    /// Opening hours, Monday first, seven days (since 1.23); nil = not given, a nil day = closed.
+    public var hours: [DayHours?]?
 
     public init(id: UUID = UUID(), name: String) {
         self.id = id
@@ -148,6 +150,8 @@ public struct GymSet: Codable, Hashable, Sendable {
     public var warmup: Bool?
     /// When Set done was tapped (since 1.11.2); older sets have none.
     public var at: Date?
+    /// How the set felt: easy, OK or hard (since 1.23).
+    public var effort: Effort?
 
     public init(kg: Double, reps: Int, warmup: Bool = false) {
         self.kg = kg
@@ -171,11 +175,11 @@ public struct GymSet: Codable, Hashable, Sendable {
     /// The same set whenever weight, reps, time, level, incline and warm-up match; when it was done does not count.
     public static func == (a: GymSet, b: GymSet) -> Bool {
         a.kg == b.kg && a.reps == b.reps && a.seconds == b.seconds && a.level == b.level
-            && a.incline == b.incline && a.warmup == b.warmup
+            && a.incline == b.incline && a.warmup == b.warmup && a.effort == b.effort
     }
 
     public func hash(into h: inout Hasher) {
-        h.combine(kg); h.combine(reps); h.combine(seconds); h.combine(level); h.combine(incline); h.combine(warmup)
+        h.combine(kg); h.combine(reps); h.combine(seconds); h.combine(level); h.combine(incline); h.combine(warmup); h.combine(effort)
     }
 
     /// A new time machine's first go: 20 minutes, level 5, no incline.
@@ -184,7 +188,8 @@ public struct GymSet: Codable, Hashable, Sendable {
     /// "30 kg × 12", "Body weight × 12", "25 min · level 8 · incline 2.5 %".
     public var text: String {
         guard let seconds else { return "\(GymSet.weight(kg)) × \(reps)" }
-        var parts = [GymSet.duration(seconds) + " min"]
+        // A short hold (a plank) reads in seconds (since 1.23).
+        var parts = [seconds < 60 ? "\(seconds) s" : GymSet.duration(seconds) + " min"]
         if let level { parts.append("level \(GymSet.number(level))") }
         if let incline, incline != 0 { parts.append("incline \(GymSet.number(incline)) %") }
         return parts.joined(separator: " · ")
@@ -219,6 +224,8 @@ public struct MachineEntry: Codable, Identifiable, Hashable, Sendable {
     public var nextTime: GymSet?
     /// How it felt.
     public var note: String?
+    /// Pain on this machine that day (since 1.23): shown next time, and no more weight is suggested.
+    public var pain: Bool?
 
     public init(id: UUID = UUID(), machineID: UUID, sets: [GymSet] = []) {
         self.id = id
@@ -267,6 +274,8 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
     public var minutesByHand: Int?
     /// Photos of the session itself (since 1.13): file names in the Photos folder, in the order added.
     public var photos: [String]?
+    /// How the whole session felt, chosen after Finish (since 1.23).
+    public var feel: Feel?
 
     public init(id: UUID = UUID(), gymID: UUID? = nil, date: Date, entries: [MachineEntry] = [],
                 started: Date? = nil, finished: Date? = nil) {
@@ -459,6 +468,12 @@ public struct GymLog: Codable, Equatable, Sendable {
     public var rests: RestDefaults
     /// The gym screen opened today with no set yet (since 1.20); moves into the visit at its first set.
     public var arrived: Arrival?
+    /// Machines moved to the next visit (since 1.23): first in line the next time at their gym.
+    public var carried: [Carry] = []
+    /// Days without a gym visit before the phone reminds you (since 1.23); nil = 4, 0 = never.
+    public var nudgeDays: Int?
+    /// The exercise list offered as the stretch after a session (since 1.23).
+    public var stretchID: UUID?
 
     public init(machines: [Machine] = [], visits: [GymVisit] = [], busyMarks: [BusyMark] = [],
                 gyms: [GymPlace] = [], currentGymID: UUID? = nil, plans: [DayPlan] = [], homeIcon: String? = nil,
@@ -579,7 +594,10 @@ public struct GymLog: Codable, Equatable, Sendable {
     /// Sets this gym's plan; the other gyms keep theirs.
     public mutating func setPlan(_ order: [UUID], on day: Date, gym: UUID?) {
         plans.removeAll { $0.gymID == gym }
-        if !order.isEmpty { plans.append(DayPlan(day: day, gymID: gym, order: order)) }
+        guard !order.isEmpty else { return }
+        // Machines moved here from the last visit go first (since 1.23).
+        let first = carriedOver(gym: gym, on: day).map(\.id).filter { !order.contains($0) }
+        plans.append(DayPlan(day: day, gymID: gym, order: first + order))
     }
 
     /// A planned machine counts as done once it has a set in today's visit.
@@ -691,20 +709,28 @@ public struct GymLog: Codable, Equatable, Sendable {
     public func next(_ machineID: UUID, in visit: GymVisit) -> NextSet {
         if var done = visit.entries.last(where: { $0.machineID == machineID })?.sets.last {
             done.warmup = nil
+            done.effort = nil
             return NextSet(set: done, reason: nil)
         }
         let isTime = machine(machineID)?.logs == .time
         let isReps = machine(machineID)?.logs == .reps
-        guard let lastEntry = last(machineID, excluding: visit.id)?.entry, let first = lastEntry.working.first else {
+        guard let lastEntry = last(machineID, excluding: visit.id)?.entry, let found = lastEntry.working.first else {
             if isReps { return NextSet(set: GymLog.starterReps, reason: nil) }
             guard isTime, let m = machine(machineID) else { return NextSet(set: GymLog.starter, reason: nil) }
             return NextSet(set: GymSet(seconds: 20 * 60, level: m.hasLevel ? 5 : nil, incline: m.hasIncline ? 0 : nil), reason: nil)
         }
-        if let planned = lastEntry.nextTime {
+        var first = found
+        first.effort = nil
+        if var planned = lastEntry.nextTime {
+            planned.effort = nil
             return NextSet(set: planned, reason: "Your plan from last time: \(text(planned, machine: machineID))")
         }
         // Warm-ups never earn more weight: only the working sets count.
         let previous = lastEntry.working
+        // Pain last time (since 1.23): the same again, never more.
+        if lastEntry.pain == true {
+            return NextSet(set: first, reason: "Pain last time — the same again, go easy")
+        }
         if isTime || first.isTime { return NextSet(set: first, reason: nil) }
         if isReps {
             // Every set reached the first set's reps: one more rep next time.
@@ -842,6 +868,7 @@ public struct GymLog: Codable, Equatable, Sendable {
             v.entries.append(MachineEntry(machineID: machineID, sets: [set]))
         }
         put(v)
+        carried.removeAll { $0.machineID == machineID }
         setBusy(machineID, false, on: day, calendar: calendar)
     }
 
@@ -1069,6 +1096,9 @@ public enum GymFile {
         var templates: [PlanTemplate]?
         var rests: RestDefaults?
         var arrived: Arrival?
+        var carried: [Carry]?
+        var nudgeDays: Int?
+        var stretch: UUID?
     }
 
     public static func encode(_ log: GymLog) throws -> Data {
@@ -1079,7 +1109,9 @@ public enum GymFile {
                                         gyms: log.gyms, currentGym: log.currentGymID, plan: nil,
                                         plans: log.plans, homeIcon: log.homeIcon,
                                         muscles: log.muscles, templates: log.templates, rests: log.rests,
-                                        arrived: log.arrived))
+                                        arrived: log.arrived,
+                                        carried: log.carried.isEmpty ? nil : log.carried,
+                                        nudgeDays: log.nudgeDays, stretch: log.stretchID))
     }
 
     public static func decode(_ data: Data) throws -> GymLog {
@@ -1091,6 +1123,9 @@ public enum GymFile {
                          plans: e.plans ?? (e.plan.map { [$0] } ?? []), homeIcon: e.homeIcon,
                          muscles: e.muscles ?? MuscleGroup.defaults, templates: e.templates ?? [],
                          rests: e.rests ?? RestDefaults(), arrived: e.arrived)
+        log.carried = e.carried ?? []
+        log.nudgeDays = e.nudgeDays
+        log.stretchID = e.stretch
         log.ensureGym()
         return log
     }

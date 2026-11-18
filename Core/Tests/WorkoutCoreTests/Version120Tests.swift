@@ -1,7 +1,7 @@
 import XCTest
 @testable import WorkoutCore
 
-/// Version 1.20: a session starts when the gym screen opens (his ask), not at the first set.
+/// Version 1.20: a session starts at `arrive` (his ask), not at the first set. Since 1.23 the app calls it when the first machine is opened, not when the gym screen opens.
 final class Version120Tests: XCTestCase {
     let gym = UUID()
     let nine = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date())!

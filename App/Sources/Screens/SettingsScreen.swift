@@ -30,6 +30,10 @@ struct SettingsScreen: View {
                     .accessibilityIdentifier("open-templates")
                 NavigationLink("Rest times") { RestTimesScreen() }
                     .accessibilityIdentifier("open-rest-times")
+                NavigationLink("Sounds") { SoundsScreen() }
+                    .accessibilityIdentifier("settings-sounds")
+                NavigationLink("Reminder and stretch") { GymExtrasScreen() }
+                    .accessibilityIdentifier("settings-gym-extras")
                 NavigationLink("Check my data") { HealthCheckScreen() }
                     .accessibilityIdentifier("settings-health")
             }

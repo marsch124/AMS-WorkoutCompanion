@@ -37,6 +37,8 @@ struct GymCard: View {
             return "Today: \(lead) · \(sets) set\(sets == 1 ? "" : "s")"
         }
         let n = library.gym.machines.count
+        // Open now, or when it opens (since 1.23) — once hours are given for the gym.
+        if n > 0, let line = library.gym.currentGym?.openLine(at: Date()) { return line.text }
         return n == 0 ? "Photo, weight and reps per machine" : "\(n) machine\(n == 1 ? "" : "s")"
     }
 
@@ -101,6 +103,7 @@ struct GymScreen: View {
     @State private var search = ""
     @State private var namingRepeat = false
     @State private var repeatName = ""
+    @State private var editingHours = false
 
     private var gymID: UUID? { library.gym.currentGym?.id }
     private var visit: GymVisit? { library.gym.openVisit(on: day, gym: gymID) }
@@ -116,6 +119,15 @@ struct GymScreen: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     gymMenu
+                    // Open now, or when it opens (since 1.23) — only once hours are given.
+                    if let line = library.gym.currentGym?.openLine(at: Date()) {
+                        Text(line.text)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(line.open ? SessionGoingLine.green : Gym.busyTint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .accessibilityIdentifier("gym-hours-line")
+                    }
                     Spacer()
                 }
                 if !isToday {
@@ -166,6 +178,10 @@ struct GymScreen: View {
                 if let visit, !visit.performed.isEmpty {
                     doneList(visit)
                 }
+
+                // Moved here from the last visit (since 1.23); a plan made today takes them first.
+                let carried = library.gym.carriedOver(gym: gymID, on: day).filter { m in !(plan?.order.contains(m.id) ?? false) }
+                if !carried.isEmpty { carriedList(carried) }
 
                 planSection
 
@@ -218,7 +234,8 @@ struct GymScreen: View {
                     // Since 1.18 (his ask) the button carries the session's minutes, seen when scrolled down.
                     // Since 1.20 it is there from opening; with no set yet it ends the session and saves nothing.
                     TimelineView(.periodic(from: .now, by: 30)) { context in
-                        let minutes = SessionGoingLine.minutes(from: sessionStart ?? visit.flatMap(SessionGoingLine.start(of:)), now: context.date)
+                        // The same clock as the green line: it stands still after 20 minutes without a set (since 1.23).
+                        let minutes = library.gym.sessionClock(on: day, gym: gymID, now: context.date).map { $0.seconds / 60 }
                         Button {
                             if let visit, visit.setCount > 0 { finish(visit) } else { library.changeGym { $0.leave() } }
                         } label: {
@@ -263,7 +280,6 @@ struct GymScreen: View {
         .navigationBarTitleDisplayMode(.large)
         .onAppear {
             if library.gym.gyms.isEmpty { library.changeGym { $0.ensureGym() } }
-            arrive()
         }
         .navigationDestination(item: $opened) { ref in
             MachineScreen(machineID: ref.id, day: day, gymID: gymID) { next in
@@ -337,6 +353,16 @@ struct GymScreen: View {
                 }
             }
         }
+        .sheet(isPresented: $editingHours) {
+            if let gym = library.gym.currentGym {
+                NavigationStack {
+                    HoursForm(gym: gym) { hours in
+                        editingHours = false
+                        if let hours { library.changeGym { $0.setHours(gym.id, hours.value) } }
+                    }
+                }
+            }
+        }
         .alert(naming == .new ? "New gym" : "Rename gym", isPresented: Binding(
             get: { naming != nil }, set: { if !$0 { naming = nil } }
         )) {
@@ -376,6 +402,8 @@ struct GymScreen: View {
                 naming = .rename
             }
             .accessibilityIdentifier("gym-place-rename")
+            Button("Opening hours…") { editingHours = true }
+                .accessibilityIdentifier("gym-place-hours")
         } label: {
             HStack(spacing: 6) {
                 Text(library.gym.currentGym?.name ?? GymLog.firstGymName)
@@ -429,7 +457,7 @@ struct GymScreen: View {
             }
             .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Gym.fill.opacity(0.5), lineWidth: 1))
-            Text("Touch and hold a machine: later, skip today or swap.")
+            Text("Touch and hold a machine: later, skip today, move to next visit or swap.")
                 .font(.caption)
                 .foregroundStyle(Theme.muted)
         } else if !machines.isEmpty {
@@ -488,7 +516,8 @@ struct GymScreen: View {
         let done = library.gym.isDone(m.id, on: day, gym: gymID)
         let skipped = plan.skipped.contains(m.id)
         let busy = library.gym.isBusy(m.id, on: day)
-        let status = done ? "done" : skipped ? "skipped today" : busy ? "busy" : isNext ? "up next" : nil
+        let moved = skipped && library.gym.isCarried(m.id)
+        let status = done ? "done" : moved ? "moved to next visit" : skipped ? "skipped today" : busy ? "busy" : isNext ? "up next" : nil
         return Button { open(m.id) } label: {
             HStack(spacing: 10) {
                 Text("\(i + 1)")
@@ -522,7 +551,16 @@ struct GymScreen: View {
         .buttonStyle(.plain)
         .contextMenu {
             Button("Later") { library.changeGym { $0.later(m.id) } }
-            Button(skipped ? "Back in today's plan" : "Skip today") { library.changeGym { $0.skip(m.id, !skipped) } }
+            Button(skipped ? "Back in today's plan" : "Skip today") {
+                library.changeGym {
+                    $0.skip(m.id, !skipped)
+                    if skipped { $0.dropCarry(m.id) }
+                }
+            }
+            if !done, !moved {
+                // Not today, but first in line next time (since 1.23).
+                Button("Move to next visit") { library.changeGym { $0.moveToNextVisit(m.id, on: day) } }
+            }
             let others = machines.filter { !plan.order.contains($0.id) }
             if !others.isEmpty {
                 Menu("Swap for") {
@@ -537,6 +575,47 @@ struct GymScreen: View {
         .accessibilityLabel("\(i + 1), \(m.name)\(status.map { ", \($0)" } ?? "")")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("plan-row-\(i + 1)")
+    }
+
+    /// "From last visit": the machines moved to this visit (since 1.23). Tap opens one; hold: not this time.
+    private func carriedList(_ machines: [Machine]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("From last visit")
+                .font(.headline)
+                .foregroundStyle(Gym.busyTint)
+                .padding(.bottom, 4)
+            ForEach(Array(machines.enumerated()), id: \.element.id) { i, m in
+                Button { open(m.id) } label: {
+                    HStack(spacing: 8) {
+                        Text(m.name)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                        Spacer(minLength: 6)
+                        Text(library.gym.lastText(m, excluding: visit?.id))
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.muted)
+                            .lineLimit(1)
+                        ControlMarkView(.chevron, size: 11, colour: Theme.muted)
+                    }
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    Button("Not this time") { library.changeGym { $0.dropCarry(m.id) } }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("gym-carried-\(m.name)")
+                if i < machines.count - 1 { Divider() }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Gym.busy.fillColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Gym.busy.fillColor.opacity(0.5), lineWidth: 1))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("gym-carried")
     }
 
     /// "Done this session": one row per machine with sets, in the order done (since 1.22).
@@ -584,6 +663,9 @@ struct GymScreen: View {
     }
 
     private func open(_ id: UUID) {
+        // The session's clock starts with the first machine opened (since 1.23, his ask) — choosing
+        // the gym and planning the day are not training time. From 1.20 to 1.22: when this screen opened.
+        arrive()
         if library.gym.isBusy(id, on: day) { library.changeGym { $0.setBusy(id, false, on: day) } }
         opened = MachineRef(id: id)
     }
@@ -636,7 +718,7 @@ struct GymScreen: View {
         return library.gym.lastText(m, excluding: visit?.id)
     }
 
-    /// Opening the gym today starts the session's clock (since 1.20); nothing is saved as a visit.
+    /// Opening the first machine today starts the session's clock (since 1.23; 1.20–1.22: opening the gym screen); nothing is saved as a visit.
     private func arrive() {
         guard isToday else { return }
         library.changeGym { $0.arrive(gym: gymID) }
@@ -647,6 +729,7 @@ struct GymScreen: View {
         beforeFinish = library.gym
         library.changeGym { $0.finish(visit: visit.id, at: now) }
         Cues.shared.finished("Well done")
+        GymNudge.sync(library.gym)
         summary = library.gym.visits.first { $0.id == visit.id }
     }
 }
@@ -669,6 +752,8 @@ struct SessionGoingLine: View {
     var identifier = "gym-session-going"
     /// The running clock at the right, ticking each second (since 1.22, gym screen only).
     var clock = false
+    /// The session's sets: the clock stands still after 20 minutes without one (since 1.23).
+    var allSets: [GymSet] = []
     static let green = Color.pair("#15803d", "#86efac")
 
     init(start: Date?, visit: GymVisit?, identifier: String = "gym-session-going", clock: Bool = false) {
@@ -676,6 +761,7 @@ struct SessionGoingLine: View {
         self.start = start ?? visit.flatMap(Self.start(of:))
         self.machines = visit?.entries.filter { !$0.sets.isEmpty }.count ?? 0
         self.sets = visit?.setCount ?? 0
+        self.allSets = visit?.entries.flatMap(\.sets) ?? []
         self.identifier = identifier
     }
 
@@ -690,16 +776,18 @@ struct SessionGoingLine: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: clock ? 1 : 30)) { context in
+            let active = start.map { GymVisit.active(start: $0, sets: allSets, now: context.date) }
+            let paused = active?.paused == true
             HStack(spacing: 8) {
-                Circle().fill(Self.green).frame(width: 9, height: 9)
-                Text(words(now: context.date))
+                Circle().fill(paused ? Theme.muted : Self.green).frame(width: 9, height: 9)
+                Text(words(minutes: active.map { $0.seconds / 60 }, paused: paused))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Self.green)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 Spacer(minLength: 0)
-                if clock, let start {
-                    Text(GymVisit.clock(Int(context.date.timeIntervalSince(start))))
+                if clock, let active {
+                    Text(GymVisit.clock(active.seconds))
                         .font(.system(.title3, design: .rounded).weight(.bold).monospacedDigit())
                         .foregroundStyle(Self.green)
                         .accessibilityIdentifier("gym-session-clock")
@@ -713,9 +801,9 @@ struct SessionGoingLine: View {
         }
     }
 
-    private func words(now: Date) -> String {
-        var parts = ["Session going"]
-        if !clock, let m = Self.minutes(from: start, now: now) { parts.append("\(m) min") }
+    private func words(minutes: Int?, paused: Bool) -> String {
+        var parts = [paused ? "Paused" : "Session going"]
+        if !clock, let m = minutes { parts.append("\(m) min") }
         if sets == 0 {
             parts.append("no sets yet")
         } else {
@@ -1063,6 +1151,7 @@ private struct VisitRow: View {
         let machines = visit.entries.count, sets = visit.setCount
         parts.append("\(machines) machine" + (machines == 1 ? "" : "s"))
         parts.append("\(sets) set" + (sets == 1 ? "" : "s"))
+        if let feel = visit.feel { parts.append("felt " + feel.title.lowercased()) }
         return parts.joined(separator: " · ")
     }
 
@@ -1103,6 +1192,19 @@ struct SummaryScreen: View {
     let done: () -> Void
     @State private var title = ""
     @State private var notes = ""
+    @State private var stretching: Workout?
+
+    /// The stretch list for after a session: the one chosen in Settings, else the app's own, made on first use.
+    private func stretch() {
+        if let w = library.workouts.first(where: { $0.id == library.gym.stretchID }) {
+            stretching = w
+            return
+        }
+        let w = Workout.afterGymStretch()
+        library.save(w)
+        library.changeGym { $0.stretchID = w.id }
+        stretching = w
+    }
 
     var body: some View {
         let visit = library.gym.visits.first { $0.id == visitID }
@@ -1119,6 +1221,16 @@ struct SummaryScreen: View {
                 .padding(.vertical, 6)
             }
             if let visit {
+                // How the whole session felt (since 1.23): one tap, the same again takes it away.
+                Section {
+                    ChoicePills(options: Feel.allCases.map { ($0, $0.title, $0.rawValue) }, chosen: visit.feel,
+                                id: "gym-feel", fill: Gym.fill, ink: Gym.ink, tint: Gym.tint) { f in
+                        library.changeGym { $0.feel(visit: visitID, visit.feel == f ? nil : f) }
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                } header: {
+                    Text("How did it feel?")
+                }
                 Section {
                     TextField(visit.suggestedTitle(in: library.gym), text: $title)
                         .font(.headline)
@@ -1147,6 +1259,37 @@ struct SummaryScreen: View {
                         row("Lifted in all", "\(GymSet.number(visit.totalKg)) kg", id: "gym-summary-total")
                     }
                 }
+                // Today against the visit before, at this gym (since 1.23).
+                let lines = library.gym.compare(visit)
+                if !lines.isEmpty, let before = library.gym.previous(of: visit) {
+                    Section("Against last visit · \(before.date.formatted(.dateTime.day().month(.abbreviated)))") {
+                        ForEach(lines) { line in
+                            HStack {
+                                Text(line.title)
+                                Spacer()
+                                Text(line.now).foregroundStyle(Theme.muted)
+                                Text(line.change)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(line.better == true ? SessionGoingLine.green : line.better == false ? Gym.busyTint : Theme.muted)
+                                    .frame(minWidth: 64, alignment: .trailing)
+                                    .accessibilityIdentifier("gym-compare-\(line.id)")
+                            }
+                        }
+                    }
+                }
+                if library.gym.stretchID != GymLog.noStretch {
+                    Section {
+                        Button(action: stretch) {
+                            HStack(spacing: 8) {
+                                IconMark(.hand("yoga"), size: 22, colour: Gym.tint)
+                                Text("Stretch now").fontWeight(.semibold).foregroundStyle(Gym.tint)
+                                Spacer()
+                                ControlMarkView(.chevron, size: 14, colour: Gym.tint)
+                            }
+                        }
+                        .accessibilityIdentifier("gym-stretch")
+                    }
+                }
                 if !bests.isEmpty {
                     Section("New bests") {
                         ForEach(bests, id: \.self) { id in
@@ -1165,6 +1308,10 @@ struct SummaryScreen: View {
         }
         .navigationTitle("Session done")
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(item: $stretching) { w in
+            ChecklistScreen(workout: w) { stretching = nil }
+                .environment(library)
+        }
         .onAppear {
             title = visit?.title ?? ""
             notes = visit?.notes ?? ""
