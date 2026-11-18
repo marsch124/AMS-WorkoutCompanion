@@ -122,6 +122,7 @@ final class Library {
                     if let jpeg = tall.jpegData(compressionQuality: 0.6) {
                         try? jpeg.write(to: photos.appendingPathComponent("tall.jpg"))
                         for i in demo.machines.indices { demo.machines[i].photo = "tall.jpg" }
+                        if let first = demo.gyms.first { demo.setPhoto(gym: first.id, "tall.jpg") }
                     }
                 }
                 if let data = try? GymFile.encode(demo) { try? data.write(to: dir.appendingPathComponent("gym.json")) }

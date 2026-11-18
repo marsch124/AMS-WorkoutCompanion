@@ -112,6 +112,8 @@ struct GymScreen: View {
     @State private var repeatName = ""
     @State private var editingHours = false
     @State private var askingEnd = false
+    @State private var choosingGym = false
+    @State private var afterChooser: GymChooserAction?
 
     private var gymID: UUID? { library.gym.currentGym?.id }
     private var visit: GymVisit? { library.gym.openVisit(on: day, gym: gymID) }
@@ -383,6 +385,22 @@ struct GymScreen: View {
                 }
             }
         }
+        .sheet(isPresented: $choosingGym, onDismiss: runChooserAction) {
+            GymChooserPlate(
+                choose: { g in
+                    library.changeGym { $0.currentGymID = g.id }
+                    choosingGym = false
+                },
+                act: { what in
+                    afterChooser = what
+                    choosingGym = false
+                },
+                done: { choosingGym = false }
+            )
+            .environment(library)
+            .presentationDetents([.fraction(0.62), .large])
+            .presentationDragIndicator(.visible)
+        }
         .alert(naming == .new ? "New gym" : "Rename gym", isPresented: Binding(
             get: { naming != nil }, set: { if !$0 { naming = nil } }
         )) {
@@ -410,31 +428,10 @@ struct GymScreen: View {
 
     // MARK: Which gym
 
+    /// The gym's name pill. Since 1.29 it opens the gym chooser plate (before: Apple's plain menu).
     private var gymMenu: some View {
-        Menu {
-            ForEach(library.gym.gyms) { g in
-                Button {
-                    library.changeGym { $0.currentGymID = g.id }
-                } label: {
-                    Text(g.id == gymID ? "\(g.name) — here now" : g.name)
-                }
-                .accessibilityIdentifier("gym-place-\(g.name)")
-            }
-            Divider()
-            Button("New gym…") {
-                gymName = ""
-                naming = .new
-            }
-            .accessibilityIdentifier("gym-place-new")
-            Button("Log an earlier day…") { pickingDay = true }
-                .accessibilityIdentifier("gym-pick-day")
-            Button("Rename this gym…") {
-                gymName = library.gym.currentGym?.name ?? ""
-                naming = .rename
-            }
-            .accessibilityIdentifier("gym-place-rename")
-            Button("Opening hours…") { editingHours = true }
-                .accessibilityIdentifier("gym-place-hours")
+        Button {
+            choosingGym = true
         } label: {
             HStack(spacing: 6) {
                 Text(library.gym.currentGym?.name ?? GymLog.firstGymName)
@@ -448,8 +445,27 @@ struct GymScreen: View {
             .padding(.vertical, 6)
             .background(Gym.place.fillColor, in: Capsule())
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("Gym: \(library.gym.currentGym?.name ?? GymLog.firstGymName)")
         .accessibilityIdentifier("gym-place-menu")
+    }
+
+    /// One of the plate's four buttons was tapped: once the plate has closed, open what it opens.
+    private func runChooserAction() {
+        guard let what = afterChooser else { return }
+        afterChooser = nil
+        switch what {
+        case .new:
+            gymName = ""
+            naming = .new
+        case .rename:
+            gymName = library.gym.currentGym?.name ?? ""
+            naming = .rename
+        case .hours:
+            editingHours = true
+        case .earlierDay:
+            pickingDay = true
+        }
     }
 
     private func saveGymName() {

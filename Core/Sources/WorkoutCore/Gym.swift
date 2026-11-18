@@ -6,6 +6,8 @@ public struct GymPlace: Codable, Identifiable, Hashable, Sendable {
     public var name: String
     /// Opening hours, Monday first, seven days (since 1.23); nil = not given, a nil day = closed.
     public var hours: [DayHours?]?
+    /// File name of the gym's own photo in the app's photo folder (since 1.29); nil = none.
+    public var photo: String?
 
     public init(id: UUID = UUID(), name: String) {
         self.id = id
@@ -1059,7 +1061,8 @@ public struct GymLog: Codable, Equatable, Sendable {
     }
 
     public var photosInUse: Set<String> {
-        Set(machines.compactMap(\.photo) + machines.compactMap(\.instructions) + visits.flatMap { $0.photos ?? [] })
+        Set(machines.compactMap(\.photo) + machines.compactMap(\.instructions) + visits.flatMap { $0.photos ?? [] }
+            + gyms.compactMap(\.photo))
     }
 
     /// Adds a photo of the session (since 1.13).
