@@ -45,6 +45,9 @@ final class Version133UITests: XCTestCase {
         XCTAssertEqual(restReps.value as? String, "9")
         let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); a.name = "133-rest"; a.lifetime = .keepAlways; add(a)
         app.buttons["Done"].firstMatch.tap()
+        app.swipeUp()
+        XCTAssertTrue(app.buttons["gym-rest-skip"].waitForExistence(timeout: 3))
+        shot("133-restbuttons")
         app.buttons["gym-rest-skip"].tap()
         XCTAssertEqual(app.textFields["gym-reps"].value as? String, "9")
     }

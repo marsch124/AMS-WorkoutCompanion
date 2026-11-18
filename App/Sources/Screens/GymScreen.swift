@@ -20,6 +20,10 @@ enum Gym {
     static let soft = Color.pair("#dbe6fb", "#1e2f52")
     /// Set done: a full green, the positive step (since 1.33 build 2, his ask).
     static let done = Color.pair("#16a34a", "#15803d")
+    /// The rest buttons, lightly tinted (since 1.33 build 3, his ask): −15 s yellow, +15 s orange, Skip rest green.
+    static let less = (fill: Color.pair("#fef6d8", "#352d0e"), ink: Color.pair("#a16207", "#fcd34d"))
+    static let more = (fill: Color.pair("#ffeedd", "#3a2212"), ink: Color.pair("#c2410c", "#fdba74"))
+    static let skip = (fill: Color.pair("#e0f7e7", "#12321f"), ink: Color.pair("#15803d", "#86efac"))
     /// A set that beat last time: a gold arrow (since 1.16).
     static let better = Color.pair("#b7791f", "#f6c453")
     /// End on the green session line: red, so it is not taken for the green line itself (since 1.27, his ask).

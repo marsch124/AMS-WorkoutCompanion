@@ -478,7 +478,7 @@ struct MachineScreen: View {
                     restEnd = end.addingTimeInterval(-cut)
                     restLength = max(5, restLength - cut)
                 }
-                .buttonStyle(SoftButtonStyle(height: 48))
+                .buttonStyle(SoftButtonStyle(height: 48, tint: Gym.less))
                 .frame(width: 84)
                 .accessibilityLabel("15 seconds less")
                 .accessibilityIdentifier("gym-rest-less")
@@ -486,14 +486,14 @@ struct MachineScreen: View {
                     restEnd = end.addingTimeInterval(15)
                     restLength += 15
                 }
-                .buttonStyle(SoftButtonStyle(height: 48))
+                .buttonStyle(SoftButtonStyle(height: 48, tint: Gym.more))
                 .frame(width: 84)
                 .accessibilityLabel("15 seconds more")
                 .accessibilityIdentifier("gym-rest-more")
                 Button { restEnd = nil } label: {
-                    MarkLabel(title: "Skip rest", mark: .skip, colour: Gym.ink)
+                    MarkLabel(title: "Skip rest", mark: .skip, colour: Gym.skip.ink)
                 }
-                .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 48))
+                .buttonStyle(SoftButtonStyle(height: 48, tint: Gym.skip))
                 .accessibilityIdentifier("gym-rest-skip")
             }
         }

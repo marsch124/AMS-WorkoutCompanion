@@ -404,3 +404,7 @@ His two approved ideas after 1.17: see that a session is going from the Train pa
 - `Gym.swatch` = `IconColour(key: "gymblue", hex: "#2f6fe0", ink: "#ffffff")` (= `Theme.accent`, the round + on Workouts); before IconColour "indigo" #4f46e5. `Gym.tint` = #2f6fe0 / #8ab4ff (before #4f46e5 / #9d97ff). `Gym.band` = #0f2347 (before #1e1b4b). Everything that used the gym colour follows: At the gym card, gym chooser + plate, Set done, steppers, rest rows, headings.
 - `machine-done-pill` (Back to gym / Exercise done): `BigButtonStyle(fill: Gym.soft, ink: Gym.tint)` — solid pale blue #dbe6fb / #1e2f52 with blue words; before full indigo like Set done. `gym-set-done` = full green `Gym.done` #16a34a / #15803d, white words (his ask: "something positive"); before full indigo.
 - Rest weight: 0 kg shows "0" in the box (before the text "Body").
+
+### Build 3 — coloured rest buttons (his ask, 18 Nov 2026)
+- `SoftButtonStyle` gained `tint: (fill, ink)?` (fill + words + a 25 % ink outline; nil = the old plain card).
+- `gym-rest-less` = `Gym.less` (#fef6d8 / #352d0e, words #a16207 / #fcd34d); `gym-rest-more` = `Gym.more` (#ffeedd / #3a2212, words #c2410c / #fdba74); `gym-rest-skip` = `Gym.skip` (#e0f7e7 / #12321f, words #15803d / #86efac) — before white, white, full indigo.

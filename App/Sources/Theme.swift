@@ -93,14 +93,17 @@ struct BigButtonStyle: ButtonStyle {
 /// A quieter button on the card colour.
 struct SoftButtonStyle: ButtonStyle {
     var height: CGFloat = 64
+    /// A light tint and its words (since 1.33 build 3: the rest buttons); nil = plain card.
+    var tint: (fill: Color, ink: Color)? = nil
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 20, weight: .semibold, design: .rounded))
-            .foregroundStyle(Theme.ink)
+            .foregroundStyle(tint?.ink ?? Theme.ink)
             .frame(maxWidth: .infinity, minHeight: height)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: height * 0.32, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: height * 0.32, style: .continuous).stroke(Theme.line, lineWidth: 1))
+            .background(tint?.fill ?? Theme.card, in: RoundedRectangle(cornerRadius: height * 0.32, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: height * 0.32, style: .continuous)
+                .stroke(tint.map { $0.ink.opacity(0.25) } ?? Theme.line, lineWidth: 1))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.spring(duration: 0.2), value: configuration.isPressed)
     }
