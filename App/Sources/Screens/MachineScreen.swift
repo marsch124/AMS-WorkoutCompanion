@@ -462,12 +462,25 @@ struct MachineScreen: View {
                 .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 48))
                 .accessibilityIdentifier("gym-next-machine")
             }
-            HStack(spacing: 10) {
+            // −15 s and +15 s, small, on one line with Skip rest (since 1.25, his ask).
+            HStack(spacing: 8) {
+                Button("−15 s") {
+                    // Never below five seconds left: the countdown still ticks.
+                    let cut = min(15, max(0, end.timeIntervalSince(Date()) - 5))
+                    restEnd = end.addingTimeInterval(-cut)
+                    restLength = max(5, restLength - cut)
+                }
+                .buttonStyle(SoftButtonStyle(height: 48))
+                .frame(width: 84)
+                .accessibilityLabel("15 seconds less")
+                .accessibilityIdentifier("gym-rest-less")
                 Button("+15 s") {
                     restEnd = end.addingTimeInterval(15)
                     restLength += 15
                 }
                 .buttonStyle(SoftButtonStyle(height: 48))
+                .frame(width: 84)
+                .accessibilityLabel("15 seconds more")
                 .accessibilityIdentifier("gym-rest-more")
                 Button { restEnd = nil } label: {
                     MarkLabel(title: "Skip rest", mark: .skip, colour: Gym.ink)

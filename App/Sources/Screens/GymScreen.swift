@@ -16,6 +16,8 @@ enum Gym {
     static let band = Color(hex: "#1e1b4b")
     /// A set that beat last time: a gold arrow (since 1.16).
     static let better = Color.pair("#b7791f", "#f6c453")
+    /// The gym chooser at the top of the gym screen: plum, apart from the indigo of the page (since 1.25, his ask).
+    static let place = IconColour.of(key: "plum")!
 }
 
 /// A machine on the gym screen, to open it.
@@ -173,7 +175,8 @@ struct GymScreen: View {
                 // A session is going (since 1.17, his ask): green dot, minutes since it began, sets so far.
                 // Since 1.20 from the moment the gym screen opens (his ask), before any set.
                 if sessionStart != nil || (visit?.setCount ?? 0) > 0 {
-                    SessionGoingLine(start: sessionStart, visit: visit, clock: true)
+                    // Since 1.25 (his ask): short words, and End on the same line — the same as Finish this session.
+                    SessionGoingLine(start: sessionStart, visit: visit, clock: true) { endSession() }
                 }
 
                 // What you did so far, in order (since 1.22, his ask): tap a row to go back to that machine.
@@ -239,7 +242,7 @@ struct GymScreen: View {
                         // The same clock as the green line: it stands still after 20 minutes without a set (since 1.23).
                         let minutes = library.gym.sessionClock(on: day, gym: gymID, now: context.date).map { $0.seconds / 60 }
                         Button {
-                            if let visit, visit.setCount > 0 { finish(visit) } else { library.changeGym { $0.leave() } }
+                            endSession()
                         } label: {
                             MarkLabel(title: minutes.map { "Finish this session · \($0) min" } ?? "Finish this session",
                                       mark: .check, size: 22, colour: Gym.ink)
@@ -410,14 +413,14 @@ struct GymScreen: View {
             HStack(spacing: 6) {
                 Text(library.gym.currentGym?.name ?? GymLog.firstGymName)
                     .font(.headline)
-                    .foregroundStyle(Gym.tint)
+                    .foregroundStyle(Gym.place.inkColor)
                     .lineLimit(1)
-                ControlMarkView(.chevron, size: 12, colour: Gym.tint)
+                ControlMarkView(.chevron, size: 12, colour: Gym.place.inkColor)
                     .rotationEffect(.degrees(90))
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(Gym.fill.opacity(0.12), in: Capsule())
+            .background(Gym.place.fillColor, in: Capsule())
         }
         .accessibilityLabel("Gym: \(library.gym.currentGym?.name ?? GymLog.firstGymName)")
         .accessibilityIdentifier("gym-place-menu")
@@ -727,6 +730,12 @@ struct GymScreen: View {
         library.changeGym { $0.arrive(gym: gymID) }
     }
 
+    /// Finish this session, from the button at the bottom or End on the green line: with sets it is
+    /// finished and Session done opens; with none it just ends and nothing is saved.
+    private func endSession() {
+        if let visit, visit.setCount > 0 { finish(visit) } else { library.changeGym { $0.leave() } }
+    }
+
     private func finish(_ visit: GymVisit) {
         let now = Date()
         beforeFinish = library.gym
@@ -757,9 +766,13 @@ struct SessionGoingLine: View {
     var clock = false
     /// The session's sets: the clock stands still after 20 minutes without one (since 1.23).
     var allSets: [GymSet] = []
+    /// End on the same line (since 1.25, gym screen only): the same as Finish this session.
+    var onEnd: (() -> Void)?
     static let green = Color.pair("#15803d", "#86efac")
 
-    init(start: Date?, visit: GymVisit?, identifier: String = "gym-session-going", clock: Bool = false) {
+    init(start: Date?, visit: GymVisit?, identifier: String = "gym-session-going", clock: Bool = false,
+         onEnd: (() -> Void)? = nil) {
+        self.onEnd = onEnd
         self.clock = clock
         self.start = start ?? visit.flatMap(Self.start(of:))
         self.machines = visit?.entries.filter { !$0.sets.isEmpty }.count ?? 0
@@ -781,27 +794,51 @@ struct SessionGoingLine: View {
         TimelineView(.periodic(from: .now, by: clock ? 1 : 30)) { context in
             let active = start.map { GymVisit.active(start: $0, sets: allSets, now: context.date) }
             let paused = active?.paused == true
+            let long = words(minutes: active.map { $0.seconds / 60 }, paused: paused)
             HStack(spacing: 8) {
-                Circle().fill(paused ? Theme.muted : Self.green).frame(width: 9, height: 9)
-                Text(words(minutes: active.map { $0.seconds / 60 }, paused: paused))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Self.green)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                Spacer(minLength: 0)
-                if clock, let active {
-                    Text(GymVisit.clock(active.seconds))
-                        .font(.system(.title3, design: .rounded).weight(.bold).monospacedDigit())
+                HStack(spacing: 8) {
+                    Circle().fill(paused ? Theme.muted : Self.green).frame(width: 9, height: 9)
+                    // With End on the line the words are short (since 1.25): "7 sets", "No sets yet", "Paused".
+                    Text(onEnd == nil ? long : short(paused: paused))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Self.green)
-                        .accessibilityIdentifier("gym-session-clock")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Spacer(minLength: 0)
+                    if clock, let active {
+                        Text(GymVisit.clock(active.seconds))
+                            .font(.system(.title3, design: .rounded).weight(.bold).monospacedDigit())
+                            .foregroundStyle(Self.green)
+                            .accessibilityIdentifier("gym-session-clock")
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(clock ? long + (active.map { ", " + GymVisit.clock($0.seconds) } ?? "") : long)
+                .accessibilityIdentifier(identifier)
+                if let onEnd {
+                    Button(action: onEnd) {
+                        Text("End")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Color.pair("#ffffff", "#052e16"))
+                            .padding(.horizontal, 14)
+                            .frame(height: 30)
+                            .background(Self.green, in: Capsule())
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("End session")
+                    .accessibilityIdentifier("gym-session-end")
                 }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(Self.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier(identifier)
         }
+    }
+
+    private func short(paused: Bool) -> String {
+        if paused { return "Paused" }
+        return sets == 0 ? "No sets yet" : sets == 1 ? "1 set" : "\(sets) sets"
     }
 
     private func words(minutes: Int?, paused: Bool) -> String {

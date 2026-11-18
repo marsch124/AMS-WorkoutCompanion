@@ -294,7 +294,7 @@ extension Workout {
     /// exercise list, yours to change.
     public static func afterGymStretch() -> Workout {
         let each = "30 s each side"
-        return Workout(name: "After-gym stretch", kind: .checklist, colour: "teal", exercises: [
+        return Workout(name: "After-gym stretch", kind: .checklist, colour: "lavender", exercises: [
             Exercise(name: "Chest in a doorway", amount: each, note: "Forearm on the frame, step through, chest forward."),
             Exercise(name: "Shoulder across the body", amount: each, note: "Pull the straight arm across the chest."),
             Exercise(name: "Hip flexor lunge", amount: each, note: "Back knee down, hips forward, body upright."),
