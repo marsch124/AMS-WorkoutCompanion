@@ -119,6 +119,8 @@ struct GymScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
+                // Since 1.26: the chooser, the hint and the three buttons in one card — the screen's head.
+                VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     gymMenu
                     // Open now, or when it opens (since 1.23) — only once hours are given.
@@ -155,6 +157,13 @@ struct GymScreen: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
                     .accessibilityIdentifier("gym-intro")
+                actionRow
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("gym-head")
 
                 // After Finish the session is closed; a set now starts the day's next one (since 1.12).
                 let doneToday = library.gym.visits(on: day, gym: gymID).filter { $0.finished != nil && $0.setCount > 0 }.count
@@ -210,7 +219,7 @@ struct GymScreen: View {
                 // A long list gets a search field (since 1.11): name or setting ("Seat 4").
                 if machines.count > GymScreen.searchFrom {
                     HStack(spacing: 6) {
-                        AppMarkView(.search, size: 16, colour: Gym.tint)
+                        AppMarkView(.search, size: 16, colour: Theme.muted)
                         TextField("Find a machine", text: $search)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -222,10 +231,9 @@ struct GymScreen: View {
                                 .accessibilityIdentifier("gym-search-clear")
                         }
                     }
-                    .padding(.horizontal, 10)
-                    .frame(height: 36)
-                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Gym.fill.opacity(0.5), lineWidth: 1))
+                    .padding(.horizontal, 14)
+                    .frame(height: 38)
+                    .background(Theme.card, in: Capsule())
                 }
                 let found = Set(library.gym.machines(in: gymID, matching: search).map(\.id))
                 LazyVGrid(columns: columns, spacing: 8) {
@@ -465,12 +473,17 @@ struct GymScreen: View {
             Text("Touch and hold a machine: later, skip today, move to next visit or swap.")
                 .font(.caption)
                 .foregroundStyle(Theme.muted)
-        } else if !machines.isEmpty, sessionStart == nil, (visit?.setCount ?? 0) == 0 {
+        }
+    }
+
+    /// Plan today, Repeat last visit, Save as template — in the head card since 1.26.
+    @ViewBuilder private var actionRow: some View {
+        if plan == nil, !machines.isEmpty, sessionStart == nil, (visit?.setCount ?? 0) == 0 {
             // Only before the session (since 1.23 build 2, his ask): once it is going, planning tiles are in the way.
             // Three equal tiles, mark above words (1.13 — his "the buttons look like crap": capsules wrapped unevenly).
             // Repeat last visit is the main one: full colour.
             let repeatOrder = library.gym.lastOrder(gym: gymID, before: day)
-            HStack(spacing: 8) {
+            HStack(spacing: 2) {
                 Button { planning = true } label: {
                     GymActionTile(title: "Plan today", main: false) {
                         ControlMarkView(.list, size: 15, colour: Gym.tint)
@@ -503,6 +516,8 @@ struct GymScreen: View {
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
+            .padding(3)
+            .background(Gym.fill.opacity(0.12), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
             .alert("Save last visit as template", isPresented: $namingRepeat) {
                 TextField("For example: Leg day", text: $repeatName)
                 Button("Cancel", role: .cancel) {}
@@ -697,6 +712,7 @@ struct GymScreen: View {
             }
             .buttonStyle(.plain)
             .padding(.bottom, bandHeight)
+            .padding(.trailing, 4)
             .accessibilityLabel(busy ? "\(m.name) is busy" : "Mark \(m.name) busy")
             .accessibilityIdentifier("busy-\(m.name)")
         }
@@ -860,24 +876,24 @@ private struct GymActionTile<Mark: View>: View {
     let main: Bool
     @ViewBuilder let mark: () -> Mark
 
-    // Since 1.17 compact (his ask): mark beside the words, footnote text — ~44 pt instead of 82.
+    // Since 1.26 one joined row: mark above the words; the main one full indigo, the others clear on the row's pale indigo.
     var body: some View {
-        HStack(spacing: 4) {
+        VStack(spacing: 2) {
             mark()
                 .frame(width: 16, height: 16)
             Text(title)
-                .font(.footnote.weight(.semibold))
-                .multilineTextAlignment(.leading)
-                .lineLimit(2)
-                .minimumScaleFactor(0.85)
+                .font(.caption.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
                 .foregroundStyle(main ? Gym.ink : Gym.tint)
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 4)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(main ? AnyShapeStyle(Gym.fill) : AnyShapeStyle(Gym.fill.opacity(0.14)),
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(main ? AnyShapeStyle(Gym.fill) : AnyShapeStyle(Color.clear),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -1053,56 +1069,52 @@ private struct MachineTile: View {
 
     private var stripe: IconColour? { library.gym.muscle(for: machine).flatMap { IconColour.of(key: $0.colour) } }
 
-    /// Dark indigo by default, orange when Busy (since 1.16).
-    private var bandFill: Color { busy ? Gym.busy.fillColor : Gym.band }
-    private var bandInk: Color { busy ? Gym.busy.inkColor : .white }
-
     var body: some View {
-        // Since 1.16 the photo fills the whole tile, with the name and last time on a band over
-        // its bottom edge — before, the name and status sat under a smaller photo.
-        MachinePhoto(name: machine.photo, height: Self.height, icon: machine.icon, corner: 0)
-            .overlay(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(machine.name.isEmpty ? "Untitled" : machine.name)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                    Text(busy ? "Busy — come back later" : status)
-                        .font(.caption)
-                        .opacity(0.88)
-                        .lineLimit(1)
+        // Since 1.26 a card: the photo on top with rounded corners, the name and last time on a light band
+        // under it (1.16–1.25: the photo filled the tile and the name sat on a dark band over its bottom edge).
+        VStack(spacing: 0) {
+            MachinePhoto(name: machine.photo, height: Self.height, icon: machine.icon, corner: 14)
+                .overlay(alignment: .topTrailing) {
+                    if done {
+                        ControlMarkView(.check, size: 14, colour: Gym.ink)
+                            .frame(width: 26, height: 26)
+                            .background(Gym.fill, in: Circle())
+                            .padding(6)
+                    }
                 }
-                .foregroundStyle(bandInk)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .padding(.leading, stripe == nil ? 0 : 3)
-                .background(bandFill.opacity(busy ? 1 : 0.82))
-                .background(GeometryReader { Color.clear.preference(key: BandHeight.self, value: $0.size.height) })
-                .accessibilityIdentifier("tile-band-\(machine.name)")
+                .padding([.top, .horizontal], 5)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(machine.name.isEmpty ? "Untitled" : machine.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                Text(busy ? "Busy — come back later" : status)
+                    .font(.caption)
+                    .foregroundStyle(busy ? Gym.busyTint : Gym.tint)
+                    .lineLimit(1)
             }
-            .overlay(alignment: .topTrailing) {
-                if done {
-                    ControlMarkView(.check, size: 14, colour: Gym.ink)
-                        .frame(width: 26, height: 26)
-                        .background(Gym.fill, in: Circle())
-                        .padding(6)
-                }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(GeometryReader { Color.clear.preference(key: BandHeight.self, value: $0.size.height) })
+            .accessibilityIdentifier("tile-band-\(machine.name)")
+        }
+        .background(Theme.card)
+        // The machine's muscle group colour, as a thin stripe down the left edge (since 1.11).
+        .overlay(alignment: .leading) {
+            if let stripe {
+                stripe.fillColor
+                    .frame(width: 5)
+                    .accessibilityIdentifier("tile-stripe-\(machine.name)")
             }
-            // The machine's muscle group colour, as a thin stripe down the left edge (since 1.11).
-            .overlay(alignment: .leading) {
-                if let stripe {
-                    stripe.fillColor
-                        .frame(width: 5)
-                        .accessibilityIdentifier("tile-stripe-\(machine.name)")
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(busy ? Gym.busy.fillColor : done ? Gym.fill : Theme.line, lineWidth: busy || done ? 2 : 1))
-            .accessibilityElement(children: .combine)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .stroke(busy ? Gym.busy.fillColor : done ? Gym.fill : .clear, lineWidth: 2))
+        .accessibilityElement(children: .combine)
     }
 
-    static let height: CGFloat = 132
+    static let height: CGFloat = 112
 }
 
 /// The height of a tile's name band, passed up so the Busy pill can sit just above it.
@@ -1140,9 +1152,9 @@ private struct NewMachineTile: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Gym.tint)
         }
-        .frame(maxWidth: .infinity, minHeight: 142)
-        .background(Gym.fill.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .frame(maxWidth: .infinity, minHeight: 160)
+        .background(Gym.fill.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
             .stroke(Gym.fill, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])))
         .accessibilityElement(children: .combine)
     }

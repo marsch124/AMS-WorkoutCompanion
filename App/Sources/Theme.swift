@@ -26,11 +26,12 @@ extension Color {
 
 /// Page and text colours — the same pairs as AMS Packing (docs/colours.md).
 enum Theme {
-    static let bg = Color.pair("#f4f6f7", "#0e1416")
-    static let card = Color.pair("#ffffff", "#161f22")
-    static let ink = Color.pair("#16232a", "#e7edee")
-    static let muted = Color.pair("#5f7078", "#94a6ac")
-    static let line = Color.pair("#e2e8ea", "#26343a")
+    // Since 1.26 ("Cards and glass", his pick): a soft indigo wash behind white cards; deep indigo by night.
+    static let bg = Color.pair("#eef0fa", "#121326")
+    static let card = Color.pair("#ffffff", "#1d1f3a")
+    static let ink = Color.pair("#161a2e", "#eceefb")
+    static let muted = Color.pair("#5c647c", "#9ba3c0")
+    static let line = Color.pair("#dfe2f0", "#2d3054")
     static let accent = Color(hex: "#2f6fe0")
     static let problem = Color(hex: "#dc3d43")
 }

@@ -47,9 +47,16 @@ struct RootView: View {
             item(.history, "History", id: "open-history", colour: Past.tint) { c in AppMarkView(.history, size: 24, colour: c) }
             item(.settings, "Settings", id: "open-settings", colour: Theme.accent) { c in ControlMarkView(.settings, size: 24, colour: c) }
         }
+        // Since 1.26: a rounded capsule, the chosen tab in a pale pill of its colour. Pages still end above it.
+        .padding(4)
+        .background(Theme.card, in: Capsule())
+        .overlay(Capsule().stroke(Theme.line, lineWidth: 1))
+        .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
+        .padding(.horizontal, 36)
         .padding(.top, 6)
-        .background(Theme.card.ignoresSafeArea(edges: .bottom))
-        .overlay(alignment: .top) { Rectangle().fill(Theme.line).frame(height: 0.5) }
+        .padding(.bottom, 2)
+        .frame(maxWidth: .infinity)
+        .background(Theme.bg.ignoresSafeArea(edges: .bottom))
     }
 
     private func item<M: View>(_ t: Tab, _ title: String, id: String, colour: Color,
@@ -62,7 +69,9 @@ struct RootView: View {
                     .foregroundStyle(on ? colour : Theme.muted)
             }
             .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
+            .padding(.vertical, 4)
+            .background(on ? colour.opacity(0.14) : .clear, in: Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
