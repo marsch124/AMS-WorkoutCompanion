@@ -74,6 +74,7 @@ final class Version123ScreensUITests: XCTestCase {
         let finish = app.buttons["gym-finish"]
         XCTAssertTrue(finish.waitForExistence(timeout: 5))
         finish.tap()
+        app.confirmEnd()
         let good = app.buttons["gym-feel-good"]
         XCTAssertTrue(good.waitForExistence(timeout: 5))
         good.tap()
@@ -98,6 +99,7 @@ final class Version123ScreensUITests: XCTestCase {
         app.buttons["machine-done-pill"].tap()
         XCTAssertTrue(any("gym-session-going").waitForExistence(timeout: 5))
         app.buttons["gym-finish"].tap()
+        app.confirmEnd()
         sleep(2)
         XCTAssertFalse(any("gym-session-going").exists, "Finish ends it and it stays ended")
         XCTAssertFalse(app.buttons["gym-finish"].exists)

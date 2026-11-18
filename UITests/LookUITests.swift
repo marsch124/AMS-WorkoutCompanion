@@ -157,6 +157,7 @@ final class LookUITests: XCTestCase {
         let finish = app.buttons["gym-finish"]
         XCTAssertTrue(finish.waitForExistence(timeout: 5))
         finish.tap()
+        app.confirmEnd()
         XCTAssertFalse(any("gym-session-going").waitForExistence(timeout: 2))
         XCTAssertFalse(app.buttons["gym-finish"].exists)
         XCTAssertFalse(any("gym-earlier-day").exists)

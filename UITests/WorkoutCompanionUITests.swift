@@ -180,6 +180,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
         waitFor(app.buttons["gym-finish"], label: "Finish this session")
         app.buttons["gym-finish"].tap()
+        app.confirmEnd()
         waitFor(app.staticTexts["gym-summary-sets"], label: "2")
         waitFor(app.staticTexts["gym-summary-machines"], label: "1")
         app.buttons["gym-summary-done"].tap()
@@ -199,6 +200,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 3))
         goBack()
         app.buttons["gym-finish"].tap()
+        app.confirmEnd()
 
         let add = any("session-photo-add")
         XCTAssertTrue(add.waitForExistence(timeout: 5))
@@ -249,6 +251,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         oneSet()
         XCTAssertTrue(app.buttons["gym-finish"].waitForExistence(timeout: 3))
         app.buttons["gym-finish"].tap()
+        app.confirmEnd()
         app.buttons["gym-summary-done"].firstMatch.tap()
         XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["gym-finish"].exists, "Finish must go once the session is stored")
@@ -260,6 +263,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["gym-finish"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.descendants(matching: .any)["gym-session-done"].firstMatch.exists)
         app.buttons["gym-finish"].tap()
+        app.confirmEnd()
         app.buttons["gym-summary-done"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["gym-session-done"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertEqual(rows.count, before + 2)
@@ -280,6 +284,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 3))
         goBack()
         app.buttons["gym-finish"].tap()
+        app.confirmEnd()
         let undo = app.buttons["gym-summary-undo"].firstMatch
         XCTAssertTrue(undo.waitForExistence(timeout: 5))
         undo.tap()
@@ -404,6 +409,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["gym-rest-skip"].tap()
         goBack()
         app.buttons["gym-finish"].tap()
+        app.confirmEnd()
         let title = app.textFields["gym-summary-title"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         title.tap()
@@ -545,6 +551,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         goBack()
         XCTAssertTrue(app.buttons["machine-Push-ups"].waitForExistence(timeout: 5))
         app.buttons["gym-finish"].tap()
+        app.confirmEnd()
         waitFor(app.staticTexts["gym-summary-sets"], label: "1")
         XCTAssertFalse(app.staticTexts["gym-summary-total"].exists)
     }

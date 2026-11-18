@@ -43,6 +43,12 @@ final class Version127UITests: XCTestCase {
         alert.buttons["Continue the session"].firstMatch.tap()
         XCTAssertTrue(app.buttons["gym-session-end"].waitForExistence(timeout: 5), "the session goes on")
 
+        // Finish this session at the bottom asks the same question (build 2).
+        app.buttons["gym-finish"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5), "Finish asks too")
+        app.alerts.firstMatch.buttons["Continue the session"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["gym-session-end"].waitForExistence(timeout: 5), "the session goes on")
+
         // End, then "End session": the session is over.
         app.buttons["gym-session-end"].tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))

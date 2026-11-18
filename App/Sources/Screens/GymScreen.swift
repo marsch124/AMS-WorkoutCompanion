@@ -256,7 +256,8 @@ struct GymScreen: View {
                         // The same clock as the green line: it stands still after 20 minutes without a set (since 1.23).
                         let minutes = library.gym.sessionClock(on: day, gym: gymID, now: context.date).map { $0.seconds / 60 }
                         Button {
-                            endSession()
+                            // Since 1.27 build 2 (his ask) Finish asks first too, with the same box as End.
+                            askingEnd = true
                         } label: {
                             MarkLabel(title: minutes.map { "Finish this session · \($0) min" } ?? "Finish this session",
                                       mark: .check, size: 22, colour: Gym.ink)
@@ -394,7 +395,8 @@ struct GymScreen: View {
         } message: {
             Text(naming == .new ? "Each gym has its own machines." : "")
         }
-        // End on the green line asks first (since 1.27, his ask); the other button keeps the session going.
+        // End on the green line and Finish this session at the bottom ask first (since 1.27, his ask);
+        // the other button keeps the session going.
         .alert("End this session?", isPresented: $askingEnd) {
             Button("End session", role: .destructive) { endSession() }
                 .accessibilityIdentifier("gym-end-confirm")
