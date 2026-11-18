@@ -44,7 +44,7 @@ final class WorkoutCompanionUITests: XCTestCase {
     }
 
     func testPushUpsDoneStartsTheRestAndSkipGoesToSetTwo() {
-        app.buttons["workout-Push-ups"].tap()
+        app.buttons["start-Push-ups"].tap()
         let set = app.descendants(matching: .any)["run-set"]
         waitFor(set, label: "Set 1 of 5")
 
@@ -58,7 +58,7 @@ final class WorkoutCompanionUITests: XCTestCase {
     }
 
     func testIntervalsMoveOnByThemselvesAndPause() {
-        app.buttons["workout-Intervals"].tap()
+        app.buttons["start-Intervals"].tap()
         // The 5-second get ready runs out on its own (a slow simulator may already be past it).
         let phase = app.staticTexts["run-phase"]
         waitFor(phase, label: "WORK", timeout: 20)
@@ -86,7 +86,7 @@ final class WorkoutCompanionUITests: XCTestCase {
 
         let card = app.buttons["workout-Knee"]
         XCTAssertTrue(card.waitForExistence(timeout: 5))
-        card.tap()
+        app.buttons["start-Knee"].tap()
 
         let check = app.buttons["check-1"]
         XCTAssertTrue(check.waitForExistence(timeout: 5))
@@ -108,9 +108,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.27 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.28 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.27"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.28"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -418,7 +418,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         goBack()
 
         // A Sets & reps workout ended early is kept too.
-        app.buttons["workout-Push-ups"].tap()
+        app.buttons["start-Push-ups"].tap()
         waitFor(app.descendants(matching: .any)["run-set"], label: "Set 1 of 5")
         app.buttons["run-done"].tap()
         waitFor(app.staticTexts["run-phase"], label: "REST")
@@ -484,7 +484,10 @@ final class WorkoutCompanionUITests: XCTestCase {
         // Two columns: Push-ups and Intervals side by side.
         XCTAssertEqual(push.frame.midY, intervals.frame.midY, accuracy: 2)
         XCTAssertLessThan(push.frame.maxX, intervals.frame.minX)
-        XCTAssertTrue(app.buttons["add-workout-tile"].exists)
+        // Since 1.28 the dashed New workout tile is gone; the round + sits at the bottom right.
+        XCTAssertFalse(app.buttons["add-workout-tile"].exists)
+        XCTAssertGreaterThan(app.buttons["add-workout"].frame.minY, push.frame.maxY)
+        XCTAssertGreaterThan(app.buttons["add-workout"].frame.midX, intervals.frame.midX)
 
         app.buttons["open-history"].tap()
         XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 3))

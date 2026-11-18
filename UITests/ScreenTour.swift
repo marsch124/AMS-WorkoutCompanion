@@ -60,7 +60,7 @@ final class ScreenTour: XCTestCase {
         snap("03 Push-ups editor")
 
         fresh()
-        app.buttons["workout-Push-ups"].tap()
+        app.buttons["start-Push-ups"].tap()
         waitFor(app.descendants(matching: .any)["run-set"], label: "Set 1 of 5")
         snap("04 Push-ups set")
         app.buttons["run-done"].tap()
@@ -68,7 +68,7 @@ final class ScreenTour: XCTestCase {
         snap("05 Rest")
 
         fresh()
-        app.buttons["workout-Intervals"].tap()
+        app.buttons["start-Intervals"].tap()
         waitFor(app.staticTexts["run-phase"], label: "WORK", timeout: 20)
         snap("06 Interval round")
 
@@ -84,7 +84,7 @@ final class ScreenTour: XCTestCase {
         app.textFields["exercise-note-1"].tap()
         app.textFields["exercise-note-1"].typeText("Lift the hips slowly, hold 2 seconds at the top")
         app.buttons["editor-save"].tap()
-        app.buttons["workout-Doctor's exercises"].tap()
+        app.buttons["start-Doctor's exercises"].tap()
         XCTAssertTrue(app.buttons["check-1"].waitForExistence(timeout: 5))
         snap("07 Doctor's exercises")
 

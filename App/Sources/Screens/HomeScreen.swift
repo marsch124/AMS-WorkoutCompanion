@@ -43,7 +43,7 @@ struct RootView: View {
 
     private var bar: some View {
         HStack(spacing: 0) {
-            item(.train, "Train", id: "open-train", colour: Theme.accent) { c in IconMark(.hand("kettlebell"), size: 24, colour: c) }
+            item(.train, "Workouts", id: "open-train", colour: Theme.accent) { c in IconMark(.hand("kettlebell"), size: 24, colour: c) }
             item(.history, "History", id: "open-history", colour: Past.tint) { c in AppMarkView(.history, size: 24, colour: c) }
             item(.settings, "Settings", id: "open-settings", colour: Theme.accent) { c in ControlMarkView(.settings, size: 24, colour: c) }
         }
@@ -85,6 +85,7 @@ struct HomeScreen: View {
     @Environment(Library.self) private var library
     @State private var running: Workout?
     @State private var editing: Workout?
+    @State private var showing: Workout?
     @State private var adding = false
     @State private var deleting: Workout?
     @State private var showGym = false
@@ -108,39 +109,52 @@ struct HomeScreen: View {
                     }
                     LazyVGrid(columns: columns, spacing: 10) {
                         ForEach(library.workouts) { w in
-                            WorkoutCard(workout: w, start: { running = w }, edit: { editing = w })
+                            WorkoutCard(workout: w, show: { showing = w }, start: { running = w }, edit: { editing = w })
                                 .contextMenu {
                                     Button("Edit") { editing = w }
                                     Button("Duplicate") { library.duplicate(w) }
                                     Button("Delete", role: .destructive) { deleting = w }
                                 }
                         }
-                        Button { adding = true } label: { NewWorkoutTile() }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("add-workout-tile")
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.top, 8)
+                // Room under the last panel for the round + at the bottom right.
+                .padding(.bottom, 84)
             }
             .background(Theme.bg.ignoresSafeArea())
+            // New workout: one round + at the bottom right, in reach of the thumb (since 1.28, his picture).
+            // Before, a + at the top right (it cut into the heading) and a dashed "New workout" tile.
+            .overlay(alignment: .bottomTrailing) {
+                Button { adding = true } label: {
+                    ControlMarkView(.add, size: 26, colour: .white)
+                        .frame(width: 56, height: 56)
+                        .background(Theme.accent, in: Circle())
+                        .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 16)
+                .padding(.bottom, 14)
+                .accessibilityLabel("New workout")
+                .accessibilityIdentifier("add-workout")
+            }
             .navigationTitle("Workout Companion")
             .navigationDestination(isPresented: $showGym) { GymScreen() }
             // The screen stays on (and sounds can play) while at the gym.
             .onChange(of: showGym) { _, on in on ? Cues.shared.begin() : Cues.shared.end() }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { adding = true } label: {
-                        ControlMarkView(.addCircle, size: 26, colour: Theme.accent)
-                    }
-                    .accessibilityLabel("New workout")
-                    .accessibilityIdentifier("add-workout")
-                }
-            }
         }
         .sheet(item: $editing) { w in
             NavigationStack {
                 EditorScreen(workout: w, isNew: false) { editing = nil }
+            }
+            .environment(library)
+        }
+        // A tap on a workout's panel only shows its plan (since 1.28, his ask).
+        .sheet(item: $showing) { w in
+            NavigationStack {
+                WorkoutPlanScreen(workout: w) { showing = nil }
             }
             .environment(library)
         }
@@ -172,46 +186,47 @@ struct HomeScreen: View {
 }
 
 /// A workout in the grid: full colour, its hand-drawn icon, name and summary, a play mark; the pencil edits.
+/// One workout's panel. Since 1.28 (his ask) it has three separate taps: the panel shows the plan,
+/// the pen edits, the round play button starts. The icon, the pen and the play button are larger.
 private struct WorkoutCard: View {
     let workout: Workout
+    let show: () -> Void
     let start: () -> Void
     let edit: () -> Void
 
     var body: some View {
-        Button(action: start) {
+        Button(action: show) {
             VStack(alignment: .leading, spacing: 4) {
-                IconMark(.hand(workout.shownIcon), size: 30, colour: workout.inkOnFill)
+                IconMark(.hand(workout.shownIcon), size: 42, colour: workout.inkOnFill)
                     .accessibilityHidden(true)
                 Spacer(minLength: 6)
-                Text(workout.name.isEmpty ? "Untitled" : workout.name)
-                    .font(.headline)
-                    .foregroundStyle(workout.inkOnFill)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                HStack(alignment: .bottom, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(workout.name.isEmpty ? "Untitled" : workout.name)
+                        .font(.headline)
+                        .foregroundStyle(workout.inkOnFill)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                     Text(workout.summary)
                         .font(.caption)
                         .foregroundStyle(workout.inkOnFill.opacity(0.85))
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                    Spacer(minLength: 0)
-                    ControlMarkView(.play, size: 13, colour: workout.fill)
-                        .frame(width: 28, height: 28)
-                        .background(workout.inkOnFill, in: Circle())
                 }
+                // Room for the play button at the bottom right: the name and the summary never run under it.
+                .padding(.trailing, 48)
             }
             .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 128, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
             .background(workout.fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Start \(workout.name), \(workout.summary)")
+        .accessibilityLabel("\(workout.name), \(workout.summary)")
         .accessibilityIdentifier("workout-\(workout.name)")
         .overlay(alignment: .topTrailing) {
             Button(action: edit) {
-                ControlMarkView(.edit, size: 17, colour: workout.inkOnFill)
-                    .frame(width: 40, height: 40)
+                ControlMarkView(.edit, size: 24, colour: workout.inkOnFill)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -219,22 +234,18 @@ private struct WorkoutCard: View {
             .accessibilityLabel("Edit \(workout.name)")
             .accessibilityIdentifier("edit-\(workout.name)")
         }
-    }
-}
-
-private struct NewWorkoutTile: View {
-    var body: some View {
-        VStack(spacing: 6) {
-            ControlMarkView(.addCircle, size: 30, colour: Theme.accent)
-            Text("New workout")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.accent)
+        .overlay(alignment: .bottomTrailing) {
+            Button(action: start) {
+                ControlMarkView(.play, size: 20, colour: workout.fill)
+                    .frame(width: 44, height: 44)
+                    .background(workout.inkOnFill, in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(10)
+            .accessibilityLabel("Start \(workout.name)")
+            .accessibilityIdentifier("start-\(workout.name)")
         }
-        .frame(maxWidth: .infinity, minHeight: 128)
-        .background(Theme.accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .stroke(Theme.accent, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])))
-        .accessibilityElement(children: .combine)
     }
 }
 
