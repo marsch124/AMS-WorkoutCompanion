@@ -163,10 +163,22 @@ struct BottomActionsBar: ViewModifier {
     var tint: Color = Theme.accent
     var cancelID = "cancel"
     var saveID = "save"
+    /// A red button at the left, e.g. Discard on the Session done page (since 1.30).
+    var discard: (() -> Void)? = nil
+    var discardTitle = "Discard"
+    var discardID = "discard"
 
     func body(content: Content) -> some View {
         content.safeAreaInset(edge: .bottom, spacing: 0) {
             HStack(spacing: 12) {
+                if let discard {
+                    Button(discardTitle, role: .destructive, action: discard)
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
+                        .tint(Gym.end)
+                        .accessibilityIdentifier(discardID)
+                    Spacer(minLength: 0)
+                }
                 if let cancel {
                     Button(cancelTitle, action: cancel)
                         .buttonStyle(.bordered)
@@ -193,9 +205,12 @@ extension View {
     /// Cancel and Save (or Done) at the bottom for one-handed use.
     func bottomActions(cancel: (() -> Void)?, cancelTitle: String = "Cancel", save: @escaping () -> Void,
                        saveTitle: String = "Save", tint: Color = Theme.accent,
-                       cancelID: String = "cancel", saveID: String = "save") -> some View {
+                       cancelID: String = "cancel", saveID: String = "save",
+                       discard: (() -> Void)? = nil, discardTitle: String = "Discard",
+                       discardID: String = "discard") -> some View {
         modifier(BottomActionsBar(cancel: cancel, cancelTitle: cancelTitle, save: save, saveTitle: saveTitle,
-                                  tint: tint, cancelID: cancelID, saveID: saveID))
+                                  tint: tint, cancelID: cancelID, saveID: saveID,
+                                  discard: discard, discardTitle: discardTitle, discardID: discardID))
     }
 }
 

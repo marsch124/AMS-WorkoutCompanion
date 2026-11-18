@@ -108,9 +108,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.29 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.30 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.29"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.30"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -210,6 +210,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["gym-summary-done"].firstMatch.tap()
 
         // The finished session is the newest earlier visit; its page shows both photos.
+        app.showEarlierVisits()
         let row = app.buttons["gym-visit-1"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         while !row.isHittable { app.swipeUp() }
@@ -237,7 +238,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-gym"].tap()
         let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'gym-visit-'"))
         XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+        app.showEarlierVisits()
         let before = rows.count
+        for _ in 0..<10 where !app.buttons["machine-Chest press"].isHittable { app.swipeDown() }
 
         func oneSet() {
             app.buttons["machine-Chest press"].tap()
@@ -277,7 +280,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-gym"].tap()
         let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'gym-visit-'"))
         XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
+        app.showEarlierVisits()
         let before = rows.count
+        for _ in 0..<10 where !app.buttons["machine-Chest press"].isHittable { app.swipeDown() }
         app.buttons["machine-Chest press"].tap()
         waitFor(app.staticTexts["gym-next-set"], label: "Set 1")
         app.buttons["gym-set-done"].tap()

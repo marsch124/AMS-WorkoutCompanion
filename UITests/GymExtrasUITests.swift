@@ -19,12 +19,17 @@ final class GymExtrasUITests: XCTestCase {
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
-    /// 1.11.3: the Earlier visits heading names the gym; an earlier visit's date has the year.
+    /// 1.11.3: an earlier visit's date has the year. Since 1.30 the list is folded behind a toggle
+    /// that names the gym (his ask); closed when the screen opens.
     func testEarlierVisitsNameTheGymAndTheDateHasTheYear() {
         openGym()
-        let heading = any("gym-earlier-heading")
-        XCTAssertTrue(heading.waitForExistence(timeout: 5))
-        XCTAssertTrue(heading.label.hasPrefix("Earlier visits · "), heading.label)
+        let toggle = app.buttons["gym-earlier-toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        XCTAssertTrue((toggle.value as? String ?? "").hasPrefix("Hidden."), "\(String(describing: toggle.value))")
+        XCTAssertTrue((toggle.value as? String ?? "").contains(" at "), "names the gym: \(String(describing: toggle.value))")
+        XCTAssertFalse(app.buttons["gym-visit-1"].exists, "closed at first")
+        app.showEarlierVisits()
+        let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); a.name = "130-earlier-open"; a.lifetime = .keepAlways; add(a)
         let row = app.buttons["gym-visit-1"]
         for _ in 0..<8 where !row.isHittable { app.swipeUp() }   // it sits far below the machines
         row.tap()
@@ -102,15 +107,73 @@ final class GymExtrasUITests: XCTestCase {
         XCTAssertFalse(app.buttons["machine-Leg press"].exists, "Leg press does not match")
     }
 
-    func testSaveLastVisitAsATemplate() {
+    /// Since 1.30 (his ask) Save as template is part of finishing: on the Well done summary.
+    func testSaveTheSessionAsATemplateWhenFinishing() {
         openGym()
-        app.buttons["gym-repeat-template"].tap()
+        XCTAssertFalse(app.buttons["gym-repeat-template"].exists, "no longer on the gym screen's head")
+        app.buttons["machine-Leg press"].tap()
+        XCTAssertTrue(app.buttons["gym-set-done"].waitForExistence(timeout: 5))
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))
+        app.buttons["machine-done-pill"].tap()
+        for _ in 0..<10 where !app.buttons["gym-finish"].isHittable { app.swipeUp() }
+        XCTAssertTrue(app.buttons["gym-finish"].waitForExistence(timeout: 5))
+        app.buttons["gym-finish"].tap()
+        app.confirmEnd()
+        let save = app.buttons["gym-summary-template"]
+        for _ in 0..<6 where !save.isHittable { app.swipeUp() }
+        save.tap()
         let field = app.alerts.firstMatch.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap()
         field.typeText("Tuesday")
-        app.alerts.firstMatch.buttons["gym-repeat-template-save"].firstMatch.tap()
+        app.alerts.firstMatch.buttons["gym-summary-template-save"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Saved as template · Tuesday"].waitForExistence(timeout: 5))
+        let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); a.name = "130-summary-template"; a.lifetime = .keepAlways; add(a)
+        app.buttons["gym-summary-done"].firstMatch.tap()
         app.buttons["gym-plan"].tap()
         XCTAssertTrue(app.buttons["plan-template-Tuesday"].waitForExistence(timeout: 5), "the template is not listed")
+    }
+
+    /// 1.30 (his ask): Discard session in the End box throws the session away, after asking once more.
+    func testDiscardSessionThrowsItAway() {
+        openGym()
+        app.buttons["machine-Leg press"].tap()
+        XCTAssertTrue(app.buttons["gym-set-done"].waitForExistence(timeout: 5))
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))
+        app.buttons["machine-done-pill"].tap()
+        let end = app.buttons["gym-session-end"]
+        XCTAssertTrue(end.waitForExistence(timeout: 5))
+        end.tap()
+        let discard = app.alerts.firstMatch.buttons["Discard session"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 5))
+        let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); a.name = "130-end-box"; a.lifetime = .keepAlways; add(a)
+        discard.tap()
+        let sure = app.alerts["Discard this session?"]
+        XCTAssertTrue(sure.waitForExistence(timeout: 5))
+        sure.buttons["Discard session"].firstMatch.tap()
+        XCTAssertFalse(any("gym-session-going").waitForExistence(timeout: 2), "the session is gone")
+        XCTAssertFalse(any("gym-session-done").exists, "nothing counted as done")
+    }
+
+    /// 1.30 (his ask): Discard on the Session done page throws the finished session away.
+    func testDiscardOnTheSessionDonePage() {
+        openGym()
+        app.buttons["machine-Leg press"].tap()
+        XCTAssertTrue(app.buttons["gym-set-done"].waitForExistence(timeout: 5))
+        app.buttons["gym-set-done"].tap()
+        XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))
+        app.buttons["machine-done-pill"].tap()
+        let end = app.buttons["gym-session-end"]
+        XCTAssertTrue(end.waitForExistence(timeout: 5))
+        end.tap()
+        app.confirmEnd()
+        let discard = app.buttons["gym-summary-discard"]
+        XCTAssertTrue(discard.waitForExistence(timeout: 5))
+        let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); a.name = "130-summary-discard"; a.lifetime = .keepAlways; add(a)
+        discard.tap()
+        app.alerts.firstMatch.buttons["Discard session"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["machine-Leg press"].waitForExistence(timeout: 5))
+        XCTAssertFalse(any("gym-session-done").exists, "nothing counted as done")
     }
 }

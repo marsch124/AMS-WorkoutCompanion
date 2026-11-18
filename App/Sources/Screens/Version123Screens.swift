@@ -147,7 +147,19 @@ struct GymExtrasScreen: View {
     @State private var stretch: UUID?
     @State private var loaded = false
 
-    private var lists: [Workout] { library.workouts.filter { $0.kind == .checklist } }
+    /// His own lists — the ready-made ones (since 1.30) are listed on their own.
+    private var lists: [Workout] {
+        let ready = Set(StretchRoutine.all.map(\.id))
+        return library.workouts.filter { $0.kind == .checklist && !ready.contains($0.id) }
+    }
+    /// The list the guide shows for the current choice.
+    private var chosenList: Workout? {
+        guard stretch != GymLog.noStretch else { return nil }
+        if let id = stretch, let w = library.workouts.first(where: { $0.id == id }) { return w }
+        if let id = stretch, let r = StretchRoutine.all.first(where: { $0.id == id }) { return r.workout() }
+        if stretch == nil, let own = library.workouts.first(where: { $0.id == library.gym.stretchID }) { return own }
+        return StretchRoutine.all[0].workout()
+    }
 
     var body: some View {
         Form {
@@ -175,7 +187,11 @@ struct GymExtrasScreen: View {
             }
             Section {
                 Picker("Stretch list", selection: $stretch) {
-                    Text("After-gym stretch (the app's own)").tag(UUID?.none)
+                    StretchChoiceRow(name: "After-gym stretch", line: StretchRoutine.all[0].summary).tag(UUID?.none)
+                    // Six more ready-made lists (since 1.30, his ask).
+                    ForEach(StretchRoutine.all.dropFirst()) { r in
+                        StretchChoiceRow(name: r.name, line: r.summary).tag(UUID?.some(r.id))
+                    }
                     ForEach(lists) { w in
                         Text(w.name.isEmpty ? "Exercise list" : w.name).tag(UUID?.some(w.id))
                     }
@@ -185,10 +201,21 @@ struct GymExtrasScreen: View {
                 .labelsHidden()
                 .tint(Gym.fill)
                 .accessibilityIdentifier("extras-stretch")
+                if let w = chosenList {
+                    NavigationLink {
+                        StretchGuideScreen(workout: w)
+                    } label: {
+                        HStack(spacing: 8) {
+                            IconMark(.hand("yoga"), size: 20, colour: Gym.tint)
+                            Text("How to do these stretches").foregroundStyle(Gym.tint).fontWeight(.semibold)
+                        }
+                    }
+                    .accessibilityIdentifier("extras-stretch-guide")
+                }
             } header: {
                 Text("Stretch after a session")
             } footer: {
-                Text("The Session done page offers \"Stretch now\" with this list. The app's own list is made the first time you use it and is then yours to change. None hides the button.")
+                Text("The Session done page offers \"Stretch now\" with this list. A list is made the first time you choose or use it and is then yours to change under Workouts. None hides the button.")
             }
         }
         .scrollContentBackground(.hidden)
@@ -202,10 +229,15 @@ struct GymExtrasScreen: View {
             remind = library.gym.nudgeAfter > 0
             days = remind ? min(14, max(2, library.gym.nudgeAfter)) : GymLog.usualNudgeDays
             let id = library.gym.stretchID
-            stretch = id == GymLog.noStretch || lists.contains { $0.id == id } ? id : nil
+            stretch = id == GymLog.noStretch || lists.contains { $0.id == id } || StretchRoutine.all.dropFirst().contains { $0.id == id } ? id : nil
         }
         .bottomActions(cancel: { dismiss() }, save: {
             let n = remind ? days : 0, s = stretch
+            // A ready-made list becomes an exercise list the first time it is chosen (since 1.30).
+            if let s, let r = StretchRoutine.all.first(where: { $0.id == s }),
+               !library.workouts.contains(where: { $0.id == s }) {
+                library.save(r.workout())
+            }
             library.changeGym {
                 $0.nudgeDays = n == GymLog.usualNudgeDays ? nil : n
                 $0.stretchID = s

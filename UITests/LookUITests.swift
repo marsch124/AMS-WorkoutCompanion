@@ -63,13 +63,21 @@ final class LookUITests: XCTestCase {
 
     // MARK: 1.17
 
-    /// His ask (5 Nov): the three action tiles smaller — they were ~84 pt tall.
+    /// His ask (5 Nov): the action tiles smaller — they were ~84 pt tall. Since 1.30 (his ask) the gym
+    /// button is as wide as the card and as tall as Plan today and Repeat last visit.
     func testActionTilesAreCompact() {
-        for id in ["gym-plan", "gym-repeat", "gym-repeat-template"] {
+        let gymButton = app.buttons["gym-place-menu"]
+        XCTAssertTrue(gymButton.waitForExistence(timeout: 5))
+        for id in ["gym-plan", "gym-repeat"] {
             let tile = app.buttons[id]
             XCTAssertTrue(tile.waitForExistence(timeout: 5), id)
             XCTAssertLessThanOrEqual(tile.frame.height, 52, "\(id) is \(tile.frame.height) pt tall")
+            XCTAssertEqual(tile.frame.height, gymButton.frame.height, accuracy: 1, id)
         }
+        XCTAssertEqual(gymButton.frame.minX, app.buttons["gym-plan"].frame.minX, accuracy: 1)
+        XCTAssertEqual(gymButton.frame.maxX, app.buttons["gym-repeat"].frame.maxX, accuracy: 1)
+        XCTAssertFalse(app.buttons["gym-repeat-template"].exists)
+        let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); a.name = "130-head"; a.lifetime = .keepAlways; add(a)
     }
 
     /// His ask (5 Nov): show that a session is going. No line before the first set; after it,

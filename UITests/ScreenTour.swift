@@ -413,6 +413,7 @@ final class ScreenTour: XCTestCase {
         app.buttons["gym-summary-done"].firstMatch.tap()
         XCTAssertTrue(any("gym-session-done").waitForExistence(timeout: 5))
         snap("54 Session done line")
+        app.showEarlierVisits()
         let row = app.buttons["gym-visit-1"]
         while !row.isHittable { app.swipeUp() }
         row.tap()

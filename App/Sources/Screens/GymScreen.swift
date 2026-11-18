@@ -108,10 +108,10 @@ struct GymScreen: View {
     @State private var gymName = ""
     @State private var pickingDay = false
     @State private var search = ""
-    @State private var namingRepeat = false
-    @State private var repeatName = ""
+    @State private var showingEarlier = false
     @State private var editingHours = false
     @State private var askingEnd = false
+    @State private var askingDiscard = false
     @State private var choosingGym = false
     @State private var afterChooser: GymChooserAction?
 
@@ -129,18 +129,16 @@ struct GymScreen: View {
             VStack(alignment: .leading, spacing: 10) {
                 // Since 1.26: the chooser, the hint and the three buttons in one card — the screen's head.
                 VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    gymMenu
-                    // Open now, or when it opens (since 1.23) — only once hours are given.
-                    if let line = library.gym.currentGym?.openLine(at: Date()) {
-                        Text(line.text)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(line.open ? SessionGoingLine.green : Gym.busyTint)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .accessibilityIdentifier("gym-hours-line")
-                    }
-                    Spacer()
+                // Since 1.30 (his ask) as wide as the card and as tall as the tiles below; hours under it.
+                gymMenu
+                // Open now, or when it opens (since 1.23) — only once hours are given.
+                if let line = library.gym.currentGym?.openLine(at: Date()) {
+                    Text(line.text)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(line.open ? SessionGoingLine.green : Gym.busyTint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .accessibilityIdentifier("gym-hours-line")
                 }
                 if !isToday {
                     HStack {
@@ -272,26 +270,29 @@ struct GymScreen: View {
                     }
                 }
 
+                // Since 1.30 (his ask) folded away behind a toggle; closed each time the screen opens.
                 let earlier = library.gym.visits(in: gymID).filter { $0.id != visit?.id }
                 if !earlier.isEmpty {
-                    Text(library.gym.gyms.first { $0.id == gymID }.map { "Earlier visits · \($0.name)" } ?? "Earlier visits")
-                        .font(.headline)
-                        .accessibilityIdentifier("gym-earlier-heading")
-                        .foregroundStyle(Gym.tint)
+                    EarlierVisitsToggle(count: earlier.count, last: earlier.first?.date,
+                                        gym: library.gym.gyms.first { $0.id == gymID }?.name,
+                                        open: $showingEarlier)
                         .padding(.top, 10)
-                    VStack(spacing: 0) {
-                        ForEach(Array(earlier.enumerated()), id: \.element.id) { i, v in
-                            // The row carries its page (a value lookup did not open — the 1.5 History fault).
-                            NavigationLink { VisitScreen(visitID: v.id) } label: {
-                                VisitRow(visit: v)
+                    if showingEarlier {
+                        VStack(spacing: 0) {
+                            ForEach(Array(earlier.enumerated()), id: \.element.id) { i, v in
+                                // The row carries its page (a value lookup did not open — the 1.5 History fault).
+                                NavigationLink { VisitScreen(visitID: v.id) } label: {
+                                    VisitRow(visit: v)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("gym-visit-\(i + 1)")
+                                if i < earlier.count - 1 { Divider().padding(.leading, 12) }
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("gym-visit-\(i + 1)")
-                            if i < earlier.count - 1 { Divider().padding(.leading, 12) }
                         }
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.line, lineWidth: 1))
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
-                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.line, lineWidth: 1))
                 }
             }
             .padding(.horizontal, 16)
@@ -352,6 +353,12 @@ struct GymScreen: View {
             NavigationStack {
                 SummaryScreen(visitID: v.id, undo: {
                     if let before = beforeFinish { library.changeGym { $0.undoFinish(visit: v.id, before: before) } }
+                    beforeFinish = nil
+                    summary = nil
+                }, discard: {
+                    // Since 1.30 (his ask): throw the just-finished session away.
+                    library.changeGym { $0.discard(visit: v.id) }
+                    GymNudge.sync(library.gym)
                     beforeFinish = nil
                     summary = nil
                 }) { summary = nil }
@@ -418,11 +425,28 @@ struct GymScreen: View {
         .alert("End this session?", isPresented: $askingEnd) {
             Button("End session", role: .destructive) { endSession() }
                 .accessibilityIdentifier("gym-end-confirm")
+            // Since 1.30 (his ask): throw the session away instead — it asks once more, as sets are lost.
+            if (visit?.setCount ?? 0) > 0 {
+                Button("Discard session", role: .destructive) { askingDiscard = true }
+                    .accessibilityIdentifier("gym-end-discard")
+            }
             Button("Continue the session", role: .cancel) { }
                 .accessibilityIdentifier("gym-end-continue")
         } message: {
             Text((visit?.setCount ?? 0) > 0 ? "Are you sure? Your sets are saved and the clock stops."
                                             : "Are you sure? There are no sets yet, so nothing is saved.")
+        }
+        .alert("Discard this session?", isPresented: $askingDiscard) {
+            Button("Discard session", role: .destructive) {
+                if let visit { library.changeGym { $0.discard(visit: visit.id) } }
+                GymNudge.sync(library.gym)
+            }
+            .accessibilityIdentifier("gym-discard-confirm")
+            Button("Keep the session", role: .cancel) { }
+                .accessibilityIdentifier("gym-discard-keep")
+        } message: {
+            let n = visit?.setCount ?? 0
+            Text("All \(n == 1 ? "1 set" : "\(n) sets") of this session are deleted. It will not show in Earlier visits or History. This cannot be undone.")
         }
     }
 
@@ -433,17 +457,21 @@ struct GymScreen: View {
         Button {
             choosingGym = true
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Text(library.gym.currentGym?.name ?? GymLog.firstGymName)
                     .font(.headline)
                     .foregroundStyle(Gym.place.inkColor)
                     .lineLimit(1)
-                ControlMarkView(.chevron, size: 12, colour: Gym.place.inkColor)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
+                ControlMarkView(.chevron, size: 13, colour: Gym.place.inkColor)
                     .rotationEffect(.degrees(90))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Gym.place.fillColor, in: Capsule())
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity)
+            .frame(height: GymScreen.headHeight)
+            .background(Gym.place.fillColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Gym: \(library.gym.currentGym?.name ?? GymLog.firstGymName)")
@@ -510,17 +538,17 @@ struct GymScreen: View {
         }
     }
 
-    /// Plan today, Repeat last visit, Save as template — in the head card since 1.26.
+    /// Plan today and Repeat last visit — in the head card since 1.26.
+    /// Since 1.30 (his ask) both green and alike (before: Repeat was full indigo), as tall as the gym button;
+    /// Save as template moved to the Well done summary after Finish.
     @ViewBuilder private var actionRow: some View {
         if plan == nil, !machines.isEmpty, sessionStart == nil, (visit?.setCount ?? 0) == 0 {
             // Only before the session (since 1.23 build 2, his ask): once it is going, planning tiles are in the way.
-            // Three equal tiles, mark above words (1.13 — his "the buttons look like crap": capsules wrapped unevenly).
-            // Repeat last visit is the main one: full colour.
             let repeatOrder = library.gym.lastOrder(gym: gymID, before: day)
-            HStack(spacing: 2) {
+            HStack(spacing: 8) {
                 Button { planning = true } label: {
-                    GymActionTile(title: "Plan today", main: false) {
-                        ControlMarkView(.list, size: 15, colour: Gym.tint)
+                    GymActionTile(title: "Plan today") {
+                        ControlMarkView(.list, size: 15, colour: SessionGoingLine.green)
                     }
                 }
                 .buttonStyle(.plain)
@@ -530,40 +558,15 @@ struct GymScreen: View {
                     Button {
                         library.changeGym { $0.setPlan(repeatOrder, on: day, gym: gymID) }
                     } label: {
-                        GymActionTile(title: "Repeat last visit", main: true) {
-                            ControlMarkView(.play, size: 15, colour: Gym.ink)
+                        GymActionTile(title: "Repeat last visit") {
+                            ControlMarkView(.play, size: 15, colour: SessionGoingLine.green)
                         }
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("gym-repeat")
-                    // Keep last visit as a template, without planning first (since 1.11).
-                    Button {
-                        repeatName = ""
-                        namingRepeat = true
-                    } label: {
-                        GymActionTile(title: "Save as template", main: false) {
-                            AppMarkView(.template, size: 15, colour: Gym.tint)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("gym-repeat-template")
                 }
             }
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(3)
-            .background(Gym.fill.opacity(0.12), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-            .alert("Save last visit as template", isPresented: $namingRepeat) {
-                TextField("For example: Leg day", text: $repeatName)
-                Button("Cancel", role: .cancel) {}
-                    .accessibilityIdentifier("gym-repeat-template-cancel")
-                Button("Save") {
-                    let name = repeatName, o = library.gym.lastOrder(gym: gymID, before: day), g = gymID
-                    library.changeGym { _ = $0.saveTemplate(named: name, order: o, gym: g) }
-                }
-                .accessibilityIdentifier("gym-repeat-template-save")
-            } message: {
-                Text("Last visit's machines, in their order. Use it later under Plan today. The same name in this gym is replaced.")
-            }
+            .frame(height: GymScreen.headHeight)
         }
     }
 
@@ -799,6 +802,8 @@ struct GymScreen: View {
 extension GymScreen {
     /// More machines than this, and the gym screen gets a search field.
     static let searchFrom = 8
+    /// The gym button and the Plan today / Repeat last visit tiles share this height (since 1.30).
+    static let headHeight: CGFloat = 50
 }
 
 private enum GymNaming { case new, rename }
@@ -905,9 +910,58 @@ struct SessionGoingLine: View {
 }
 
 /// One of the gym screen's action tiles: a hand-drawn mark beside its words, all tiles the same size.
+/// "Earlier visits · 12 sessions at City gym · last Mon 16 Nov" — tap to show or hide the list (since 1.30, his ask).
+private struct EarlierVisitsToggle: View {
+    let count: Int
+    let last: Date?
+    let gym: String?
+    @Binding var open: Bool
+
+    private var line: String {
+        var t = count == 1 ? "1 session" : "\(count) sessions"
+        if let gym { t += " at \(gym)" }
+        if let last { t += " · last \(last.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))" }
+        return t
+    }
+
+    var body: some View {
+        Button {
+            withAnimation(.snappy(duration: 0.25)) { open.toggle() }
+        } label: {
+            HStack(spacing: 12) {
+                AppMarkView(.clock, size: 20, colour: Gym.tint)
+                    .frame(width: 38, height: 38)
+                    .background(Gym.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Earlier visits")
+                        .font(.headline)
+                        .foregroundStyle(Theme.ink)
+                    Text(line)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 4)
+                ControlMarkView(.chevron, size: 14, colour: Gym.tint)
+                    .rotationEffect(.degrees(open ? 90 : 0))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Earlier visits")
+        .accessibilityValue(open ? "Shown. \(line)" : "Hidden. \(line)")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("gym-earlier-toggle")
+    }
+}
+
 private struct GymActionTile<Mark: View>: View {
     let title: String
-    let main: Bool
     @ViewBuilder let mark: () -> Mark
 
     // Since 1.26 one joined row: mark above the words; the main one full indigo, the others clear on the row's pale indigo.
@@ -920,14 +974,14 @@ private struct GymActionTile<Mark: View>: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-                .foregroundStyle(main ? Gym.ink : Gym.tint)
+                .foregroundStyle(SessionGoingLine.green)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(main ? AnyShapeStyle(Gym.fill) : AnyShapeStyle(Color.clear),
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        // Since 1.30 (his ask) each tile pale green, both alike — none singled out.
+        .background(SessionGoingLine.green.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -1266,10 +1320,16 @@ struct SummaryScreen: View {
     let visitID: UUID
     /// Undo Finish — tapped by mistake: the session goes on (since 1.14).
     var undo: (() -> Void)? = nil
+    /// Discard session — throw it away after all (since 1.30, his ask); asks once more first.
+    var discard: (() -> Void)? = nil
     let done: () -> Void
+    @State private var askingDiscard = false
     @State private var title = ""
     @State private var notes = ""
     @State private var stretching: Workout?
+    @State private var namingTemplate = false
+    @State private var templateName = ""
+    @State private var savedTemplate: String?
 
     /// The stretch list for after a session: the one chosen in Settings, else the app's own, made on first use.
     private func stretch() {
@@ -1354,6 +1414,48 @@ struct SummaryScreen: View {
                         }
                     }
                 }
+                // Save as template — part of finishing since 1.30 (his ask; before: a tile on the gym screen's head).
+                let order = visit.templateOrder(in: library.gym)
+                if !order.isEmpty {
+                    Section {
+                        Button {
+                            templateName = ""
+                            namingTemplate = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                if savedTemplate != nil {
+                                    ControlMarkView(.check, size: 20, colour: SessionGoingLine.green)
+                                } else {
+                                    AppMarkView(.template, size: 22, colour: Gym.tint)
+                                }
+                                Text(savedTemplate.map { "Saved as template · \($0)" } ?? "Save as template")
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(savedTemplate != nil ? SessionGoingLine.green : Gym.tint)
+                                    .lineLimit(1)
+                                Spacer()
+                                if savedTemplate == nil { ControlMarkView(.chevron, size: 14, colour: Gym.tint) }
+                            }
+                        }
+                        .disabled(savedTemplate != nil)
+                        .accessibilityIdentifier("gym-summary-template")
+                        .alert("Save as template", isPresented: $namingTemplate) {
+                            TextField("For example: Leg day", text: $templateName)
+                            Button("Cancel", role: .cancel) {}
+                            Button("Save") {
+                                let name = templateName.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard !name.isEmpty else { return }
+                                let g = visit.gymID
+                                library.changeGym { _ = $0.saveTemplate(named: name, order: order, gym: g) }
+                                savedTemplate = name
+                            }
+                            .accessibilityIdentifier("gym-summary-template-save")
+                        } message: {
+                            Text("This session's machines, in the order you used them. Use it later under Plan today. The same name in this gym is replaced.")
+                        }
+                    } footer: {
+                        Text("Keep this session's machines and order for another day.")
+                    }
+                }
                 if library.gym.stretchID != GymLog.noStretch {
                     Section {
                         Button(action: stretch) {
@@ -1365,6 +1467,17 @@ struct SummaryScreen: View {
                             }
                         }
                         .accessibilityIdentifier("gym-stretch")
+                        // The guide: how to do each stretch (since 1.30, his ask).
+                        NavigationLink {
+                            StretchGuideScreen(workout: library.workouts.first { $0.id == library.gym.stretchID }
+                                               ?? StretchRoutine.all[0].workout())
+                        } label: {
+                            HStack(spacing: 8) {
+                                AppMarkView(.template, size: 20, colour: Gym.tint)
+                                Text("How to do the stretches").foregroundStyle(Gym.tint)
+                            }
+                        }
+                        .accessibilityIdentifier("gym-stretch-guide")
                     }
                 }
                 if !bests.isEmpty {
@@ -1399,7 +1512,16 @@ struct SummaryScreen: View {
         } }, cancelTitle: "Undo Finish", save: {
             library.changeGym { $0.describe(visit: visitID, title: title, notes: notes) }
             done()
-        }, saveTitle: "Done", tint: Gym.fill, cancelID: "gym-summary-undo", saveID: "gym-summary-done")
+        }, saveTitle: "Done", tint: Gym.fill, cancelID: "gym-summary-undo", saveID: "gym-summary-done",
+           discard: discard.map { _ in { askingDiscard = true } }, discardTitle: "Discard", discardID: "gym-summary-discard")
+        .alert("Discard this session?", isPresented: $askingDiscard) {
+            Button("Discard session", role: .destructive) { discard?() }
+                .accessibilityIdentifier("gym-summary-discard-confirm")
+            Button("Keep the session", role: .cancel) { }
+        } message: {
+            let n = library.gym.visits.first { $0.id == visitID }?.setCount ?? 0
+            Text("All \(n == 1 ? "1 set" : "\(n) sets") of this session are deleted, with its title, notes and photos. It will not show in Earlier visits or History. This cannot be undone.")
+        }
     }
 
     private func row(_ title: String, _ value: String, id: String) -> some View {
