@@ -147,7 +147,9 @@ struct GymScreen: View {
                 }
                 Text(machines.isEmpty
                      ? "At each machine: take a photo, give it a name, then log your sets."
-                     : plan == nil ? "Tap the machine you'll use next — or plan today's order." : "Follow the plan, or tap any machine that is free.")
+                     : plan != nil ? "Follow the plan, or tap any machine that is free."
+                     : sessionStart != nil || (visit?.setCount ?? 0) > 0 ? "Tap the machine you'll use next."
+                     : "Tap the machine you'll use next — or plan today's order.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
                     .accessibilityIdentifier("gym-intro")
@@ -460,7 +462,8 @@ struct GymScreen: View {
             Text("Touch and hold a machine: later, skip today, move to next visit or swap.")
                 .font(.caption)
                 .foregroundStyle(Theme.muted)
-        } else if !machines.isEmpty {
+        } else if !machines.isEmpty, sessionStart == nil, (visit?.setCount ?? 0) == 0 {
+            // Only before the session (since 1.23 build 2, his ask): once it is going, planning tiles are in the way.
             // Three equal tiles, mark above words (1.13 — his "the buttons look like crap": capsules wrapped unevenly).
             // Repeat last visit is the main one: full colour.
             let repeatOrder = library.gym.lastOrder(gym: gymID, before: day)

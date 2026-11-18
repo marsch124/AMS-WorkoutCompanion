@@ -22,4 +22,16 @@ final class Version123UITests: XCTestCase {
         app.buttons["machine-done-pill"].tap()
         XCTAssertTrue(any("gym-session-going").waitForExistence(timeout: 5))
     }
+
+    /// Build 2: Plan today, Repeat last visit and Save as template show only before the session.
+    func testPlanningTilesHideOnceTheSessionIsGoing() {
+        XCTAssertTrue(app.buttons["gym-repeat"].waitForExistence(timeout: 5))
+        app.buttons["machine-Leg press"].tap()
+        XCTAssertTrue(app.buttons["machine-done-pill"].waitForExistence(timeout: 5))
+        app.buttons["machine-done-pill"].tap()
+        XCTAssertTrue(any("gym-session-going").waitForExistence(timeout: 5))
+        XCTAssertFalse(any("gym-plan").exists)
+        XCTAssertFalse(any("gym-repeat").exists)
+        XCTAssertFalse(any("gym-repeat-template").exists)
+    }
 }
