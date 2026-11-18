@@ -170,6 +170,8 @@ struct MachineScreen: View {
             .accessibilityIdentifier("machine-done-pill")
         }
         .toolbar {
+            // How long the session has been going, small at the top left (since 1.31, his ask).
+            ToolbarItem(placement: .topBarLeading) { SessionClockPill(day: day, gymID: gymID) }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { editing = true } label: { ControlMarkView(.edit, size: 22, colour: Gym.tint) }
                     .accessibilityLabel("Edit machine")
@@ -436,6 +438,8 @@ struct MachineScreen: View {
             Text("Next: set \(today.count + 1) · \(said(GymSet(kg: isReps ? 0 : kg, reps: reps)))")
                 .font(.subheadline)
                 .foregroundStyle(Theme.muted)
+            // Change the next set's weight while resting (since 1.31, his ask).
+            if !isReps { restWeight }
             if RestLive.isShowing {
                 // The same countdown is on the lock screen and in the Dynamic Island (since 1.15).
                 Text("Also on your lock screen")
@@ -492,6 +496,39 @@ struct MachineScreen: View {
         .frame(maxWidth: .infinity)
         .padding(12)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// "Next set  −  34,5 kg  +" — under the rest ring (since 1.31, his ask: adjust the weight during the rest).
+    private var restWeight: some View {
+        HStack(spacing: 10) {
+            Text("Weight").font(.subheadline.weight(.semibold)).foregroundStyle(Gym.tint)
+            Spacer(minLength: 0)
+            Button { kg = max(0, kg - step) } label: {
+                Capsule().fill(Gym.ink).frame(width: 14, height: 2.2)
+                    .frame(width: 34, height: 34)
+                    .background(Gym.fill, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Less weight")
+            .accessibilityIdentifier("gym-rest-weight-minus")
+            Text(kg <= 0 ? "Body" : "\(GymSet.number(kg)) kg")
+                .font(.system(.title3, design: .rounded).weight(.bold).monospacedDigit())
+                .foregroundStyle(Theme.ink)
+                .frame(minWidth: 92)
+                .accessibilityIdentifier("gym-rest-weight")
+            Button { kg += step } label: {
+                ControlMarkView(.add, size: 18, colour: Gym.ink)
+                    .frame(width: 34, height: 34)
+                    .background(Gym.fill, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("More weight")
+            .accessibilityIdentifier("gym-rest-weight-plus")
+        }
+        .padding(.leading, 12)
+        .padding(.trailing, 6)
+        .padding(.vertical, 5)
+        .background(Gym.fill.opacity(0.10), in: Capsule())
     }
 
     /// Time, level and incline — for a treadmill, a rowing machine, a bike.
@@ -1241,6 +1278,44 @@ struct CameraPicker: UIViewControllerRepresentable {
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             finished(nil)
+        }
+    }
+}
+
+/// The session's clock as a small green pill: a dot that breathes while it runs, h:mm:ss or m:ss
+/// (since 1.31, his ask: "a small cool timer"). Grey and still when the clock is paused.
+struct SessionClockPill: View {
+    @Environment(Library.self) private var library
+    let day: Date
+    let gymID: UUID?
+    @State private var pulse = false
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            if let c = library.gym.sessionClock(on: day, gym: gymID, now: context.date) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(c.paused ? Theme.muted : SessionGoingLine.green)
+                        .frame(width: 7, height: 7)
+                        .scaleEffect(pulse && !c.paused ? 1.35 : 1)
+                        .opacity(pulse && !c.paused ? 0.55 : 1)
+                    Text(GymVisit.clock(c.seconds))
+                        .font(.system(.subheadline, design: .rounded).weight(.bold).monospacedDigit())
+                        .foregroundStyle(c.paused ? Theme.muted : SessionGoingLine.green)
+                        .contentTransition(.numericText())
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .background((c.paused ? Theme.muted : SessionGoingLine.green).opacity(0.14), in: Capsule())
+                .fixedSize()
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(c.paused ? "Session paused" : "Session going")
+                .accessibilityValue(GymVisit.clock(c.seconds))
+                .accessibilityIdentifier("machine-session-clock")
+            }
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) { pulse = true }
         }
     }
 }
