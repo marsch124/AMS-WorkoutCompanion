@@ -399,3 +399,8 @@ His two approved ideas after 1.17: see that a session is going from the Train pa
 - **Next time form.** `next-time-kg`, `next-time-reps`: typed boxes plus −/+ (were steppers only).
 - **No swipe back.** `noSwipeBack()` (App/Sources/NoSwipeBack.swift) disables the interactive pop gesture (edge swipe, and the full-page swipe of iOS 26) on the machine page, the gym page, History and Settings. Pages are left only with the Back button (top left) or the bottom button. Before: a sideways finger while double-tapping the weight could go back to the gym page.
 - **Texts.** What's new (1.33) and How it works (Logging a set) updated.
+
+### Build 2 — blue instead of indigo (his ask, 18 Nov 2026)
+- `Gym.swatch` = `IconColour(key: "gymblue", hex: "#2f6fe0", ink: "#ffffff")` (= `Theme.accent`, the round + on Workouts); before IconColour "indigo" #4f46e5. `Gym.tint` = #2f6fe0 / #8ab4ff (before #4f46e5 / #9d97ff). `Gym.band` = #0f2347 (before #1e1b4b). Everything that used the gym colour follows: At the gym card, gym chooser + plate, Set done, steppers, rest rows, headings.
+- `machine-done-pill` (Back to gym / Exercise done): `BigButtonStyle(fill: Gym.soft, ink: Gym.tint)` — solid pale blue #dbe6fb / #1e2f52 with blue words; before full indigo like Set done. `gym-set-done` = full green `Gym.done` #16a34a / #15803d, white words (his ask: "something positive"); before full indigo.
+- Rest weight: 0 kg shows "0" in the box (before the text "Body").

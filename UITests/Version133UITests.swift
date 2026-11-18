@@ -7,10 +7,12 @@ final class Version133UITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-uitest", "-gymdemo"]
         app.launch()
+        shot("133-home")
         app.buttons["open-gym"].tap()
         app.buttons["machine-Leg press"].tap()
         let kg = app.textFields["gym-weight"]
         XCTAssertTrue(kg.waitForExistence(timeout: 5))
+        shot("133-machine")
 
         // A sideways slide on the page no longer goes back to the gym.
         app.swipeRight()
@@ -45,5 +47,9 @@ final class Version133UITests: XCTestCase {
         app.buttons["Done"].firstMatch.tap()
         app.buttons["gym-rest-skip"].tap()
         XCTAssertEqual(app.textFields["gym-reps"].value as? String, "9")
+    }
+
+    private func shot(_ name: String) {
+        let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a)
     }
 }

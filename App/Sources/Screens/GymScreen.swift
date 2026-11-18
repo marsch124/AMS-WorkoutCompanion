@@ -4,16 +4,22 @@ import WorkoutCore
 
 /// The gym log's colour: its headings, buttons and marks.
 enum Gym {
-    static let swatch = IconColour.of(key: "indigo")!
+    /// Blue since 1.33 (his ask: he hated the indigo of the At the gym card and loved the blue of the
+    /// round + on Workouts) — the same #2f6fe0 as `Theme.accent`. It was indigo #4f46e5 from 1.0 to 1.32.
+    static let swatch = IconColour(key: "gymblue", name: "Blue", hex: "#2f6fe0", ink: "#ffffff")
     static var fill: Color { swatch.fillColor }
     static var ink: Color { swatch.inkColor }
-    /// Headings, words and marks on the page: indigo by day, a lighter indigo by night.
-    static let tint = Color.pair("#4f46e5", "#9d97ff")
+    /// Headings, words and marks on the page: blue by day, a lighter blue by night (indigo until 1.32).
+    static let tint = Color.pair("#2f6fe0", "#8ab4ff")
     /// A machine marked Busy: orange, so it stands out from the indigo of the rest.
     static let busy = IconColour.of(key: "orange")!
     static let busyTint = Color.pair("#c2410c", "#fdba74")
     /// The band with the name over a machine photo: deep indigo, day and night (since 1.16).
-    static let band = Color(hex: "#1e1b4b")
+    static let band = Color(hex: "#0f2347")
+    /// A solid pale blue for the second button (Back to gym, Exercise done), since 1.33 build 2.
+    static let soft = Color.pair("#dbe6fb", "#1e2f52")
+    /// Set done: a full green, the positive step (since 1.33 build 2, his ask).
+    static let done = Color.pair("#16a34a", "#15803d")
     /// A set that beat last time: a gold arrow (since 1.16).
     static let better = Color.pair("#b7791f", "#f6c453")
     /// End on the green session line: red, so it is not taken for the green line itself (since 1.27, his ask).

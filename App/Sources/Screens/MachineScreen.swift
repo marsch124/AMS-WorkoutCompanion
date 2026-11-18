@@ -159,7 +159,8 @@ struct MachineScreen: View {
                     }
                 }
             }
-            .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 50))
+            // Pale blue with blue words since 1.33 (his ask: set it apart from the full-blue Set done).
+            .buttonStyle(BigButtonStyle(fill: Gym.soft, ink: Gym.tint, height: 50))
             .keyboardShortcut(today.isEmpty ? .cancelAction : nil)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -390,9 +391,10 @@ struct MachineScreen: View {
                      minus: { reps = max(1, reps - 1) }, plus: { reps += 1 })
             HStack(spacing: 8) {
                 Button(action: setDone) {
-                    MarkLabel(title: "Set done", mark: .check, size: 24, colour: Gym.ink)
+                    MarkLabel(title: "Set done", mark: .check, size: 24, colour: .white)
                 }
-                .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
+                // Green since 1.33 build 2 (his ask: "something positive"); it was indigo.
+                .buttonStyle(BigButtonStyle(fill: Gym.done, ink: .white, height: 58))
                 .accessibilityIdentifier("gym-set-done")
             }
             if today.isEmpty {
