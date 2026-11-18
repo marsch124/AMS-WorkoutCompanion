@@ -21,8 +21,8 @@ struct RootView: View {
                     .opacity(tab == .train ? 1 : 0)
                     .allowsHitTesting(tab == .train)
                     .accessibilityHidden(tab != .train)
-                if tab == .history { NavigationStack { HistoryScreen() } }
-                if tab == .settings { NavigationStack { SettingsScreen() } }
+                if tab == .history { NavigationStack { HistoryScreen().noSwipeBack() } }
+                if tab == .settings { NavigationStack { SettingsScreen().noSwipeBack() } }
             }
             .frame(maxHeight: .infinity)
             // While typing, the keyboard takes the bar's place.

@@ -311,6 +311,7 @@ struct GymScreen: View {
         }
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("At the gym")
+        .noSwipeBack()
         .navigationBarTitleDisplayMode(.large)
         .onAppear {
             if library.gym.gyms.isEmpty { library.changeGym { $0.ensureGym() } }

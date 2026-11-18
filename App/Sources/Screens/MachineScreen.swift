@@ -33,7 +33,7 @@ struct MachineScreen: View {
     /// A hold against the clock — a plank (since 1.23): its seconds, and the countdown while it runs.
     @State private var holdSeconds = 30
     @State private var holdEnd: Date?
-    @FocusState private var typing: Bool
+    @FocusState private var typing: NumberBox?
 
     private let clock = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
@@ -179,10 +179,12 @@ struct MachineScreen: View {
             }
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("Done") { typing = false }
+                Button("Done") { typing = nil }
             }
         }
         .onAppear(perform: prefill)
+        // No swipe back on the machine page: a finger sliding while tapping a number left the page (since 1.33).
+        .noSwipeBack()
         // A locked iPhone still buzzes when the rest is over (since 1.8).
         .onChange(of: restEnd) { _, end in
             RestAlarm.set(end, "Set \(today.count + 1) on \(machine?.name ?? "the machine")")
@@ -381,19 +383,11 @@ struct MachineScreen: View {
                     .accessibilityIdentifier("gym-last-set")
             }
             if !isReps {
-                Stepper2(title: "kg", id: "gym-weight",
-                         minus: { kg = max(0, kg - step) }, plus: { kg += step }) {
-                    TextField("0", value: $kg, format: .number.precision(.fractionLength(0...2)))
-                        .keyboardType(.decimalPad)
-                        .focused($typing)
-                }
+                Stepper2(title: "kg", id: "gym-weight", value: $kg, box: .kg, typing: $typing,
+                         minus: { kg = max(0, kg - step) }, plus: { kg += step })
             }
-            Stepper2(title: "reps", id: "gym-reps",
-                     minus: { reps = max(1, reps - 1) }, plus: { reps += 1 }) {
-                TextField("0", value: $reps, format: .number)
-                    .keyboardType(.numberPad)
-                    .focused($typing)
-            }
+            Stepper2(title: "reps", id: "gym-reps", value: whole($reps), decimals: false, box: .reps, typing: $typing,
+                     minus: { reps = max(1, reps - 1) }, plus: { reps += 1 })
             HStack(spacing: 8) {
                 Button(action: setDone) {
                     MarkLabel(title: "Set done", mark: .check, size: 24, colour: Gym.ink)
@@ -439,7 +433,15 @@ struct MachineScreen: View {
                 .font(.subheadline)
                 .foregroundStyle(Theme.muted)
             // Change the next set's weight while resting (since 1.31, his ask).
-            if !isReps { restWeight }
+            if !isReps && !isTime {
+                restRow("Weight", unit: "kg", id: "gym-rest-weight", value: $kg, decimals: true, box: .restKg,
+                        minus: { kg = max(0, kg - step) }, plus: { kg += step })
+            }
+            // The reps of the next set, typed or −/+ (since 1.33, his ask).
+            if !isTime {
+                restRow("Reps", unit: "reps", id: "gym-rest-reps", value: whole($reps), decimals: false, box: .restReps,
+                        minus: { reps = max(1, reps - 1) }, plus: { reps += 1 })
+            }
             if RestLive.isShowing {
                 // The same countdown is on the lock screen and in the Dynamic Island (since 1.15).
                 Text("Also on your lock screen")
@@ -498,37 +500,49 @@ struct MachineScreen: View {
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    /// "Next set  −  34,5 kg  +" — under the rest ring (since 1.31, his ask: adjust the weight during the rest).
-    private var restWeight: some View {
+    /// "Weight  −  34,5 kg  +" — under the rest ring (since 1.31, his ask: adjust the weight during the rest).
+    /// Since 1.33 the number can be typed: tap it and write the new one; the same for the reps.
+    private func restRow(_ title: String, unit: String, id: String, value: Binding<Double>, decimals: Bool,
+                         box: NumberBox, minus: @escaping () -> Void, plus: @escaping () -> Void) -> some View {
         HStack(spacing: 10) {
-            Text("Weight").font(.subheadline.weight(.semibold)).foregroundStyle(Gym.tint)
+            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(Gym.tint)
             Spacer(minLength: 0)
-            Button { kg = max(0, kg - step) } label: {
+            Button(action: minus) {
                 Capsule().fill(Gym.ink).frame(width: 14, height: 2.2)
                     .frame(width: 34, height: 34)
                     .background(Gym.fill, in: Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Less weight")
-            .accessibilityIdentifier("gym-rest-weight-minus")
-            Text(kg <= 0 ? "Body" : "\(GymSet.number(kg)) kg")
-                .font(.system(.title3, design: .rounded).weight(.bold).monospacedDigit())
-                .foregroundStyle(Theme.ink)
-                .frame(minWidth: 92)
-                .accessibilityIdentifier("gym-rest-weight")
-            Button { kg += step } label: {
+            .accessibilityLabel("Less \(title.lowercased())")
+            .accessibilityIdentifier("\(id)-minus")
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                NumberField(value: value, decimals: decimals, box: box, typing: $typing)
+                    .font(.system(.title3, design: .rounded).weight(.bold).monospacedDigit())
+                    .foregroundStyle(Theme.ink)
+                    .accessibilityIdentifier(id)
+                Text(unit).font(.subheadline).foregroundStyle(Theme.muted)
+            }
+            .frame(minWidth: 92, minHeight: 34)
+            .contentShape(Rectangle())
+            .onTapGesture { typing = box }
+            Button(action: plus) {
                 ControlMarkView(.add, size: 18, colour: Gym.ink)
                     .frame(width: 34, height: 34)
                     .background(Gym.fill, in: Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("More weight")
-            .accessibilityIdentifier("gym-rest-weight-plus")
+            .accessibilityLabel("More \(title.lowercased())")
+            .accessibilityIdentifier("\(id)-plus")
         }
         .padding(.leading, 12)
         .padding(.trailing, 6)
         .padding(.vertical, 5)
         .background(Gym.fill.opacity(0.10), in: Capsule())
+    }
+
+    /// An Int number as a Double for the number boxes.
+    private func whole(_ v: Binding<Int>) -> Binding<Double> {
+        Binding(get: { Double(v.wrappedValue) }, set: { v.wrappedValue = Int($0.rounded()) })
     }
 
     /// Time, level and incline — for a treadmill, a rowing machine, a bike.
@@ -541,14 +555,10 @@ struct MachineScreen: View {
                 .accessibilityIdentifier("gym-next-set")
             if isHold {
                 // A hold is entered in seconds and can count down by itself (since 1.23).
-                Stepper2(title: "sec", id: "gym-seconds",
-                         minus: { holdSeconds = max(5, holdSeconds - 5) }, plus: { holdSeconds += 5 }) {
-                    TextField("0", value: $holdSeconds, format: .number)
-                        .keyboardType(.numberPad)
-                        .focused($typing)
-                }
+                Stepper2(title: "sec", id: "gym-seconds", value: whole($holdSeconds), decimals: false, box: .seconds, typing: $typing,
+                         minus: { holdSeconds = max(5, holdSeconds - 5) }, plus: { holdSeconds += 5 })
                 Button {
-                    typing = false
+                    typing = nil
                     holdSeconds = max(5, holdSeconds)
                     restEnd = nil
                     holdEnd = Date().addingTimeInterval(Double(holdSeconds))
@@ -560,28 +570,16 @@ struct MachineScreen: View {
                 .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
                 .accessibilityIdentifier("gym-hold-start")
             } else {
-                Stepper2(title: "min", id: "gym-minutes",
-                         minus: { minutes = max(1, minutes - 1) }, plus: { minutes += 1 }) {
-                    TextField("0", value: $minutes, format: .number.precision(.fractionLength(0...1)))
-                        .keyboardType(.decimalPad)
-                        .focused($typing)
-                }
+                Stepper2(title: "min", id: "gym-minutes", value: $minutes, box: .minutes, typing: $typing,
+                         minus: { minutes = max(1, minutes - 1) }, plus: { minutes += 1 })
             }
             if machine?.hasLevel != false {
-                Stepper2(title: "level", id: "gym-level",
-                         minus: { level = max(0, level - 1) }, plus: { level += 1 }) {
-                    TextField("0", value: $level, format: .number.precision(.fractionLength(0...1)))
-                        .keyboardType(.decimalPad)
-                        .focused($typing)
-                }
+                Stepper2(title: "level", id: "gym-level", value: $level, box: .level, typing: $typing,
+                         minus: { level = max(0, level - 1) }, plus: { level += 1 })
             }
             if machine?.hasIncline != false {
-                Stepper2(title: "% incline", id: "gym-incline",
-                         minus: { incline = max(0, incline - 0.5) }, plus: { incline += 0.5 }) {
-                    TextField("0", value: $incline, format: .number.precision(.fractionLength(0...1)))
-                        .keyboardType(.decimalPad)
-                        .focused($typing)
-                }
+                Stepper2(title: "% incline", id: "gym-incline", value: $incline, box: .incline, typing: $typing,
+                         minus: { incline = max(0, incline - 0.5) }, plus: { incline += 0.5 })
             }
             HStack(spacing: 8) {
                 if isHold {
@@ -777,7 +775,7 @@ struct MachineScreen: View {
     }
 
     private func timeDone() {
-        typing = false
+        typing = nil
         let set = GymSet(seconds: isHold ? max(1, holdSeconds) : max(1, Int((minutes * 60).rounded())),
                          level: machine?.hasLevel == false ? nil : level,
                          incline: machine?.hasIncline == false ? nil : incline)
@@ -793,7 +791,7 @@ struct MachineScreen: View {
     }
 
     private func setDone() {
-        typing = false
+        typing = nil
         let set = GymSet(kg: isReps ? 0 : max(0, kg), reps: max(1, reps), warmup: warmup)
         let before = library.gym.best(machineID)
         library.changeGym { $0.add(set, machine: machineID, on: day) }
@@ -818,30 +816,73 @@ private struct SetIndex: Identifiable {
     var id: Int { index }
 }
 
-/// "− [ 30 ] kg +" — large, for thumbs at the gym.
-private struct Stepper2<Field: View>: View {
+/// Which number box has the keyboard (since 1.33: one per box, so a tap on a number opens the right one).
+enum NumberBox: Hashable { case kg, reps, seconds, minutes, level, incline, restKg, restReps }
+
+/// A number box that can be typed in (since 1.33): the whole number is selected on the first tap,
+/// so writing "32,5" replaces it; a comma or a point both work.
+struct NumberField: View {
+    @Binding var value: Double
+    var decimals = true
+    let box: NumberBox
+    var typing: FocusState<NumberBox?>.Binding
+    @State private var text = ""
+
+    var body: some View {
+        TextField("0", text: $text)
+            .keyboardType(decimals ? .decimalPad : .numberPad)
+            .multilineTextAlignment(.trailing)
+            .fixedSize()
+            .focused(typing, equals: box)
+            .onAppear { text = GymSet.number(value) }
+            .onChange(of: value) { _, v in
+                if NumberField.read(text) != v { text = GymSet.number(v) }
+            }
+            .onChange(of: text) { _, t in
+                if let v = NumberField.read(t), v != value { value = decimals ? v : v.rounded() }
+            }
+            .onChange(of: typing.wrappedValue) { _, now in
+                if now == box {
+                    DispatchQueue.main.async {
+                        UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
+                    }
+                } else if NumberField.read(text) == nil || text.isEmpty {
+                    text = GymSet.number(value)
+                }
+            }
+    }
+
+    static func read(_ t: String) -> Double? { GymSet.typed(t) }
+}
+
+/// "− [ 30 ] kg +" — large, for thumbs at the gym. Since 1.33 a tap anywhere on the number
+/// opens the keyboard to type it (before: only exactly on the digits).
+private struct Stepper2: View {
     let title: String
     let id: String
+    @Binding var value: Double
+    var decimals = true
+    let box: NumberBox
+    var typing: FocusState<NumberBox?>.Binding
     let minus: () -> Void
     let plus: () -> Void
-    @ViewBuilder let field: () -> Field
 
     var body: some View {
         HStack(spacing: 10) {
             round(.minus, action: minus).accessibilityIdentifier("\(id)-minus")
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                field()
+                NumberField(value: $value, decimals: decimals, box: box, typing: typing)
                     .font(.system(size: 34, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .multilineTextAlignment(.trailing)
                     .foregroundStyle(Theme.ink)
-                    .fixedSize()
                     .accessibilityIdentifier(id)
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(Theme.muted)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .contentShape(Rectangle())
+            .onTapGesture { typing.wrappedValue = box }
             round(.plus, action: plus).accessibilityIdentifier("\(id)-plus")
         }
     }
@@ -887,8 +928,9 @@ private struct SetEditor: View {
                     Text("kg").foregroundStyle(Theme.muted)
                 }
                 }
-                Stepper("Reps: \(set.reps)", value: $set.reps, in: 1...500)
-                    .accessibilityIdentifier("set-edit-reps")
+                FormNumberRow(title: "Reps", unit: "", id: "set-edit-reps", decimals: false,
+                              value: Binding(get: { Double(set.reps) }, set: { set.reps = max(1, Int($0.rounded())) }),
+                              minus: { set.reps = max(1, set.reps - 1) }, plus: { set.reps = min(500, set.reps + 1) })
                 Toggle("Warm-up", isOn: Binding(get: { set.isWarmup }, set: { set.warmup = $0 ? true : nil }))
                     .tint(Warmup.swatch.fillColor)
                     .accessibilityIdentifier("set-edit-warmup")
@@ -939,13 +981,13 @@ private struct NextTimeForm: View {
                         }
                     } else {
                         if !repsOnly {
-                            Stepper("Weight: \(GymSet.weight(set.kg))",
-                                    onIncrement: { set.kg += step },
-                                    onDecrement: { set.kg = max(0, set.kg - step) })
-                                .accessibilityIdentifier("next-time-kg")
+                            FormNumberRow(title: "Weight", unit: "kg", id: "next-time-kg", decimals: true,
+                                          value: $set.kg,
+                                          minus: { set.kg = max(0, set.kg - step) }, plus: { set.kg += step })
                         }
-                        Stepper("Reps: \(set.reps)", value: $set.reps, in: 1...500)
-                            .accessibilityIdentifier("next-time-reps")
+                        FormNumberRow(title: "Reps", unit: "", id: "next-time-reps", decimals: false,
+                                      value: Binding(get: { Double(set.reps) }, set: { set.reps = max(1, Int($0.rounded())) }),
+                                      minus: { set.reps = max(1, set.reps - 1) }, plus: { set.reps = min(500, set.reps + 1) })
                     }
                 }
             } footer: {
@@ -1317,5 +1359,33 @@ struct SessionClockPill: View {
         .onAppear {
             withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) { pulse = true }
         }
+    }
+}
+
+/// "Reps   [ 10 ]  − +" in a form (since 1.33, his ask): the number can be typed as well as stepped.
+private struct FormNumberRow: View {
+    let title: String
+    let unit: String
+    let id: String
+    let decimals: Bool
+    @Binding var value: Double
+    let minus: () -> Void
+    let plus: () -> Void
+    @FocusState private var typing: NumberBox?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(title)
+            Spacer(minLength: 4)
+            NumberField(value: $value, decimals: decimals, box: .reps, typing: $typing)
+                .monospacedDigit()
+                .accessibilityIdentifier(id)
+            if !unit.isEmpty { Text(unit).foregroundStyle(Theme.muted) }
+            Stepper(title, onIncrement: plus, onDecrement: minus)
+                .labelsHidden()
+                .accessibilityIdentifier("\(id)-stepper")
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { typing = .reps }
     }
 }
