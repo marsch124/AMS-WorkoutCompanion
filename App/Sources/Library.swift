@@ -225,8 +225,12 @@ final class Library {
         if let label { keepForUndo(label) }
         var log = gym
         change(&log)
+        // A finished session new, changed or gone: the Garmin Board's file follows (since 1.24).
+        let finished: (GymLog) -> [GymVisit] = { $0.visits.filter { $0.finished != nil } }
+        let boardChanged = finished(log) != finished(gym)
         gym = log
         persistGym()
+        if boardChanged { writeBoardFile() }
         // The session on the lock screen follows every change (since 1.23).
         SessionLive.sync(gym)
     }
@@ -443,6 +447,59 @@ final class Library {
             .filter { $0.lastPathComponent.hasPrefix("Workouts backup ") && $0.pathExtension == "json" }
             .map { (name: $0.lastPathComponent, date: (try? $0.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast) }
         for name in Backup.toRemove(ours, keep: 7) { try? fm.removeItem(at: url.appendingPathComponent(name)) }
+    }
+
+    // MARK: Garmin Board link (since 1.24)
+
+    private static let boardKey = "boardFolder"
+    private static let boardLastKey = "boardLast"
+
+    /// The folder chosen for the Garmin Board's file, or nil when nothing is shared.
+    var boardFolderName: String? { boardFolder()?.lastPathComponent }
+    var boardLast: Date? { defaults.object(forKey: Self.boardLastKey) as? Date }
+    /// Why the last write failed, shown on the Garmin Board page.
+    private(set) var boardProblem: String?
+
+    private func boardFolder() -> URL? {
+        guard let data = defaults.data(forKey: Self.boardKey) else { return nil }
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale) else { return nil }
+        if stale, let fresh = try? url.bookmarkData() { defaults.set(fresh, forKey: Self.boardKey) }
+        return url
+    }
+
+    /// Shares the finished sessions into this folder from now on, and writes the file at once.
+    func chooseBoardFolder(_ url: URL) {
+        let access = url.startAccessingSecurityScopedResource()
+        defer { if access { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? url.bookmarkData() else {
+            boardProblem = "That folder cannot be used. Choose another one."
+            return
+        }
+        defaults.set(data, forKey: Self.boardKey)
+        writeBoardFile()
+    }
+
+    /// Forgets the folder; the file already there stays.
+    func stopBoardLink() {
+        defaults.removeObject(forKey: Self.boardKey)
+        defaults.removeObject(forKey: Self.boardLastKey)
+        boardProblem = nil
+    }
+
+    /// Writes "Workout Companion sessions.json" into the chosen folder: the last 60 finished sessions.
+    /// Nothing is written without a chosen folder, or while the gym file cannot be read.
+    func writeBoardFile(now: Date = Date()) {
+        guard unreadableNote == nil, let url = boardFolder() else { return }
+        let access = url.startAccessingSecurityScopedResource()
+        defer { if access { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? gym.boardFile(now: now).encoded(),
+              (try? data.write(to: url.appendingPathComponent(BoardFile.name), options: .atomic)) != nil else {
+            boardProblem = "The file could not be written to \(url.lastPathComponent). Is iCloud Drive on, and the folder still there?"
+            return
+        }
+        boardProblem = nil
+        defaults.set(now, forKey: Self.boardLastKey)
     }
 
     /// Puts a backup's data in place of today's. Today's files and photos are first kept aside in

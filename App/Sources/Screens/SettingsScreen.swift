@@ -34,6 +34,8 @@ struct SettingsScreen: View {
                     .accessibilityIdentifier("settings-sounds")
                 NavigationLink("Reminder and stretch") { GymExtrasScreen() }
                     .accessibilityIdentifier("settings-gym-extras")
+                NavigationLink("Garmin Board") { BoardLinkScreen() }
+                    .accessibilityIdentifier("settings-board")
                 NavigationLink("Check my data") { HealthCheckScreen() }
                     .accessibilityIdentifier("settings-health")
             }

@@ -21,7 +21,10 @@ struct AMSWorkoutCompanionApp: App {
         }
         // Leaving the app: the day's automatic backup, if one is due (since 1.7).
         .onChange(of: phase) { _, now in
-            if now == .background { library.autoBackupIfDue() }
+            if now == .background {
+                library.autoBackupIfDue()
+                library.writeBoardFile()
+            }
         }
     }
 }
