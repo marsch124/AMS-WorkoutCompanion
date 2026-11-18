@@ -56,3 +56,24 @@ final class Version130Tests: XCTestCase {
         XCTAssertEqual(w.exercises.count, all[3].moves.count)
     }
 }
+
+/// 1.32: the guided stretch timer.
+final class Version132Tests: XCTestCase {
+    func testAmountsBecomeHoldsAndPhases() {
+        XCTAssertEqual(StretchTimer.hold(of: "30 s each side").seconds, 30)
+        XCTAssertEqual(StretchTimer.hold(of: "30 s each side").sides, 2)
+        XCTAssertEqual(StretchTimer.hold(of: "60 s").seconds, 60)
+        XCTAssertEqual(StretchTimer.hold(of: "1 min").seconds, 60)
+        XCTAssertEqual(StretchTimer.hold(of: "2 × 10").seconds, StretchTimer.usualHold)
+        let p = StretchTimer.phases(for: [Exercise(name: "Hamstring", amount: "30 s each side"),
+                                          Exercise(name: "Child's pose", amount: "60 s")])
+        XCTAssertEqual(p.map(\.kind), [.ready, .hold, .switchSides, .hold, .ready, .hold])
+        XCTAssertEqual(p[0].spoken, "First: Hamstring. 30 seconds each side. Get into position.")
+        XCTAssertEqual(p[4].spoken, "Last one: Child's pose. one minute. Get into position.")
+        XCTAssertEqual(StretchTimer.total(p), 8 + 30 + 5 + 30 + 8 + 60)
+        XCTAssertEqual(StretchTimer.word(p[1], secondsLeft: 10), "Ten seconds")
+        XCTAssertEqual(StretchTimer.word(p[0], secondsLeft: 2), "Two")
+        // Every ready-made list runs.
+        for r in StretchRoutine.all { XCTAssertFalse(StretchTimer.phases(for: r.workout().exercises).isEmpty, r.name) }
+    }
+}

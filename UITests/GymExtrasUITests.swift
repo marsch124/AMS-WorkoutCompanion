@@ -29,6 +29,7 @@ final class GymExtrasUITests: XCTestCase {
         XCTAssertTrue((toggle.value as? String ?? "").contains(" at "), "names the gym: \(String(describing: toggle.value))")
         XCTAssertFalse(app.buttons["gym-visit-1"].exists, "closed at first")
         app.showEarlierVisits()
+        XCTAssertTrue(app.buttons["gym-visit-1"].isHittable, "the opened list scrolls into view (1.32)")
         let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); a.name = "130-earlier-open"; a.lifetime = .keepAlways; add(a)
         let row = app.buttons["gym-visit-1"]
         for _ in 0..<8 where !row.isHittable { app.swipeUp() }   // it sits far below the machines

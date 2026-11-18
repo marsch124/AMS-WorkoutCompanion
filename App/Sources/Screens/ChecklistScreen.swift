@@ -12,6 +12,14 @@ struct ChecklistScreen: View {
     @State private var zoom: ZoomedPhoto?
     @State private var startedAt = Date()
     @State private var kept = false
+    @State private var timing = false
+    /// A list where a time is given can run as a guided timer (since 1.32).
+    private var timed: Bool {
+        workout.exercises.contains { e in
+            let a = e.amount.lowercased()
+            return a.range(of: #"\d+\s*(s\b|sec|min)"#, options: .regularExpression) != nil
+        }
+    }
 
     private var allDone: Bool { !workout.exercises.isEmpty && done.count == workout.exercises.count }
 
@@ -27,6 +35,25 @@ struct ChecklistScreen: View {
                                 .foregroundStyle(Theme.muted)
                                 .multilineTextAlignment(.center)
                                 .padding(.top, 60)
+                        }
+                        if timed, done.isEmpty {
+                            Button { timing = true } label: {
+                                HStack(spacing: 10) {
+                                    IconMark(.hand("headphones"), size: 22, colour: workout.inkOnFill)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text("Start the timer").fontWeight(.semibold)
+                                        Text("Voice cues in your AirPods").font(.caption)
+                                    }
+                                    Spacer()
+                                    ControlMarkView(.play, size: 18, colour: workout.inkOnFill)
+                                }
+                                .foregroundStyle(workout.inkOnFill)
+                                .padding(.horizontal, 14)
+                                .frame(height: 56)
+                                .background(workout.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("run-stretch-timer")
                         }
                         ForEach(Array(workout.exercises.enumerated()), id: \.element.id) { i, e in
                             card(e, number: i + 1)
@@ -60,6 +87,13 @@ struct ChecklistScreen: View {
         .background(Theme.bg.ignoresSafeArea())
         .onAppear { Cues.shared.begin() }
         .onDisappear { Cues.shared.end() }
+        .fullScreenCover(isPresented: $timing) {
+            StretchTimerScreen(workout: workout) {
+                timing = false
+                onClose()
+            }
+            .environment(library)
+        }
         .fullScreenCover(item: $zoom) { z in
             ZStack {
                 Color.black.ignoresSafeArea()

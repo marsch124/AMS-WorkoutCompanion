@@ -125,6 +125,7 @@ struct GymScreen: View {
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 // Since 1.26: the chooser, the hint and the three buttons in one card — the screen's head.
@@ -165,7 +166,7 @@ struct GymScreen: View {
                     .accessibilityIdentifier("gym-intro")
                 actionRow
                 }
-                .padding(12)
+                .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .accessibilityElement(children: .contain)
@@ -225,7 +226,7 @@ struct GymScreen: View {
                 // A long list gets a search field (since 1.11): name or setting ("Seat 4").
                 if machines.count > GymScreen.searchFrom {
                     HStack(spacing: 6) {
-                        AppMarkView(.search, size: 16, colour: Theme.muted)
+                        AppMarkView(.search, size: 21, colour: Theme.muted)
                         TextField("Find a machine", text: $search)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -237,8 +238,8 @@ struct GymScreen: View {
                                 .accessibilityIdentifier("gym-search-clear")
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .frame(height: 38)
+                    .padding(.horizontal, 10)
+                    .frame(height: 36)
                     .background(Theme.card, in: Capsule())
                 }
                 let found = Set(library.gym.machines(in: gymID, matching: search).map(\.id))
@@ -277,6 +278,7 @@ struct GymScreen: View {
                                         gym: library.gym.gyms.first { $0.id == gymID }?.name,
                                         open: $showingEarlier)
                         .padding(.top, 10)
+                        .id("earlier-toggle")
                     if showingEarlier {
                         VStack(spacing: 0) {
                             ForEach(Array(earlier.enumerated()), id: \.element.id) { i, v in
@@ -292,11 +294,20 @@ struct GymScreen: View {
                         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.line, lineWidth: 1))
                         .transition(.opacity.combined(with: .move(edge: .top)))
+                        .id("earlier-list")
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
+        }
+        // Opening Earlier visits brings the list up into view (since 1.32, his ask: "you don't see anything").
+        .onChange(of: showingEarlier) { _, open in
+            guard open else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo("earlier-toggle", anchor: .top) }
+            }
+        }
         }
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("At the gym")
@@ -548,7 +559,7 @@ struct GymScreen: View {
             HStack(spacing: 8) {
                 Button { planning = true } label: {
                     GymActionTile(title: "Plan today") {
-                        ControlMarkView(.list, size: 15, colour: SessionGoingLine.green)
+                        ControlMarkView(.list, size: 21, colour: SessionGoingLine.green)
                     }
                 }
                 .buttonStyle(.plain)
@@ -559,7 +570,7 @@ struct GymScreen: View {
                         library.changeGym { $0.setPlan(repeatOrder, on: day, gym: gymID) }
                     } label: {
                         GymActionTile(title: "Repeat last visit") {
-                            ControlMarkView(.play, size: 15, colour: SessionGoingLine.green)
+                            ControlMarkView(.play, size: 21, colour: SessionGoingLine.green)
                         }
                     }
                     .buttonStyle(.plain)
@@ -803,7 +814,7 @@ extension GymScreen {
     /// More machines than this, and the gym screen gets a search field.
     static let searchFrom = 8
     /// The gym button and the Plan today / Repeat last visit tiles share this height (since 1.30).
-    static let headHeight: CGFloat = 50
+    static let headHeight: CGFloat = 44
 }
 
 private enum GymNaming { case new, rename }
@@ -929,8 +940,9 @@ private struct EarlierVisitsToggle: View {
             withAnimation(.snappy(duration: 0.25)) { open.toggle() }
         } label: {
             HStack(spacing: 12) {
-                AppMarkView(.clock, size: 20, colour: Gym.tint)
-                    .frame(width: 38, height: 38)
+                // Since 1.32 (his ask): a much larger mark.
+                AppMarkView(.clock, size: 32, colour: Gym.tint)
+                    .frame(width: 46, height: 46)
                     .background(Gym.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Earlier visits")
@@ -966,9 +978,10 @@ private struct GymActionTile<Mark: View>: View {
 
     // Since 1.26 one joined row: mark above the words; the main one full indigo, the others clear on the row's pale indigo.
     var body: some View {
-        VStack(spacing: 2) {
+        // Since 1.32 (his ask): bigger marks, less padding.
+        VStack(spacing: 1) {
             mark()
-                .frame(width: 16, height: 16)
+                .frame(width: 22, height: 22)
             Text(title)
                 .font(.caption.weight(.semibold))
                 .multilineTextAlignment(.center)
@@ -977,7 +990,7 @@ private struct GymActionTile<Mark: View>: View {
                 .foregroundStyle(SessionGoingLine.green)
         }
         .padding(.horizontal, 4)
-        .padding(.vertical, 6)
+        .padding(.vertical, 2)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Since 1.30 (his ask) each tile pale green, both alike — none singled out.
         .background(SessionGoingLine.green.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -1461,7 +1474,10 @@ struct SummaryScreen: View {
                         Button(action: stretch) {
                             HStack(spacing: 8) {
                                 IconMark(.hand("yoga"), size: 22, colour: Gym.tint)
-                                Text("Stretch now").fontWeight(.semibold).foregroundStyle(Gym.tint)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Stretch now").fontWeight(.semibold).foregroundStyle(Gym.tint)
+                                    Text("Timer with voice cues in your AirPods").font(.caption).foregroundStyle(Theme.muted)
+                                }
                                 Spacer()
                                 ControlMarkView(.chevron, size: 14, colour: Gym.tint)
                             }
@@ -1498,8 +1514,9 @@ struct SummaryScreen: View {
         }
         .navigationTitle("Session done")
         .navigationBarTitleDisplayMode(.inline)
+        // Since 1.32 (his ask) Stretch now starts the guided timer with voice cues.
         .fullScreenCover(item: $stretching) { w in
-            ChecklistScreen(workout: w) { stretching = nil }
+            StretchTimerScreen(workout: w) { stretching = nil }
                 .environment(library)
         }
         .onAppear {
