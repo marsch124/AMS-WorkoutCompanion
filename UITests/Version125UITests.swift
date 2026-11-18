@@ -30,6 +30,9 @@ final class Version125UITests: XCTestCase {
         XCTAssertTrue(app.buttons["gym-session-end"].waitForExistence(timeout: 5))
         do { let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); a.name = "125-gym"; a.lifetime = .keepAlways; add(a) }
         app.buttons["gym-session-end"].tap()
+        // Since 1.27 End asks first.
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
+        app.alerts.firstMatch.buttons["End session"].firstMatch.tap()
         XCTAssertTrue(app.buttons["gym-feel-good"].waitForExistence(timeout: 5))
         app.buttons["gym-summary-done"].tap()
         XCTAssertFalse(any("gym-session-going").waitForExistence(timeout: 2))

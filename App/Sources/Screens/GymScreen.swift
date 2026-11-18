@@ -16,8 +16,12 @@ enum Gym {
     static let band = Color(hex: "#1e1b4b")
     /// A set that beat last time: a gold arrow (since 1.16).
     static let better = Color.pair("#b7791f", "#f6c453")
-    /// The gym chooser at the top of the gym screen: plum, apart from the indigo of the page (since 1.25, his ask).
-    static let place = IconColour.of(key: "plum")!
+    /// End on the green session line: red, so it is not taken for the green line itself (since 1.27, his ask).
+    static let end = Color.pair("#dc2626", "#f87171")
+    static let endInk = Color.pair("#ffffff", "#450a0a")
+    /// The gym chooser at the top of the gym screen: the same indigo as the At the gym card and
+    /// Back to gym (since 1.27, his ask: the three share one colour). It was plum in 1.25 and 1.26.
+    static let place = swatch
 }
 
 /// A machine on the gym screen, to open it.
@@ -41,7 +45,8 @@ struct GymCard: View {
         let n = library.gym.machines.count
         // Open now, or when it opens (since 1.23) — once hours are given for the gym.
         if n > 0, let line = library.gym.currentGym?.openLine(at: Date()) { return line.text }
-        return n == 0 ? "Photo, weight and reps per machine" : "\(n) machine\(n == 1 ? "" : "s")"
+        // Since 1.27 (his ask) the card no longer counts the machines: it names the gym instead.
+        return n == 0 ? "Photo, weight and reps per machine" : (library.gym.currentGym?.name ?? GymLog.firstGymName)
     }
 
     var body: some View {
@@ -106,6 +111,7 @@ struct GymScreen: View {
     @State private var namingRepeat = false
     @State private var repeatName = ""
     @State private var editingHours = false
+    @State private var askingEnd = false
 
     private var gymID: UUID? { library.gym.currentGym?.id }
     private var visit: GymVisit? { library.gym.openVisit(on: day, gym: gymID) }
@@ -185,7 +191,7 @@ struct GymScreen: View {
                 // Since 1.20 from the moment the gym screen opens (his ask), before any set.
                 if sessionStart != nil || (visit?.setCount ?? 0) > 0 {
                     // Since 1.25 (his ask): short words, and End on the same line — the same as Finish this session.
-                    SessionGoingLine(start: sessionStart, visit: visit, clock: true) { endSession() }
+                    SessionGoingLine(start: sessionStart, visit: visit, clock: true) { askingEnd = true }
                 }
 
                 // What you did so far, in order (since 1.22, his ask): tap a row to go back to that machine.
@@ -387,6 +393,16 @@ struct GymScreen: View {
                 .accessibilityIdentifier("gym-place-save")
         } message: {
             Text(naming == .new ? "Each gym has its own machines." : "")
+        }
+        // End on the green line asks first (since 1.27, his ask); the other button keeps the session going.
+        .alert("End this session?", isPresented: $askingEnd) {
+            Button("End session", role: .destructive) { endSession() }
+                .accessibilityIdentifier("gym-end-confirm")
+            Button("Continue the session", role: .cancel) { }
+                .accessibilityIdentifier("gym-end-continue")
+        } message: {
+            Text((visit?.setCount ?? 0) > 0 ? "Are you sure? Your sets are saved and the clock stops."
+                                            : "Are you sure? There are no sets yet, so nothing is saved.")
         }
     }
 
@@ -835,10 +851,10 @@ struct SessionGoingLine: View {
                     Button(action: onEnd) {
                         Text("End")
                             .font(.subheadline.weight(.bold))
-                            .foregroundStyle(Color.pair("#ffffff", "#052e16"))
+                            .foregroundStyle(Gym.endInk)
                             .padding(.horizontal, 14)
                             .frame(height: 30)
-                            .background(Self.green, in: Capsule())
+                            .background(Gym.end, in: Capsule())
                             .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
@@ -1067,8 +1083,6 @@ private struct MachineTile: View {
     let done: Bool
     let busy: Bool
 
-    private var stripe: IconColour? { library.gym.muscle(for: machine).flatMap { IconColour.of(key: $0.colour) } }
-
     var body: some View {
         // Since 1.26 a card: the photo on top with rounded corners, the name and last time on a light band
         // under it (1.16–1.25: the photo filled the tile and the name sat on a dark band over its bottom edge).
@@ -1100,14 +1114,7 @@ private struct MachineTile: View {
             .accessibilityIdentifier("tile-band-\(machine.name)")
         }
         .background(Theme.card)
-        // The machine's muscle group colour, as a thin stripe down the left edge (since 1.11).
-        .overlay(alignment: .leading) {
-            if let stripe {
-                stripe.fillColor
-                    .frame(width: 5)
-                    .accessibilityIdentifier("tile-stripe-\(machine.name)")
-            }
-        }
+        // The muscle group stripe down the left edge (1.11) is gone since 1.27 (his ask: "disturbing").
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
             .stroke(busy ? Gym.busy.fillColor : done ? Gym.fill : .clear, lineWidth: 2))
