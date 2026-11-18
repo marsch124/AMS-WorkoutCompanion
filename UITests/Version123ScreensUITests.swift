@@ -78,10 +78,12 @@ final class Version123ScreensUITests: XCTestCase {
         let good = app.buttons["gym-feel-good"]
         XCTAssertTrue(good.waitForExistence(timeout: 5))
         good.tap()
+        // Since 1.35 Stretch now is at the top, the comparison further down.
+        XCTAssertTrue(app.buttons["gym-stretch"].exists)
+        XCTAssertLessThan(app.buttons["gym-stretch"].frame.minY, good.frame.minY, "Stretch now above How did it feel")
         picture("123-session-done")
-        app.swipeUp()
+        app.scrollTo(any("gym-compare-sets"))
         XCTAssertTrue(any("gym-compare-sets").waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["gym-stretch"].waitForExistence(timeout: 5))
         picture("123-session-done-lower")
         app.buttons["gym-summary-done"].tap()
 

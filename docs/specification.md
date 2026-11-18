@@ -419,7 +419,9 @@ His two approved ideas after 1.17: see that a session is going from the Train pa
 - **Checked.** Warm-up sets are saved with the gym session and show in History as chips with a "W" and a frame on the visit, in the machine's history lines, and in the "Warm-up and cardio" card; a stretch session shows as its own History row (verified by a test).
 - **Texts.** What's new (1.34) and How it works (Two sessions in a day; Exercise done and one-hand buttons) updated.
 
-## Version 1.35 — spoken cues during a rest (18 Nov 2026)
+## Version 1.35 — spoken cues during a rest; Stretch now and Save as template first on Session done (18 Nov 2026)
+
+- **Session done order (his ask, with a marked screenshot).** In `GymScreen` (Session done, `List`), the Stretch section (`gym-stretch`, `gym-stretch-guide`) and then the Save as template section (`gym-summary-template`, with its footer) now come right after the Well done section. Before: Well done, How did it feel, Title and notes, Photos, numbers, Against last visit, Save as template, Stretch, New bests. Now: Well done, Stretch, Save as template, How did it feel, Title and notes, Photos, numbers, Against last visit, New bests. Nothing else changed. UI tests that read the numbers scroll down first (`XCUIApplication.scrollTo`, in `UITests/ConfirmEnd.swift`); `Version123ScreensUITests` checks that Stretch now is above How did it feel.
 
 - **Rest cues.** Every rest now speaks: "Twenty seconds left" at 20 s left, "Ten seconds left" at 10 s left, then "Three", "Two", "One". It covers the rest after a set on a machine page, the rest between sets in a Sets & reps workout and the "off" rounds of an Interval workout. Before: a machine rest only ticked (tick sound plus tap) at 3, 2, 1 with no voice; a Sets & reps / interval rest said only "Three, Two, One".
 - **Short rests.** "Twenty seconds left" only when the rest is longer than 20 s; "Ten seconds left" only when it is longer than 10 s (no cue right at the start of a short rest).

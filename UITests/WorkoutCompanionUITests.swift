@@ -181,6 +181,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         waitFor(app.buttons["gym-finish"], label: "Finish this session")
         app.buttons["gym-finish"].tap()
         app.confirmEnd()
+        app.scrollTo(app.staticTexts["gym-summary-sets"])
         waitFor(app.staticTexts["gym-summary-sets"], label: "2")
         waitFor(app.staticTexts["gym-summary-machines"], label: "1")
         app.buttons["gym-summary-done"].tap()
@@ -560,6 +561,7 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["machine-Push-ups"].waitForExistence(timeout: 5))
         app.buttons["gym-finish"].tap()
         app.confirmEnd()
+        app.scrollTo(app.staticTexts["gym-summary-sets"])
         waitFor(app.staticTexts["gym-summary-sets"], label: "1")
         XCTAssertFalse(app.staticTexts["gym-summary-total"].exists)
     }
