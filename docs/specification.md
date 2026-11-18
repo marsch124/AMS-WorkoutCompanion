@@ -418,3 +418,9 @@ His two approved ideas after 1.17: see that a session is going from the Train pa
 - **History rule.** Core `SessionRecord.ofStretch(_:started:ended:held:chosen:)` (Version134.swift): saved as "3 of 6 stretches" or, when only some were chosen, "3 of 4 chosen stretches" (before "3 of 6 exercises"); complete when all chosen were held. A stretch now counts as held when its hold ran out (before: only when the timer moved past it).
 - **Checked.** Warm-up sets are saved with the gym session and show in History as chips with a "W" and a frame on the visit, in the machine's history lines, and in the "Warm-up and cardio" card; a stretch session shows as its own History row (verified by a test).
 - **Texts.** What's new (1.34) and How it works (Two sessions in a day; Exercise done and one-hand buttons) updated.
+
+## Version 1.35 — At the gym card without the gym name (18 Nov 2026)
+
+- **At the gym card (Workouts), second line.** Before (1.27 to 1.34): when nothing was logged today and no opening hours were set, the second line showed the name of the chosen gym (for example "City gym"). Now: that case shows no second line, only "At the gym".
+- **Unchanged lines.** The second line still appears only when it says something: "Today: N machines · N sets" after sets today, the open-now / opening line (for example "Open until 22:00") when the gym's opening hours are set, and "Photo, weight and reps per machine" before any machine exists. The gym's name is still shown on the gym screen (`gym-place-menu`) and on the Choose gym plate.
+- **Texts.** What's new (1.35) and How it works (At the gym) updated; the version list in Core `WorkoutCoreTests` and UI `testSettingsShowsTheVersionAndWhatsNew` now expect 1.35.

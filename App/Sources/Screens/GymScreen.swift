@@ -45,7 +45,8 @@ struct GymCard: View {
     let open: () -> Void
     @State private var changingIcon = false
 
-    private var summary: String {
+    /// The second line under "At the gym", or nil for none.
+    private var summary: String? {
         let today = library.gym.visits.filter { Calendar.current.isDateInToday($0.date) && $0.setCount > 0 }
         if !today.isEmpty {
             let sets = today.reduce(0) { $0 + $1.setCount }
@@ -55,8 +56,8 @@ struct GymCard: View {
         let n = library.gym.machines.count
         // Open now, or when it opens (since 1.23) — once hours are given for the gym.
         if n > 0, let line = library.gym.currentGym?.openLine(at: Date()) { return line.text }
-        // Since 1.27 (his ask) the card no longer counts the machines: it names the gym instead.
-        return n == 0 ? "Photo, weight and reps per machine" : (library.gym.currentGym?.name ?? GymLog.firstGymName)
+        // 1.27 named the gym here; since 1.35 (his ask, he crossed it out) the card shows no gym name.
+        return n == 0 ? "Photo, weight and reps per machine" : nil
     }
 
     var body: some View {
@@ -69,10 +70,12 @@ struct GymCard: View {
                     Text("At the gym")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(Gym.ink)
-                    Text(summary)
-                        .font(.subheadline)
-                        .foregroundStyle(Gym.ink.opacity(0.85))
-                        .lineLimit(1)
+                    if let summary {
+                        Text(summary)
+                            .font(.subheadline)
+                            .foregroundStyle(Gym.ink.opacity(0.85))
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 8)
                 ControlMarkView(.chevron, size: 16, colour: Gym.ink)
@@ -84,7 +87,7 @@ struct GymCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("At the gym, \(summary)")
+        .accessibilityLabel(summary.map { "At the gym, \($0)" } ?? "At the gym")
         .accessibilityIdentifier("open-gym")
         .contextMenu {
             Button("Change icon…") { changingIcon = true }
