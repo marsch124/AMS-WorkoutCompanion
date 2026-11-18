@@ -161,6 +161,8 @@ struct MachineScreen: View {
             }
             // Pale blue with blue words since 1.33 (his ask: set it apart from the full-blue Set done).
             .buttonStyle(BigButtonStyle(fill: Gym.soft, ink: Gym.tint, height: 50))
+            // A blue frame like a done machine tile (since 1.34, his ask).
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Gym.fill, lineWidth: 2))
             .keyboardShortcut(today.isEmpty ? .cancelAction : nil)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

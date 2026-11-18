@@ -20,6 +20,9 @@ final class Version132UITests: XCTestCase {
         XCTAssertTrue(app.buttons["gym-summary-done"].waitForExistence(timeout: 5))
         for _ in 0..<8 where !(stretch.exists && stretch.isHittable) { app.swipeUp() }
         stretch.tap()
+        // Since 1.34 the chooser comes first, with every stretch ticked.
+        XCTAssertTrue(app.buttons["stretch-choose-start"].waitForExistence(timeout: 5))
+        app.buttons["stretch-choose-start"].tap()
 
         let phase = app.staticTexts["stretch-timer-phase"]
         XCTAssertTrue(phase.waitForExistence(timeout: 5))
