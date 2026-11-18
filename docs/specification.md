@@ -1,9 +1,9 @@
 # AMS WorkoutCompanion — specification
 
-Version 1.11.3. iPhone only, portrait, iOS 17+, light and dark. The name under the app icon is "Workouts" (not "Companion": Apple refuses it, error 90129).
+Version 1.11.3. iPhone only, portrait, iOS 17+, light and dark. The name under the app icon is "Workout Companion" since 1.22 (1.5–1.21: "Workouts"; plain "Companion" is refused by Apple, error 90129).
 
 ## Workouts (home, since 1.5: three tabs)
-- A tab bar at the bottom with hand-drawn marks: Train, History, Settings. Train keeps its place when switching tabs (the gym screen stays where you were); History and Settings open fresh each time their tab is chosen. The Train tab is headed "Workout Companion"; the name under the app icon stays "Workouts".
+- A tab bar at the bottom with hand-drawn marks: Train, History, Settings. Train keeps its place when switching tabs (the gym screen stays where you were); History and Settings open fresh each time their tab is chosen. The Train tab is headed "Workout Companion"; the name under the app icon is "Workout Companion" since 1.22.
 - Train: a wide full-colour indigo "At the gym" tile at the top; below it one full-colour tile per workout in two columns: hand-drawn icon on the workout's colour, name, one-line summary, a play mark, a pencil at the top right; then a dashed "New workout" tile.
 - Tap the tile: the workout starts (full screen). Pencil: the editor. Touch and hold: Edit, Duplicate, Delete (Delete asks first). + (top right) also makes a new workout.
 - History is its own tab (no longer a card among the workouts). Settings is a tab: no Done button, and the gear at the top left is gone.
@@ -275,3 +275,11 @@ His two approved ideas after 1.17: see that a session is going from the Train pa
 - **New — red note on Train.** When the workouts, the gym log or the History could not be read, a red note at the top of Train says so: "Your workouts could not be read" (or "Your gym log could not be read", "Your history could not be read"), with the line "Nothing is saved over them. Restore a backup to get them back." and a "Backups" button that opens Settings → Backups. Accessibility identifiers: the note `unreadable-note`, its button `unreadable-backups`.
 - **Changed — Restore is all-or-nothing.** The backup's files and photos are first written to a waiting folder; only when every one of them is written are they put in place. If anything fails on the way (for example the phone is full), everything stays exactly as it was before. As before, today's data is first kept in "Before restore <date>".
 - **Texts.** What's new (1.21) and How it works (Backups) updated; version lists in Core `WorkoutCoreTests` and UI `testSettingsShowsTheVersionAndWhatsNew` now expect 1.21.
+
+## Version 1.22 — "Done this session", one button on a machine, session clock, new name (18 Nov 2026)
+- His four asks, built together.
+- **Name.** The name under the app icon is now "Workout Companion" (was "Workouts"). Train stays headed "Workout Companion". The iPhone may shorten the name under the icon when it is too long.
+- **Done this session.** On the gym screen, right under the green Session going line, a list `gym-done-list` with one row per machine that has sets in the open session, in the order they were done. Each row `gym-done-<machine name>` shows a number (1, 2, 3…), the machine name and its sets (for example "30 kg × 12, 12, 10"). Tapping a row opens that machine again (to add a set or look). Not shown before the first set.
+- **One button on a machine.** The green "Next" beside Set done (`gym-machine-done`) is removed. The bottom button `machine-done-pill` is the only way on: before the first set "Back to gym" (logs nothing, as before; Escape on the Mac the same); after a set "Exercise done". When today's plan has a machine still to do, "Next: <name>" shows under "Exercise done" and the button goes straight to that machine; with no plan or nothing left it goes back to the gym screen. The "Next machine: <name>" button during the rest (once the sets done equal the sets last time) is unchanged.
+- **Session clock.** The green Session going line on the gym screen has a running clock at its right, `gym-session-clock`, counting every second as hours:minutes:seconds ("0:42:15") since the session began (the moment the gym screen opened). The words keep the counts ("Session going · 3 machines · 7 sets"). The Finish button still shows minutes. The line under the At the gym card on Train (`home-session-going`) is unchanged.
+- **Texts.** What's new (1.22) and How it works (At the gym, Next machine, Exercise done and one-hand buttons, Workouts) updated; version lists in Core `WorkoutCoreTests` and UI `testSettingsShowsTheVersionAndWhatsNew` now expect 1.22.

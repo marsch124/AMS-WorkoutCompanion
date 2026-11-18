@@ -30,7 +30,7 @@ final class ReplayUITests: XCTestCase {
         XCTAssertTrue(app.buttons["gym-set-done"].waitForExistence(timeout: 5))
         app.buttons["gym-set-done"].tap()
         if app.buttons["gym-rest-skip"].waitForExistence(timeout: 3) { app.buttons["gym-rest-skip"].tap() }
-        let next = app.buttons["gym-machine-done"]
+        let next = app.buttons["machine-done-pill"]
         XCTAssertTrue(next.waitForExistence(timeout: 3))
         let a1 = XCTAttachment(string: "next label: " + next.label); a1.lifetime = .keepAlways; add(a1)
         next.tap()

@@ -137,11 +137,18 @@ struct MachineScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            // Back to the machines; the green Next goes on to the next planned one.
             // With no set yet it says "Back to gym" and logs nothing (since 1.19, his ask; his word since 1.20); Escape on the Mac.
+            // Since 1.22 the ONE way on (his ask): after a set "Exercise done" goes to the next planned machine
+            // ("Next: Hantel" under it), else back to the gym. The green Next beside Set done is gone.
             let leaving = today.isEmpty ? "Back to gym" : "Exercise done"
-            Button { moveOn(nil) } label: {
-                Text(leaving)
+            let next = today.isEmpty ? nil : upNext
+            Button { moveOn(next?.id) } label: {
+                VStack(spacing: 0) {
+                    Text(leaving)
+                    if let next {
+                        Text("Next: \(next.name)").font(.caption.weight(.semibold)).lineLimit(1)
+                    }
+                }
             }
             .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 50))
             .keyboardShortcut(today.isEmpty ? .cancelAction : nil)
@@ -150,6 +157,7 @@ struct MachineScreen: View {
             .frame(maxWidth: .infinity)
             .background(Theme.bg.opacity(0.96).ignoresSafeArea(edges: .bottom))
             .accessibilityLabel(leaving)
+            .accessibilityValue(next.map { "Next: \($0.name)" } ?? "")
             .accessibilityIdentifier("machine-done-pill")
         }
         .toolbar {
@@ -353,7 +361,6 @@ struct MachineScreen: View {
                 }
                 .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
                 .accessibilityIdentifier("gym-set-done")
-                if !today.isEmpty { nextButton }
             }
             if today.isEmpty {
                 Text(isReps ? "Filled in from last time — your own body weight, reps only."
@@ -473,7 +480,6 @@ struct MachineScreen: View {
                 }
                 .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 58))
                 .accessibilityIdentifier("gym-set-done")
-                if !today.isEmpty { nextButton }
             }
             if today.isEmpty {
                 Text("Level and incline can be switched off for this machine with the pencil.")
@@ -511,29 +517,6 @@ struct MachineScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("gym-next-time")
-    }
-
-    /// Done with this machine — green, beside Set done: on to the next planned machine, or back to the machines.
-    private var nextButton: some View {
-        let green = IconColour.of(key: "green")!
-        return Button { moveOn(upNext?.id) } label: {
-            VStack(spacing: 0) {
-                HStack(spacing: 4) {
-                    Text("Next")
-                    ControlMarkView(.chevron, size: 14, colour: green.inkColor)
-                }
-                .font(.system(.title3, design: .rounded).weight(.bold))
-                if let upNext {
-                    Text(upNext.name).font(.caption2.weight(.semibold)).lineLimit(1)
-                }
-            }
-            .foregroundStyle(green.inkColor)
-            .padding(.horizontal, 6)
-        }
-        .buttonStyle(BigButtonStyle(fill: green.fillColor, ink: green.inkColor, height: 58))
-        .frame(width: 118)
-        .accessibilityLabel(upNext.map { "Done with this machine, next: \($0.name)" } ?? "Done with this machine")
-        .accessibilityIdentifier("gym-machine-done")
     }
 
     @ViewBuilder private var history: some View {

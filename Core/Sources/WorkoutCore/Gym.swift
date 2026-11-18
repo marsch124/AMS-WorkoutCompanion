@@ -280,6 +280,15 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
 
     public var setCount: Int { entries.reduce(0) { $0 + $1.sets.count } }
 
+    /// The machines done so far, in the order done — one per machine with at least one set (since 1.22).
+    public var performed: [MachineEntry] { entries.filter { !$0.sets.isEmpty } }
+
+    /// "0:42:15" — the running session clock, hours:minutes:seconds (since 1.22).
+    public static func clock(_ seconds: Int) -> String {
+        let s = max(0, seconds)
+        return String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
+    }
+
     /// Minutes logged on time machines.
     public var minutesOnMachines: Int {
         entries.flatMap(\.sets).reduce(0) { $0 + ($1.seconds ?? 0) } / 60

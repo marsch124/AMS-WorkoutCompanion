@@ -108,9 +108,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.21 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("1.22 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.21"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-1.22"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -367,11 +367,11 @@ final class WorkoutCompanionUITests: XCTestCase {
         // Changing a set done (crashed before 1.4: read while changing).
         app.buttons["gym-set-1"].tap()
         app.buttons["set-edit-save"].tap()
-        // Done with this machine goes straight on to the next planned one.
-        waitFor(app.buttons["gym-machine-done"], label: "Done with this machine, next: Chest press")
-        // Green and on the same line as Set done (1.5).
-        XCTAssertEqual(app.buttons["gym-machine-done"].frame.midY, app.buttons["gym-set-done"].frame.midY, accuracy: 2)
-        app.buttons["gym-machine-done"].tap()
+        // Since 1.22 one button: Exercise done goes straight on to the next planned one; the green Next is gone.
+        XCTAssertFalse(app.buttons["gym-machine-done"].exists)
+        waitFor(app.buttons["machine-done-pill"], label: "Exercise done")
+        XCTAssertEqual(app.buttons["machine-done-pill"].value as? String, "Next: Chest press")
+        app.buttons["machine-done-pill"].tap()
         waitFor(app.staticTexts["gym-setting"], label: "Seat 4, handles 2")
 
         goBack()

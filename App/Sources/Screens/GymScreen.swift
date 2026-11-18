@@ -159,7 +159,12 @@ struct GymScreen: View {
                 // A session is going (since 1.17, his ask): green dot, minutes since it began, sets so far.
                 // Since 1.20 from the moment the gym screen opens (his ask), before any set.
                 if sessionStart != nil || (visit?.setCount ?? 0) > 0 {
-                    SessionGoingLine(start: sessionStart, visit: visit)
+                    SessionGoingLine(start: sessionStart, visit: visit, clock: true)
+                }
+
+                // What you did so far, in order (since 1.22, his ask): tap a row to go back to that machine.
+                if let visit, !visit.performed.isEmpty {
+                    doneList(visit)
                 }
 
                 planSection
@@ -534,6 +539,50 @@ struct GymScreen: View {
         .accessibilityIdentifier("plan-row-\(i + 1)")
     }
 
+    /// "Done this session": one row per machine with sets, in the order done (since 1.22).
+    private func doneList(_ visit: GymVisit) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Done this session")
+                .font(.headline)
+                .foregroundStyle(Gym.tint)
+                .padding(.bottom, 4)
+            ForEach(Array(visit.performed.enumerated()), id: \.element.id) { i, entry in
+                let name = library.gym.machine(entry.machineID)?.name ?? "Machine"
+                Button { open(entry.machineID) } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("\(i + 1)")
+                            .font(.subheadline.weight(.bold).monospacedDigit())
+                            .foregroundStyle(Gym.tint)
+                            .frame(width: 18, alignment: .trailing)
+                        Text(name)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                        Spacer(minLength: 6)
+                        Text(entry.text)
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(Theme.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        ControlMarkView(.chevron, size: 11, colour: Theme.muted)
+                    }
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("gym-done-\(name)")
+                if i < visit.performed.count - 1 { Divider() }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.line, lineWidth: 1))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("gym-done-list")
+    }
+
     private func open(_ id: UUID) {
         if library.gym.isBusy(id, on: day) { library.changeGym { $0.setBusy(id, false, on: day) } }
         opened = MachineRef(id: id)
@@ -618,9 +667,12 @@ struct SessionGoingLine: View {
     var machines = 0
     var sets = 0
     var identifier = "gym-session-going"
+    /// The running clock at the right, ticking each second (since 1.22, gym screen only).
+    var clock = false
     static let green = Color.pair("#15803d", "#86efac")
 
-    init(start: Date?, visit: GymVisit?, identifier: String = "gym-session-going") {
+    init(start: Date?, visit: GymVisit?, identifier: String = "gym-session-going", clock: Bool = false) {
+        self.clock = clock
         self.start = start ?? visit.flatMap(Self.start(of:))
         self.machines = visit?.entries.filter { !$0.sets.isEmpty }.count ?? 0
         self.sets = visit?.setCount ?? 0
@@ -637,7 +689,7 @@ struct SessionGoingLine: View {
     }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
+        TimelineView(.periodic(from: .now, by: clock ? 1 : 30)) { context in
             HStack(spacing: 8) {
                 Circle().fill(Self.green).frame(width: 9, height: 9)
                 Text(words(now: context.date))
@@ -646,6 +698,12 @@ struct SessionGoingLine: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 Spacer(minLength: 0)
+                if clock, let start {
+                    Text(GymVisit.clock(Int(context.date.timeIntervalSince(start))))
+                        .font(.system(.title3, design: .rounded).weight(.bold).monospacedDigit())
+                        .foregroundStyle(Self.green)
+                        .accessibilityIdentifier("gym-session-clock")
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
@@ -657,7 +715,7 @@ struct SessionGoingLine: View {
 
     private func words(now: Date) -> String {
         var parts = ["Session going"]
-        if let m = Self.minutes(from: start, now: now) { parts.append("\(m) min") }
+        if !clock, let m = Self.minutes(from: start, now: now) { parts.append("\(m) min") }
         if sets == 0 {
             parts.append("no sets yet")
         } else {
