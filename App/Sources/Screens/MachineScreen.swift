@@ -23,6 +23,8 @@ struct MachineScreen: View {
     @State private var zoomInstructions = false
     @State private var restEnd: Date?
     @State private var restLength: Double = Double(GymLog.restSeconds)
+    /// The last whole second a rest cue was given for, so none is said twice (since 1.35).
+    @State private var restCueSaid: Int?
     @State private var now = Date()
     @State private var editing = false
     @State private var changingSet: Int?
@@ -218,8 +220,16 @@ struct MachineScreen: View {
                 if left <= 0 {
                     restEnd = nil
                     Cues.shared.go("Set \(today.count + 1)")
-                } else if left < 3.2, Int(left.rounded(.up)) != Int((left + 0.25).rounded(.up)) {
-                    Cues.shared.countdown()
+                } else if left < 20.2, Int(left.rounded(.up)) != Int((left + 0.25).rounded(.up)) {
+                    // "Twenty seconds left", "Ten seconds left", then three-two-one (since 1.35, his ask).
+                    // With the spoken countdown off: a tick at 3, 2, 1 as before.
+                    let s = Int(left.rounded(.up))
+                    if s != restCueSaid {
+                        restCueSaid = s
+                        let word = Cues.shared.sounds.spokenCountdown
+                            ? SpokenCue.word(secondsLeft: s, phaseLength: Int(restLength.rounded()), isWork: false) : nil
+                        if s <= 3 { Cues.shared.countdown(spoken: word) } else if let word { Cues.shared.speak(word) }
+                    }
                 }
             }
         }

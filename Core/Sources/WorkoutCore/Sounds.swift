@@ -59,7 +59,13 @@ public enum SpokenCue {
         case 1: return "One"
         default: break
         }
-        guard isWork else { return nil }
+        guard isWork else {
+            // A rest (since 1.35, his ask): twenty and ten seconds left, then three-two-one.
+            // Only when the rest is longer, so a short rest gets no cue right at its start.
+            if phaseLength > 20, secondsLeft == 20 { return "Twenty seconds left" }
+            if phaseLength > 10, secondsLeft == 10 { return "Ten seconds left" }
+            return nil
+        }
         if phaseLength >= 30, secondsLeft == 10 { return "Ten seconds" }
         if phaseLength >= 20, secondsLeft == phaseLength / 2 { return "Halfway" }
         return nil

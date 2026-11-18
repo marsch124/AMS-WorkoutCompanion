@@ -14,13 +14,13 @@ final class Version123SoundTests: XCTestCase {
         }
         XCTAssertEqual(SpokenCue.word(secondsLeft: 3, phaseLength: 40, isWork: true), "Three")
         XCTAssertEqual(SpokenCue.word(secondsLeft: 20, phaseLength: 40, isWork: true), "Halfway")
-        XCTAssertNil(SpokenCue.word(secondsLeft: 10, phaseLength: 20, isWork: false) )
+        XCTAssertEqual(SpokenCue.word(secondsLeft: 10, phaseLength: 20, isWork: false), "Ten seconds left") // since 1.35
         XCTAssertEqual(SpokenCue.word(secondsLeft: 10, phaseLength: 20, isWork: true), "Halfway")
         XCTAssertNil(SpokenCue.word(secondsLeft: 7, phaseLength: 15, isWork: true))
         XCTAssertNil(SpokenCue.word(secondsLeft: 5, phaseLength: 10, isWork: true))
         XCTAssertEqual(SpokenCue.word(secondsLeft: 10, phaseLength: 45, isWork: true), "Ten seconds")
         XCTAssertNil(SpokenCue.word(secondsLeft: 10, phaseLength: 25, isWork: true))
-        XCTAssertNil(SpokenCue.word(secondsLeft: 20, phaseLength: 40, isWork: false))
+        XCTAssertEqual(SpokenCue.word(secondsLeft: 20, phaseLength: 40, isWork: false), "Twenty seconds left") // since 1.35
     }
 
     func testBuiltInPresets() {
