@@ -8,8 +8,27 @@ import WorkoutCore
 /// AirPods (or the phone's speaker), alongside his music. The screen stays on while it runs.
 struct StretchTimerScreen: View {
     @Environment(Library.self) private var library
-    let workout: Workout
+    /// The old way (checklists, after a session): a list of exercises, chosen here, saved as a SessionRecord.
+    let workout: Workout?
+    /// Since 2.0, inside a gym visit: the stretches from the chooser; nothing is recorded here, the
+    /// result goes back through `onFinish`.
+    let picksIn: [StretchPick]
+    let onFinish: ((StretchOutcome) -> Void)?
     let onClose: () -> Void
+
+    init(workout: Workout, onClose: @escaping () -> Void) {
+        self.workout = workout; self.picksIn = []; self.onFinish = nil; self.onClose = onClose
+        _choosing = State(initialValue: true)
+    }
+
+    init(picks: [StretchPick], onFinish: @escaping (StretchOutcome) -> Void, onClose: @escaping () -> Void) {
+        self.workout = nil; self.picksIn = picks; self.onFinish = onFinish; self.onClose = onClose
+        _choosing = State(initialValue: false)
+        _picked = State(initialValue: Set(picks.map(\.id)))
+    }
+
+    private var tint: Color { workout?.fill ?? Gym.fill }
+    private var ink: Color { workout?.inkOnFill ?? Gym.ink }
 
     @State private var phases: [StretchPhase] = []
     @State private var at = 0
@@ -23,11 +42,14 @@ struct StretchTimerScreen: View {
     @State private var kept = false
     @State private var now = Date()
     /// Since 1.34 (his ask): which stretches of the list to do this time (all at first), and which were held.
-    @State private var picked: Set<UUID> = []
-    @State private var held: Set<UUID> = []
+    @State private var picked: Set<String> = []
+    @State private var held: Set<String> = []
+    /// Held stretches in the order they were done, and the ones skipped (since 2.0).
+    @State private var heldOrder: [String] = []
+    @State private var skipped: Set<String> = []
     /// The stretches the running phases belong to, in order (a phase's index points here).
-    @State private var order: [Exercise] = []
-    @State private var choosing = true
+    @State private var order: [StretchPick] = []
+    @State private var choosing: Bool
     @State private var rechoosing = false
     private let tick = Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()
 
@@ -36,8 +58,8 @@ struct StretchTimerScreen: View {
         if let endsAt { return max(0, endsAt.timeIntervalSince(now)) }
         return leftWhenPaused
     }
-    private var all: [Exercise] { StretchTimer.choosable(workout.exercises) }
-    private var chosenList: [Exercise] { all.filter { picked.contains($0.id) } }
+    private var all: [StretchPick] { workout.map { StretchTimer.picks(for: $0.exercises) } ?? picksIn }
+    private var chosenList: [StretchPick] { all.filter { picked.contains($0.id) } }
     private var stretchCount: Int { chosenList.count }
     /// "Stretch 3 of 4": where the current stretch sits among the chosen ones.
     private var currentNumber: Int {
@@ -70,8 +92,8 @@ struct StretchTimerScreen: View {
         VStack(spacing: 0) {
             header
             if choosing {
-                StretchChooser(all: all, picked: $picked, tint: workout.fill, ink: workout.inkOnFill,
-                               title: "Start", action: begin)
+                ListStretchChooser(all: all, picked: $picked, tint: tint, ink: ink,
+                                   title: "Start", action: begin)
             } else if finished {
                 Spacer()
                 VStack(spacing: 18) {
@@ -80,7 +102,7 @@ struct StretchTimerScreen: View {
                     Text("\(held.count) of \(stretchCount) stretch\(stretchCount == 1 ? "" : "es") · \(Clock.text(Int(Date().timeIntervalSince(startedAt))))")
                         .font(.subheadline).foregroundStyle(Theme.muted)
                     Button("Close", action: close)
-                        .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill))
+                        .buttonStyle(BigButtonStyle(fill: tint, ink: ink))
                         .accessibilityIdentifier("stretch-timer-close-done")
                 }
                 .padding(24)
@@ -89,7 +111,7 @@ struct StretchTimerScreen: View {
                 Spacer()
             } else if let phase {
                 ScrollView {
-                    VStack(spacing: 14) {
+                    VStack(spacing: 12) {
                         Text(label(phase))
                             .font(.caption.weight(.bold))
                             .tracking(1)
@@ -98,39 +120,34 @@ struct StretchTimerScreen: View {
                             .frame(height: 26)
                             .background(colour(phase.kind).opacity(0.14), in: Capsule())
                             .accessibilityIdentifier("stretch-timer-phase")
-                        ZStack {
-                            Ring(fractionLeft: left / Double(max(1, phase.seconds)), colour: colour(phase.kind), width: 14)
-                                .animation(.linear(duration: 0.2), value: left)
-                            Text("\(Int(left.rounded(.up)))")
-                                .font(.system(size: 64, weight: .bold, design: .rounded))
-                                .monospacedDigit()
-                                .foregroundStyle(Theme.ink)
-                                .contentTransition(.numericText(countsDown: true))
-                                .accessibilityIdentifier("stretch-timer-seconds")
-                        }
-                        .frame(width: 200, height: 200)
+                        figure(phase)
                         Text(phase.name)
                             .font(.title2.weight(.bold))
                             .foregroundStyle(Theme.ink)
                             .multilineTextAlignment(.center)
                             .accessibilityIdentifier("stretch-timer-name")
-                        if let move = StretchRoutine.move(named: phase.name) {
-                            VStack(alignment: .leading, spacing: 5) {
-                                ForEach(Array(move.steps.enumerated()), id: \.offset) { n, step in
-                                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                        Text("\(n + 1).").font(.subheadline.weight(.semibold)).foregroundStyle(Gym.tint)
-                                            .frame(width: 18, alignment: .trailing)
-                                        Text(step).font(.subheadline).foregroundStyle(Theme.ink)
-                                    }
-                                }
-                                Text(move.feel).font(.footnote).foregroundStyle(SessionGoingLine.green).padding(.top, 2)
-                            }
-                            .padding(12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        } else if let e = workout.exercises.first(where: { $0.name == phase.name }), !e.note.isEmpty {
-                            Text(e.note).font(.subheadline).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
+                        ZStack {
+                            Ring(fractionLeft: left / Double(max(1, phase.seconds)), colour: colour(phase.kind), width: 10)
+                                .animation(.linear(duration: 0.2), value: left)
+                            Text("\(Int(left.rounded(.up)))")
+                                .font(.system(size: 48, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(Theme.ink)
+                                .contentTransition(.numericText(countsDown: true))
+                                .accessibilityIdentifier("stretch-timer-seconds")
                         }
+                        .frame(width: 140, height: 140)
+                        Button { jump(1) } label: {
+                            Text("Skip")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Gym.tint)
+                                .padding(.horizontal, 18)
+                                .frame(height: 34)
+                                .background(Gym.fill.opacity(0.12), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("stretch-skip")
+                        guideCard(phase)
                         if let next = phases.dropFirst(at + 1).first(where: { $0.index != phase.index }) {
                             Text("Then: \(next.name)").font(.subheadline).foregroundStyle(Theme.muted)
                                 .accessibilityIdentifier("stretch-timer-next")
@@ -145,8 +162,8 @@ struct StretchTimerScreen: View {
         .onAppear(perform: prepare)
         .sheet(isPresented: $rechoosing) {
             NavigationStack {
-                StretchChooser(all: all, picked: $picked, tint: workout.fill, ink: workout.inkOnFill,
-                               title: "Go on with these", held: held) {
+                ListStretchChooser(all: all, picked: $picked, tint: tint, ink: ink,
+                                   title: "Go on with these", held: held) {
                     rechoosing = false
                     rebuild()
                 }
@@ -162,6 +179,50 @@ struct StretchTimerScreen: View {
         }
     }
 
+    /// The big picture of the stretch (since 2.0): the drawn figure (mirrored on side 2), or his own photo.
+    @ViewBuilder private func figure(_ phase: StretchPhase) -> some View {
+        let pick = order.indices.contains(phase.index) ? order[phase.index] : nil
+        Group {
+            if let fig = phase.figureID, FigureView.has(fig) || pick?.photo == nil {
+                FigureView(id: fig, size: 200, mirrored: phase.side == 2, animated: false, tint: Theme.accent)
+            } else if let image = library.image(pick?.photo) {
+                Image(uiImage: image).resizable().scaledToFill()
+                    .frame(width: 200, height: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            } else {
+                IconMark(.hand("yoga"), size: 96, colour: Theme.accent)
+                    .frame(width: 200, height: 200)
+            }
+        }
+        .frame(width: 200, height: 200)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(phase.name)
+        .accessibilityIdentifier("stretch-figure")
+    }
+
+    @ViewBuilder private func guideCard(_ phase: StretchPhase) -> some View {
+        let pick = order.indices.contains(phase.index) ? order[phase.index] : nil
+        let steps: [String]? = phase.figureID.flatMap { StretchLibrary.guide($0)?.steps } ?? StretchRoutine.move(named: phase.name)?.steps
+        let feel: String? = phase.figureID.flatMap { StretchLibrary.guide($0)?.feel } ?? StretchRoutine.move(named: phase.name)?.feel
+        if let steps {
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(Array(steps.enumerated()), id: \.offset) { n, step in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text("\(n + 1).").font(.subheadline.weight(.semibold)).foregroundStyle(Gym.tint)
+                            .frame(width: 18, alignment: .trailing)
+                        Text(step).font(.subheadline).foregroundStyle(Theme.ink)
+                    }
+                }
+                if let feel { Text(feel).font(.footnote).foregroundStyle(SessionGoingLine.green).padding(.top, 2) }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        } else if let note = pick?.note, !note.isEmpty {
+            Text(note).font(.subheadline).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
+        }
+    }
+
     private var header: some View {
         VStack(spacing: 10) {
             HStack {
@@ -169,7 +230,7 @@ struct StretchTimerScreen: View {
                     .accessibilityIdentifier("stretch-timer-close")
                 Spacer()
                 VStack(spacing: 2) {
-                    Text(workout.name.isEmpty ? "Stretch" : workout.name)
+                    Text((workout?.name ?? "").isEmpty ? "Stretch" : workout!.name)
                         .font(.system(.headline, design: .rounded))
                         .foregroundStyle(Theme.ink)
                     Text(choosing ? "Choose the stretches for today" : finished ? "Done" : "Stretch \(max(1, min(stretchCount, currentNumber))) of \(stretchCount) · \(Clock.text(totalLeft)) left")
@@ -202,7 +263,7 @@ struct StretchTimerScreen: View {
                 let all = max(1, StretchTimer.total(phases))
                 ZStack(alignment: .leading) {
                     Capsule().fill(Theme.line)
-                    Capsule().fill(workout.fill)
+                    Capsule().fill(tint)
                         .frame(width: choosing ? 0 : finished ? g.size.width : g.size.width * Double(all - totalLeft) / Double(all))
                 }
             }
@@ -253,6 +314,7 @@ struct StretchTimerScreen: View {
     /// Every stretch is chosen at first; nothing runs until Start (since 1.34).
     private func prepare() {
         if picked.isEmpty { picked = Set(all.map(\.id)) }
+        if !choosing && phases.isEmpty && !finished { begin() }
     }
 
     private func begin() {
@@ -277,7 +339,9 @@ struct StretchTimerScreen: View {
     /// A hold that ran out counts its stretch as held.
     private func markHeld(_ p: StretchPhase) {
         guard p.kind == .hold, order.indices.contains(p.index) else { return }
-        held.insert(order[p.index].id)
+        let id = order[p.index].id
+        if held.insert(id).inserted { heldOrder.append(id) }
+        skipped.remove(id)
     }
 
     /// Save now: what was held is kept, and a hold more than half done counts too.
@@ -325,6 +389,8 @@ struct StretchTimerScreen: View {
         guard let p = phase else { return }
         let target = p.index + by
         if target < 0 { enter(0); return }
+        // Next/Skip leaves a stretch not yet held as skipped (since 2.0).
+        if by > 0, !held.contains(p.pickID) { skipped.insert(p.pickID) }
         if let i = phases.firstIndex(where: { $0.index == target }) { enter(i) } else if by > 0 { finish() }
     }
 
@@ -337,7 +403,13 @@ struct StretchTimerScreen: View {
 
     /// Into History, once, when at least one stretch was held — also when stopped early (since 1.34).
     private func keep() {
-        guard !kept, let r = SessionRecord.ofStretch(workout, started: startedAt, ended: Date(),
+        if let onFinish {
+            guard !kept, !heldOrder.isEmpty else { return }
+            kept = true
+            onFinish(StretchOutcome(held: heldOrder, skipped: skipped.subtracting(held).count, start: startedAt, end: Date()))
+            return
+        }
+        guard !kept, let workout, let r = SessionRecord.ofStretch(workout, started: startedAt, ended: Date(),
                                                      held: held.count, chosen: stretchCount) else { return }
         kept = true
         library.record(r)
@@ -349,90 +421,11 @@ struct StretchTimerScreen: View {
     }
 }
 
-/// Tick the stretches to do this time (since 1.34, his ask). All are ticked at first;
-/// stretches already held show a check and stay as they are.
-struct StretchChooser: View {
-    let all: [Exercise]
-    @Binding var picked: Set<UUID>
-    let tint: Color
-    let ink: Color
-    let title: String
-    var held: Set<UUID> = []
-    let action: () -> Void
 
-    private var minutes: Int {
-        let secs = StretchTimer.total(StretchTimer.phases(for: all.filter { picked.contains($0.id) && !held.contains($0.id) }))
-        return max(1, Int((Double(secs) / 60).rounded()))
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 8) {
-                    HStack {
-                        Text("\(picked.count) of \(all.count) chosen")
-                            .font(.subheadline).foregroundStyle(Theme.muted)
-                            .accessibilityIdentifier("stretch-choose-count")
-                        Spacer()
-                        Button(picked.count == all.count ? "None" : "All") {
-                            picked = picked.count == all.count ? held : Set(all.map(\.id))
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Gym.tint)
-                        .accessibilityIdentifier("stretch-choose-all")
-                    }
-                    ForEach(Array(all.enumerated()), id: \.element.id) { n, e in
-                        let on = picked.contains(e.id)
-                        let done = held.contains(e.id)
-                        Button {
-                            guard !done else { return }
-                            if on { picked.remove(e.id) } else { picked.insert(e.id) }
-                        } label: {
-                            HStack(spacing: 12) {
-                                ZStack {
-                                    Circle().fill(on ? tint : Color.clear)
-                                    Circle().stroke(on ? tint : Theme.line, lineWidth: 1.5)
-                                    if on { ControlMarkView(.check, size: 14, colour: ink) }
-                                }
-                                .frame(width: 26, height: 26)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(e.name).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
-                                    if done || !e.amount.isEmpty {
-                                        Text(done ? "Held" : e.amount).font(.footnote)
-                                            .foregroundStyle(done ? SessionGoingLine.green : Theme.muted)
-                                    }
-                                }
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(on ? tint.opacity(0.6) : Theme.line, lineWidth: 1))
-                            .opacity(done ? 0.6 : 1)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(e.name)
-                        .accessibilityValue(on ? "chosen" : "not chosen")
-                        .accessibilityIdentifier("stretch-choose-\(n + 1)")
-                    }
-                }
-                .padding(16)
-            }
-            VStack(spacing: 4) {
-                Button(action: action) {
-                    MarkLabel(title: title, mark: .play, size: 20, colour: ink)
-                }
-                .buttonStyle(BigButtonStyle(fill: tint, ink: ink, height: 56))
-                .disabled(picked.subtracting(held).isEmpty)
-                .opacity(picked.subtracting(held).isEmpty ? 0.5 : 1)
-                .accessibilityIdentifier("stretch-choose-start")
-                Text("About \(minutes) min · voice cues in your AirPods")
-                    .font(.footnote).foregroundStyle(Theme.muted)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Theme.bg.ignoresSafeArea(edges: .bottom))
-        }
-    }
+/// What a stretch session inside a gym visit hands back (since 2.0).
+struct StretchOutcome {
+    var held: [String]
+    var skipped: Int
+    var start: Date
+    var end: Date
 }
