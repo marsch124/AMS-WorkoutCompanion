@@ -427,6 +427,8 @@ His two approved ideas after 1.17: see that a session is going from the Train pa
 
 ## Version 2.0 — warm-up, one stretch library, pictures, one Well done, instruction view, rest voice (19 Nov 2026)
 
+- **Signs in this app (How it works chapter, 2.0).** `AppText.howItWorks` has a chapter "Signs in this app" listing every mark and colour with its meaning (tick = finished machine, pencil + "Change" = change a logged set, green session line, red End, orange Busy pill, yellow Warm-up pill, gold arrow, Pain pill, rest button tints, star, suggested dot, drag handle, trophy gold, time bar colours, instruction picture, mirrored figure). On a logged set the filled-circle tick was replaced by a pencil (`ControlMark.edit`) and the word "Change" (caption, tint); identifier `gym-set-N` unchanged. How it works › History now says five tiles (Sessions, Minutes, Exercises, Sets, Lifted) and a 12-week chart.
+
 Version 2.0 (build 1). Data envelopes stay `"version":1`; every new field is optional and decoded with `decodeIfPresent`, so old files and old backups load unchanged.
 
 ### Warm-up

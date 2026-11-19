@@ -211,8 +211,8 @@ struct StretchChooser: View {
                             .multilineTextAlignment(.leading)
                         HStack(spacing: 4) {
                             if suggested.contains(id) {
-                                Circle().fill(Gym.busyTint).frame(width: 6, height: 6)
-                                Text("suggested ·").font(.caption).foregroundStyle(Gym.busyTint)
+                                Circle().fill(Gym.tint).frame(width: 6, height: 6)
+                                Text("suggested ·").font(.caption).foregroundStyle(Gym.tint)
                             }
                             Text(amount(id)).font(.caption).foregroundStyle(Theme.muted)
                         }
@@ -261,7 +261,7 @@ struct StretchChooser: View {
 
     private func starButton(_ id: String, _ fav: Bool, _ ident: String) -> some View {
         Button { book.toggleFavourite(id); persist() } label: {
-            StretchMarkView(mark: .star, size: 18, colour: fav ? Gym.better : Theme.muted)
+            StretchMarkView(mark: .star, size: 18, colour: fav ? Gym.tint : Theme.muted)
                 .frame(width: 30, height: 30)
         }
         .buttonStyle(.plain)

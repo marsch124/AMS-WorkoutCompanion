@@ -237,7 +237,7 @@ struct SummaryScreen: View {
     }
 
     private static let gold = Color.pair("#d4a017", "#f5c542")
-    private static let warmOrange = Color.pair("#ea7c10", "#fb9e3f")
+    private static let warmOrange = Warmup.tint  // the same warm-up colour as on the machine page (sign check)
 
     /// The first session photo big with the trophy badge on its lower-right corner; no photo: the trophy large.
     @ViewBuilder private func heroPicture(visit: GymVisit?, gold: Bool) -> some View {

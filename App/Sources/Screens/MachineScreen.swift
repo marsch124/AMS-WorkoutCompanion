@@ -344,10 +344,11 @@ struct MachineScreen: View {
                             Text(effort.title).font(.caption.weight(.semibold)).foregroundStyle(Gym.tint)
                         }
                         Text(said(s)).fontWeight(s.isWarmup ? .regular : .semibold).foregroundStyle(s.isWarmup ? Theme.muted : Theme.ink)
-                        // A tick in a filled circle (since 1.16; before, a bare tick).
-                        ControlMarkView(.check, size: 11, colour: s.isWarmup ? Warmup.swatch.inkColor : Gym.ink)
-                            .frame(width: 20, height: 20)
-                            .background(s.isWarmup ? Warmup.swatch.fillColor : Gym.fill, in: Circle())
+                        // A pencil and "Change": tapping the row changes the set. The tick means a finished machine (2.0).
+                        HStack(spacing: 3) {
+                            ControlMarkView(.edit, size: 12, colour: Gym.tint)
+                            Text("Change").font(.caption).foregroundStyle(Gym.tint)
+                        }
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)

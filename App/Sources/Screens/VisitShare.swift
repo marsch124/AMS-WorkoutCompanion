@@ -44,7 +44,7 @@ struct VisitShareCard: View {
             if visit.warmup != nil || visit.stretching != nil {
                 VStack(alignment: .leading, spacing: 3) {
                     if let line = visit.warmupLine(in: gym) {
-                        Text(line).font(.footnote.weight(.semibold)).foregroundStyle(Color(red: 0.85, green: 0.45, blue: 0.08))
+                        Text(line).font(.footnote.weight(.semibold)).foregroundStyle(Color(red: 0.63, green: 0.38, blue: 0.03))
                     }
                     if let line = visit.stretchLine() {
                         Text(line).font(.footnote.weight(.semibold)).foregroundStyle(Color(red: 0.13, green: 0.55, blue: 0.30))
