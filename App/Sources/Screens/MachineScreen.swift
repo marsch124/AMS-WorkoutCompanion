@@ -1102,18 +1102,6 @@ struct MachineForm: View {
                 Text("Shown each time you use the machine.")
             }
             Section {
-                TextField("A few words on how to use it", text: Binding(
-                    get: { draft.howTo ?? "" },
-                    set: { draft.howTo = $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
-                ), axis: .vertical)
-                    .lineLimit(3...8)
-                    .accessibilityIdentifier("machine-howto-field")
-            } header: {
-                Text("How to use it")
-            } footer: {
-                Text("Shown with the instruction photo when you tap the small picture beside the machine name.")
-            }
-            Section {
                 Picker("Muscle group", selection: $draft.muscle) {
                     Text("Not chosen").tag(String?.none)
                     ForEach(library.gym.muscles) { m in
@@ -1137,6 +1125,18 @@ struct MachineForm: View {
                 Text(draft.logs == .time ? "Minutes, level and incline — for a treadmill, rowing machine or bike. A plank: Time, with level and incline off."
                      : draft.logs == .reps ? "Reps per set, no weight — push-ups, sit-ups, pull-ups."
                      : "Weight and reps per set.")
+            }
+            Section {
+                TextField("A few words on how to use it", text: Binding(
+                    get: { draft.howTo ?? "" },
+                    set: { draft.howTo = $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+                ), axis: .vertical)
+                    .lineLimit(3...8)
+                    .accessibilityIdentifier("machine-howto-field")
+            } header: {
+                Text("How to use it")
+            } footer: {
+                Text("Shown with the instruction photo when you tap the small picture beside the machine name.")
             }
             if draft.logs == .time {
                 Section {

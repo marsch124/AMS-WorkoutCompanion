@@ -649,7 +649,7 @@ struct GymScreen: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .accessibilityIdentifier("gym-warmup")
+                    .accessibilityIdentifier("gym-warmup-start")
                 }
             }
             .frame(height: GymScreen.headHeight)

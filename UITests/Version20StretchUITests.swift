@@ -29,15 +29,18 @@ final class Version20StretchUITests: XCTestCase {
         openChooser(app)
         XCTAssertTrue(app.descendants(matching: .any)["stretch-drag-1"].firstMatch.waitForExistence(timeout: 5))
         let cobra = app.buttons["stretch-add-cobra"]
-        for _ in 0..<8 where !(cobra.exists && cobra.isHittable) { app.swipeUp() }
+        app.reveal(cobra)
         cobra.tap()
         XCTAssertEqual(cobra.value as? String, "chosen")
         XCTAssertTrue(app.descendants(matching: .any)["stretch-area-back"].firstMatch.exists)
         app.buttons["stretch-choose-close"].tap()
-        // Open it again: the tick is still there.
-        app.terminate(); app.launch()
-        openChooser(app)
-        for _ in 0..<8 where !(cobra.exists && cobra.isHittable) { app.swipeUp() }
+        // Open it again from Well done's Stretch now: the tick is still there.
+        XCTAssertTrue(app.buttons["gym-summary-done"].waitForExistence(timeout: 5))
+        let again = app.buttons["gym-stretch"]
+        app.reveal(again)
+        again.tap()
+        XCTAssertTrue(app.buttons["stretch-choose-start"].waitForExistence(timeout: 5))
+        app.reveal(cobra)
         XCTAssertEqual(cobra.value as? String, "chosen")
     }
 

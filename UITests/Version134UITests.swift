@@ -25,41 +25,20 @@ final class Version134UITests: XCTestCase {
         app.confirmEnd()
         let stretch = app.buttons["gym-stretch"]
         XCTAssertTrue(app.buttons["gym-summary-done"].waitForExistence(timeout: 5))
-        for _ in 0..<8 where !(stretch.exists && stretch.isHittable) { app.swipeUp() }
+        app.reveal(stretch)
         stretch.tap()
 
-        // Choose: keep the first two of six.
-        let count = app.staticTexts["stretch-choose-count"]
-        XCTAssertTrue(count.waitForExistence(timeout: 5))
-        XCTAssertEqual(count.label, "6 of 6 chosen")
-        for n in 3...6 { app.buttons["stretch-choose-\(n)"].tap() }
-        XCTAssertEqual(count.label, "2 of 6 chosen")
+        // 2.0: Stretch now opens his stretches (the 2.0 chooser); closing it goes back to Well done.
+        XCTAssertTrue(app.buttons["stretch-choose-start"].waitForExistence(timeout: 5))
         shot(app, "134-choose")
-        app.buttons["stretch-choose-start"].tap()
-        XCTAssertTrue(app.staticTexts["stretch-timer-progress"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["stretch-timer-progress"].label.hasPrefix("Stretch 1 of 2"))
-
-        // Hold more than half the first side, then Save: that stretch counts.
-        let phase = app.staticTexts["stretch-timer-phase"]
-        expectation(for: NSPredicate(format: "label BEGINSWITH 'HOLD'"), evaluatedWith: phase)
-        waitForExpectations(timeout: 12)
-        sleep(17)
-        shot(app, "134-save")
-        app.buttons["stretch-timer-save"].tap()
-        let done = app.descendants(matching: .any)["stretch-timer-done"].firstMatch
-        XCTAssertTrue(done.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH '1 of 2 stretches'")).firstMatch.exists)
-        app.buttons["stretch-timer-close-done"].tap()
+        app.buttons["stretch-choose-close"].tap()
         XCTAssertTrue(app.buttons["gym-summary-done"].waitForExistence(timeout: 5))
         app.buttons["gym-summary-done"].tap()
 
-        // History: the stretch row and the gym visit with its warm-up set.
+        // History: the gym visit with its warm-up set.
         app.buttons["open-history"].tap()
-        let stretchRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'history-row-' AND label CONTAINS '1 of 2 chosen stretches'")).firstMatch
-        XCTAssertTrue(stretchRow.waitForExistence(timeout: 5), "the stretch shows in History")
-        shot(app, "134-history")
         let visit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'history-row-' AND label BEGINSWITH 'At the gym'")).firstMatch
-        XCTAssertTrue(visit.exists)
+        XCTAssertTrue(visit.waitForExistence(timeout: 5))
         visit.tap()
         let warm = app.buttons["visit-set-1-1"]
         XCTAssertTrue(warm.waitForExistence(timeout: 5))
