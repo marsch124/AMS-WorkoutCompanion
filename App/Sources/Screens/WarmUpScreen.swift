@@ -32,7 +32,7 @@ struct WarmUpFlow: View {
             if let run {
                 WarmUpRunScreen(run: run, day: day, gymID: gymID, finished: close)
             } else {
-                WarmUpScreen(gymID: gymID, cancel: close) { start($0) }
+                WarmUpScreen(gymID: gymID, day: day, cancel: close) { start($0) }
             }
         }
         .environment(library)
@@ -77,6 +77,7 @@ struct WarmRun {
 struct WarmUpScreen: View {
     @Environment(Library.self) private var library
     let gymID: UUID?
+    var day: Date = Date()
     let cancel: () -> Void
     let start: (WarmChoice) -> Void
 
@@ -86,6 +87,8 @@ struct WarmUpScreen: View {
     @State private var order: [String] = []
     @State private var ticked: Set<String> = []
     @State private var loaded = false
+    /// Today's suggestions (since 2.1): moves that suit the muscle groups of today's machines.
+    @State private var suggestion = WarmupSuggestion.none
 
     private var cardio: [Machine] { library.gym.machines(in: gymID).filter { $0.logs == .time } }
 
@@ -116,6 +119,11 @@ struct WarmUpScreen: View {
                         .padding(12)
                         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     } else {
+                        if !suggestion.words.isEmpty {
+                            Text("Suggested for today: \(suggestion.words)")
+                                .font(.footnote).foregroundStyle(Theme.muted)
+                                .accessibilityIdentifier("warmup-suggested-line")
+                        }
                         movesList
                         Text("Hold a move and drag it up or down to change the order.")
                             .font(.caption).foregroundStyle(Theme.muted)
@@ -186,6 +194,7 @@ struct WarmUpScreen: View {
         }
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.line, lineWidth: 1))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("warmup-moves")
     }
 
@@ -202,12 +211,19 @@ struct WarmUpScreen: View {
                 .frame(width: 24, height: 24)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(on ? "\(m.name), ticked" : "\(m.name), not ticked")
+            .accessibilityLabel(m.name + (suggestion.moves.contains(m.id) ? ", suggested" : "") + (on ? ", ticked" : ", not ticked"))
             .accessibilityIdentifier("warmup-move-\(i + 1)")
             FigureView(id: m.id, size: 36, tint: Theme.accent)
             VStack(alignment: .leading, spacing: 0) {
                 Text(m.name).font(.body)
-                Text(sub).font(.caption).foregroundStyle(Theme.muted)
+                HStack(spacing: 4) {
+                    if suggestion.moves.contains(m.id) {
+                        Circle().fill(Gym.tint).frame(width: 6, height: 6)
+                        Text("suggested ·").font(.caption).foregroundStyle(Gym.tint)
+                            .accessibilityIdentifier("warmup-move-suggested-\(i + 1)")
+                    }
+                    Text(sub).font(.caption).foregroundStyle(Theme.muted)
+                }
             }
             Spacer(minLength: 4)
         }
@@ -224,10 +240,10 @@ struct WarmUpScreen: View {
         loaded = true
         let warm = library.gym.stretchBook?.warm
         minutes = max(1, warm?.minutes ?? 8)
-        let all = StretchLibrary.moves.map(\.id)
-        let saved = (warm?.moves ?? []).filter { all.contains($0) }
-        order = saved + all.filter { !saved.contains($0) }
-        ticked = Set(saved.isEmpty ? all : saved)
+        suggestion = library.gym.suggestedWarmupMoves(gym: gymID, on: day)
+        let shown = WarmPrefs.movesShown(saved: warm?.moves ?? [], suggested: suggestion.moves)
+        order = shown.order
+        ticked = shown.ticked
         let remembered = warm?.machineID.flatMap { id in cardio.first { $0.id == id } }
         switch warm?.kind {
         case .cardio?:

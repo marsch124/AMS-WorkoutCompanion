@@ -82,12 +82,12 @@ public enum StretchLibrary {
     ]
 
     public static let moves: [StretchItem] = [
-        StretchItem("dyn-arm-circles", "Arm circles", .warm, ["shoulders"], 30, sides: 1),
+        StretchItem("dyn-arm-circles", "Arm circles", .warm, ["shoulders", "chest", "arms"], 30, sides: 1),
         StretchItem("dyn-leg-swing-front", "Leg swings forward and back", .warm, ["legs"], 30, sides: 2),
         StretchItem("dyn-leg-swing-side", "Leg swings side to side", .warm, ["legs"], 30, sides: 2),
         StretchItem("dyn-hip-circles", "Hip circles", .warm, ["legs", "core"], 30, sides: 1),
         StretchItem("dyn-lunge-twist", "Lunge with a twist", .warm, ["legs", "core"], 30, sides: 1),
-        StretchItem("dyn-inchworm", "Inchworm", .warm, ["legs", "core", "shoulders"], 30, sides: 1),
+        StretchItem("dyn-inchworm", "Inchworm", .warm, ["legs", "core", "shoulders", "chest"], 30, sides: 1),
         StretchItem("dyn-squat", "Body-weight squat", .warm, ["legs"], 30, sides: 1),
         StretchItem("dyn-glute-bridge", "Glute bridge", .warm, ["legs", "core"], 30, sides: 1),
         StretchItem("dyn-torso-turns", "Torso turns", .warm, ["core", "back"], 30, sides: 1),

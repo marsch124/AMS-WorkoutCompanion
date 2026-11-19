@@ -483,3 +483,22 @@ Version 2.0 (build 1). Data envelopes stay `"version":1`; every new field is opt
 ### Tests (lean)
 - Core, one per rule: old JSON decodes and new fields round-trip; split and minutes; warm-up-only visit kept; book migration; suggested stretches; rest marks; figures parse; Board fields only when set. UI (by identifier): warm-up to `gym-warmup-chip`; End box buttons; chooser and `stretch-drag-1`; timer `stretch-figure` and `stretch-skip`; Well done `done-trophy`, `done-timebar`, `done-week`; `machine-howto-thumb`; the version list expects 2.0.
 - **Texts.** What's new (2.0) and How it works (new chapters Warm-up, Stretching, Instruction pictures, Rest voice; changed Sounds and words, At the gym, Plan today, Instructions photo, Machines for time, Session time, Two sessions in a day, Garmin Board, Sharing a visit, Warm-up sets, Backups, Where things are kept) updated.
+
+## Version 2.1 — warm-up moves that fit today's plan (19 Nov 2026)
+
+Version 2.1 (build 1; the build number goes back to 1). Data envelopes unchanged; no new stored fields.
+
+### Suggested warm-up moves
+- **Where.** Gym page, tile `gym-warmup-start`, then chip `warmup-choose-moves` ("Warm-up moves"): the list of the 10 moves (`WarmUpScreen`).
+- **Core rule.** `GymLog.suggestedWarmupMoves(gym:on:)` in `Core/Sources/WorkoutCore/Version21Warmup.swift` returns the move ids that suit today's muscle groups. Today's muscle groups are the groups of the machines in today's plan at this gym (machines skipped or removed from the plan do not count); with no plan for today, the machines of the last visit at this gym. Groups: chest, back, shoulders, arms, legs, core; Martin's own group names count when the name says so. With no plan and no last visit the result is empty and everything works as in 2.0.
+- **Merge rule.** `WarmPrefs.movesShown(saved:suggested:)` (same file): his remembered ticks and their order stay; suggestions only ADD ticks; suggested moves he does not have yet come right after his own ones. With nothing remembered, only the suggested moves are ticked (before 2.1: all 10 were ticked).
+- **Marks.** A suggested move carries a small blue dot and the blue word "suggested" (id `warmup-move-suggested-N`, N = the move's place in the list; the tick button `warmup-move-N` reads "<name>, suggested, ticked"), the same mark the stretch chooser uses. The mark means one thing for stretches and warm-up moves: suggested for today's machines.
+- **Line.** Under the list title, `warmup-suggested-line`: "Suggested for today: legs, back" (the groups found). Hidden when nothing is suggested.
+- **Start.** The ticked moves are remembered for next time, as before; with none ticked all moves are done (unchanged from 2.0).
+- **Library data.** `StretchLibrary` moves: Arm circles now counts for shoulders, chest and arms; Inchworm for legs, core, shoulders and chest (before: no move was linked to chest or arms). The stretches are unchanged.
+- **Demo check.** With `-gymdemo -gymextras` the last demo visit did Chest press and Lat pulldown, so the line reads "Suggested for today: chest, back" and Arm circles, Inchworm, Torso turns and World's greatest stretch come first, ticked.
+
+### Tests (lean)
+- Core `Version21Tests`: one data test per rule (suggested moves from plan, from last visit, none; merge with remembered ticks and order; nothing remembered → only suggested).
+- UI `Version21UITests`: one screen test finding `warmup-suggested-line` and `warmup-move-suggested-N`.
+- **Texts.** What's new (2.1), How it works (Warm-up; Signs in this app: the blue dot and "suggested" widened to warm-up moves).
