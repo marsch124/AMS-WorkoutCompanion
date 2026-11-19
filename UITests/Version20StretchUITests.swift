@@ -14,10 +14,10 @@ final class Version20StretchUITests: XCTestCase {
         app.buttons["machine-done-pill"].tap()
         XCTAssertTrue(app.buttons["gym-session-end"].waitForExistence(timeout: 5))
         app.buttons["gym-session-end"].tap()
-        app.confirmEnd()
-        let now = app.buttons["finish-stretch-now"]
-        XCTAssertTrue(now.waitForExistence(timeout: 5))
-        now.tap()
+        // 2.0: the End box offers "Stretch now".
+        let box = app.alerts.firstMatch
+        XCTAssertTrue(box.waitForExistence(timeout: 5))
+        box.buttons["Stretch now"].firstMatch.tap()
         XCTAssertTrue(app.buttons["stretch-choose-start"].waitForExistence(timeout: 5))
     }
 

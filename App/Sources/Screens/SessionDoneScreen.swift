@@ -14,23 +14,14 @@ struct SummaryScreen: View {
     @State private var askingDiscard = false
     @State private var title = ""
     @State private var notes = ""
-    @State private var stretching: Workout?
+    @State private var stretchingNow = false
     @State private var namingTemplate = false
     @State private var templateName = ""
     @State private var savedTemplate: String?
     @State private var showingPhotos = false
 
-    /// The stretch list for after a session: the one chosen in Settings, else the app's own, made on first use.
-    private func stretch() {
-        if let w = library.workouts.first(where: { $0.id == library.gym.stretchID }) {
-            stretching = w
-            return
-        }
-        let w = Workout.afterGymStretch()
-        library.save(w)
-        library.changeGym { $0.stretchID = w.id }
-        stretching = w
-    }
+    /// 2.0: Stretch now opens his stretches (chooser → timer) for this visit; the time joins the visit.
+    private func stretch() { stretchingNow = true }
 
     var body: some View {
         let visit = library.gym.visits.first { $0.id == visitID }
@@ -161,7 +152,7 @@ struct SummaryScreen: View {
                         Text("Keep this session's machines and order for another day.")
                     }
                 }
-                if library.gym.stretchID != GymLog.noStretch {
+                if library.gym.stretchID != GymLog.noStretch, visit.stretching == nil {
                     Section {
                         Button(action: stretch) {
                             HStack(spacing: 8) {
@@ -177,8 +168,7 @@ struct SummaryScreen: View {
                         .accessibilityIdentifier("gym-stretch")
                         // The guide: how to do each stretch (since 1.30, his ask).
                         NavigationLink {
-                            StretchGuideScreen(workout: library.workouts.first { $0.id == library.gym.stretchID }
-                                               ?? StretchRoutine.all[0].workout())
+                            StretchGuideScreen(libraryIDs: library.gym.stretchBook?.ticked.filter { StretchLibrary.item($0) != nil })
                         } label: {
                             HStack(spacing: 8) {
                                 AppMarkView(.template, size: 20, colour: Gym.tint)
@@ -206,10 +196,14 @@ struct SummaryScreen: View {
         }
         .navigationTitle("Session done")
         .navigationBarTitleDisplayMode(.inline)
-        // Since 1.32 (his ask) Stretch now starts the guided timer with voice cues.
-        .fullScreenCover(item: $stretching) { w in
-            StretchTimerScreen(workout: w) { stretching = nil }
-                .environment(library)
+        // Since 1.32 (his ask) Stretch now starts the guided timer with voice cues; since 2.0 his chosen
+        // stretches, and the stretching time joins this visit.
+        .fullScreenCover(isPresented: $stretchingNow) {
+            StretchSessionEntry(visitID: visitID) { part in
+                if let part { library.changeGym { $0.setStretching(visitID: visitID, part: part) } }
+                stretchingNow = false
+            }
+            .environment(library)
         }
         .sheet(isPresented: $showingPhotos) {
             NavigationStack {
