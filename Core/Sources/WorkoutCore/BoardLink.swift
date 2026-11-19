@@ -33,6 +33,13 @@ public struct BoardFile: Codable, Equatable, Sendable {
         public var cardioMinutes: Int
         public var bests: [String]
         public var entries: [Entry]
+        /// Since 2.0, only written when there was a warm-up or stretching (format stays 1).
+        public var warmupMinutes: Int? = nil
+        public var warmupKind: String? = nil
+        public var warmupSpeed: Double? = nil
+        public var warmupHeartRate: Int? = nil
+        public var stretchMinutes: Int? = nil
+        public var stretchCount: Int? = nil
     }
 
     public var app = "AMS Workout Companion"
@@ -58,7 +65,7 @@ extension GymLog {
                 if let f = v.finished, f >= last, f <= last.addingTimeInterval(GymVisit.finishGrace) { return f }
                 return last
             }
-            return BoardFile.Session(
+            var session = BoardFile.Session(
                 id: v.id, date: v.date.formatted(day), start: v.started, end: end, minutes: v.minutes,
                 gym: gyms.first { $0.id == v.gymID }?.name ?? GymLog.firstGymName,
                 title: v.title, feel: v.feel?.rawValue, notes: v.notes,
@@ -69,6 +76,17 @@ extension GymLog {
                                     muscle: muscle(for: machine(e.machineID))?.name,
                                     sets: text(e), setCount: e.sets.count, topKg: e.heaviest, pain: e.pain == true)
                 })
+            if let w = v.warmup {
+                session.warmupMinutes = w.minutes
+                session.warmupKind = w.kind.rawValue
+                session.warmupSpeed = w.speed
+                session.warmupHeartRate = w.heartRate
+            }
+            if let s = v.stretching {
+                session.stretchMinutes = s.minutes
+                session.stretchCount = s.held ?? s.names?.count
+            }
+            return session
         }
     }
 
