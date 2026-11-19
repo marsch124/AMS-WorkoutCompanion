@@ -61,6 +61,17 @@ struct VisitScreen: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
+                    if let w = visit.warmup {
+                        partRow(title: "Warm-up", mark: "strength", colour: Color.pair("#ea7c10", "#fb9e3f"), id: "visit-warmup",
+                                lines: ["\(library.gym.warmupName(w)) · \(w.minutes) min"]
+                                    + [[w.speed.map { "\(GymSet.number($0)) km/h" }, w.heartRate.map { "\($0) bpm" }].compactMap { $0 }.joined(separator: " · ")].filter { !$0.isEmpty })
+                    }
+                    if let st = visit.stretching {
+                        let held = st.held.map { "\($0) held" }
+                        let skipped = st.skipped.flatMap { $0 > 0 ? "\($0) skipped" : nil }
+                        partRow(title: "Stretching", mark: "yoga", colour: Gym.done, id: "visit-stretch",
+                                lines: ["\(st.minutes) min"] + [[held, skipped].compactMap { $0 }.joined(separator: " · ")].filter { !$0.isEmpty })
+                    }
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Photos").font(.headline).foregroundStyle(Gym.tint)
                         SessionPhotos(visitID: visit.id)
@@ -167,6 +178,22 @@ struct VisitScreen: View {
         if ProcessInfo.processInfo.arguments.contains("-uitest"), let ui = VisitShareCard.renderUIImage(visit, gym: library.gym, photo: { library.image($0) }) {
             try? ui.pngData()?.write(to: FileManager.default.temporaryDirectory.appendingPathComponent("uitest/share.png"))
         }
+    }
+
+    private func partRow(title: String, mark: String, colour: Color, id: String, lines: [String]) -> some View {
+        HStack(spacing: 10) {
+            IconMark(.hand(mark), size: 24, colour: colour)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.headline).foregroundStyle(colour)
+                ForEach(lines, id: \.self) { Text($0).font(.subheadline).foregroundStyle(Theme.ink) }
+            }
+            Spacer()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(id)
     }
 
     private func header(_ visit: GymVisit) -> some View {

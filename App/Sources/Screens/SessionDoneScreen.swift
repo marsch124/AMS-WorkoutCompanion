@@ -18,6 +18,7 @@ struct SummaryScreen: View {
     @State private var namingTemplate = false
     @State private var templateName = ""
     @State private var savedTemplate: String?
+    @State private var showingPhotos = false
 
     /// The stretch list for after a session: the one chosen in Settings, else the app's own, made on first use.
     private func stretch() {
@@ -37,13 +38,29 @@ struct SummaryScreen: View {
         List {
             Section {
                 VStack(spacing: 8) {
-                    IconMark(.hand(bests.isEmpty ? "strength" : "trophy"), size: 56, colour: Gym.tint)
+                    heroPicture(visit: visit, gold: !bests.isEmpty)
                     Text("Well done")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(Theme.ink)
+                        .frame(maxWidth: .infinity, alignment: visit?.photos?.first != nil ? .leading : .center)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
+                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .listRowBackground(Color.clear)
+            }
+            if let visit {
+                let split = visit.split
+                let hasBar = split.warmup > 0 || split.stretch > 0
+                do {
+                    Section {
+                        VStack(spacing: 8) {
+                            if hasBar { timeBar(split) }
+                            weekTile(visit)
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                    }
+                }
             }
             if let visit {
                 // How the whole session felt (since 1.23): one tap, the same again takes it away.
@@ -194,6 +211,15 @@ struct SummaryScreen: View {
             StretchTimerScreen(workout: w) { stretching = nil }
                 .environment(library)
         }
+        .sheet(isPresented: $showingPhotos) {
+            NavigationStack {
+                ScrollView { SessionPhotos(visitID: visitID).padding(16) }
+                    .navigationTitle("Photos of this session")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingPhotos = false } } }
+            }
+            .environment(library)
+        }
         .onAppear {
             title = visit?.title ?? ""
             notes = visit?.notes ?? ""
@@ -214,6 +240,96 @@ struct SummaryScreen: View {
             let n = library.gym.visits.first { $0.id == visitID }?.setCount ?? 0
             Text("All \(n == 1 ? "1 set" : "\(n) sets") of this session are deleted, with its title, notes and photos. It will not show in Earlier visits or History. This cannot be undone.")
         }
+    }
+
+    private static let gold = Color.pair("#d4a017", "#f5c542")
+    private static let warmOrange = Color.pair("#ea7c10", "#fb9e3f")
+
+    /// The first session photo big with the trophy badge on its lower-right corner; no photo: the trophy large.
+    @ViewBuilder private func heroPicture(visit: GymVisit?, gold: Bool) -> some View {
+        let colour = gold ? Self.gold : Gym.tint
+        let value = gold ? "gold" : "plain"
+        if let name = visit?.photos?.first, let ui = library.image(name) {
+            Button { showingPhotos = true } label: {
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 220)
+                    .overlay { Image(uiImage: ui).resizable().scaledToFill() }
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Session photo")
+            .accessibilityIdentifier("done-photo")
+            .overlay(alignment: .bottomTrailing) {
+                IconMark(.hand("trophy"), size: 30, colour: colour)
+                    .frame(width: 56, height: 56)
+                    .background(Theme.card, in: Circle())
+                    .overlay(Circle().stroke(colour.opacity(0.5), lineWidth: 1.5))
+                    .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                    .offset(x: 6, y: 10)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Trophy")
+                    .accessibilityValue(value)
+                    .accessibilityIdentifier("done-trophy")
+            }
+            .padding(.bottom, 10)
+        } else {
+            IconMark(.hand("trophy"), size: 56, colour: colour)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Trophy")
+                .accessibilityValue(value)
+                .accessibilityIdentifier("done-trophy")
+        }
+    }
+
+    /// Warm-up (orange), machines (blue), stretching (green) as one capsule, with the minutes under it.
+    private func timeBar(_ split: (warmup: Int, machines: Int, stretch: Int)) -> some View {
+        let parts: [(String, Int, Color, String)] = [
+            ("Warm-up", split.warmup, Self.warmOrange, "done-time-warmup"),
+            ("Machines", split.machines, Gym.fill, "done-time-machines"),
+            ("Stretching", split.stretch, Gym.done, "done-time-stretch"),
+        ].filter { $0.1 > 0 }
+        let total = max(1, parts.reduce(0) { $0 + $1.1 })
+        return VStack(spacing: 6) {
+            GeometryReader { geo in
+                HStack(spacing: 2) {
+                    ForEach(parts.indices, id: \.self) { i in
+                        Rectangle().fill(parts[i].2)
+                            .frame(width: max(4, (geo.size.width - CGFloat(parts.count - 1) * 2) * CGFloat(parts[i].1) / CGFloat(total)))
+                    }
+                }
+                .clipShape(Capsule())
+            }
+            .frame(height: 12)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Time split")
+            .accessibilityValue(parts.map { "\($0.0) \($0.1) min" }.joined(separator: ", "))
+            .accessibilityIdentifier("done-timebar")
+            ForEach(parts.indices, id: \.self) { i in
+                HStack(spacing: 6) {
+                    Circle().fill(parts[i].2).frame(width: 8, height: 8)
+                    Text(parts[i].0).font(.subheadline).foregroundStyle(Theme.ink)
+                    Spacer()
+                    Text("\(parts[i].1) min").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
+                        .accessibilityIdentifier(parts[i].3)
+                }
+            }
+        }
+    }
+
+    /// "Sessions this week" with the count, this one included.
+    private func weekTile(_ visit: GymVisit) -> some View {
+        let n = library.gym.sessionsThisWeek(containing: visit.date, including: visit.id)
+        return VStack(alignment: .leading, spacing: 0) {
+            Text("Sessions this week").font(.caption.weight(.semibold)).foregroundStyle(Gym.done)
+            Text("\(n)").font(.title2.weight(.bold)).monospacedDigit().foregroundStyle(Theme.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Gym.done.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("done-week")
     }
 
     private func row(_ title: String, _ value: String, id: String) -> some View {

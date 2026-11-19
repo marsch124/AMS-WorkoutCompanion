@@ -41,6 +41,17 @@ struct VisitShareCard: View {
                 tile("Sets", "\(visit.setCount)", Color(red: 0.85, green: 0.45, blue: 0.08))
                 tile("Lifted", "\(GymSet.number(visit.totalKg)) kg", Color(red: 0.55, green: 0.25, blue: 0.65))
             }
+            if visit.warmup != nil || visit.stretching != nil {
+                VStack(alignment: .leading, spacing: 3) {
+                    if let line = visit.warmupLine(in: gym) {
+                        Text(line).font(.footnote.weight(.semibold)).foregroundStyle(Color(red: 0.85, green: 0.45, blue: 0.08))
+                    }
+                    if let line = visit.stretchLine() {
+                        Text(line).font(.footnote.weight(.semibold)).foregroundStyle(Color(red: 0.13, green: 0.55, blue: 0.30))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
             ForEach(visit.entries) { e in
                 let m = gym.machine(e.machineID)
                 HStack(alignment: .top, spacing: 10) {
