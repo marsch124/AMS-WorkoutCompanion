@@ -530,7 +530,7 @@ public struct GymLog: Codable, Equatable, Sendable {
     /// Opening the gym screen starts the session's clock (since 1.20, his ask) — unless a session is already
     /// going or one was finished today (a second session still starts with its first set). Saves no visit.
     public mutating func arrive(gym: UUID?, at now: Date = Date(), calendar: Calendar = .current) {
-        if openVisit(on: now, gym: gym, calendar: calendar).map({ $0.setCount > 0 }) == true { return }
+        if openVisit(on: now, gym: gym, calendar: calendar).map({ $0.setCount > 0 || $0.warmup != nil }) == true { return }
         if visits(on: now, gym: gym, calendar: calendar).contains(where: { $0.finished != nil && $0.setCount > 0 }) { return }
         if let a = arrived, a.gymID == gym, calendar.isDate(a.at, inSameDayAs: now) { return }
         arrived = Arrival(gymID: gym, at: now)
@@ -541,8 +541,11 @@ public struct GymLog: Codable, Equatable, Sendable {
 
     /// When the session going on this day at this gym began: its visit's start, or when the gym screen opened.
     public func sessionStart(on day: Date, gym: UUID?, calendar: Calendar = .current) -> Date? {
-        if let v = openVisit(on: day, gym: gym, calendar: calendar), v.setCount > 0 {
-            return v.started ?? v.entries.flatMap(\.sets).compactMap(\.at).min()
+        if let v = openVisit(on: day, gym: gym, calendar: calendar), v.setCount > 0 || v.warmup != nil {
+            // 2.0: the warm-up starts the clock.
+            let first = v.started ?? v.entries.flatMap(\.sets).compactMap(\.at).min()
+            guard let w = v.warmup?.start else { return first }
+            return first.map { min($0, w) } ?? w
         }
         if let a = arrived, a.gymID == gym, calendar.isDate(a.at, inSameDayAs: day) { return a.at }
         return nil
@@ -826,6 +829,7 @@ public struct GymLog: Codable, Equatable, Sendable {
     public mutating func undoFinish(visit visitID: UUID, before: GymLog) {
         guard var v = visits.first(where: { $0.id == visitID }) else { return }
         v.finished = before.visits.first { $0.id == visitID }?.finished
+        v.stretching = before.visits.first { $0.id == visitID }?.stretching   // 2.0: Undo Finish also clears the stretching
         put(v)
         busyMarks = before.busyMarks
         plans = before.plans

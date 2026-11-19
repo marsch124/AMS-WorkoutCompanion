@@ -34,6 +34,9 @@ enum Gym {
     static let place = swatch
 }
 
+/// The session whose stretching is open (since 2.0).
+struct StretchVisitRef: Identifiable { let id: UUID }
+
 /// A machine on the gym screen, to open it.
 struct MachineRef: Hashable {
     let id: UUID
@@ -127,6 +130,11 @@ struct GymScreen: View {
     @State private var askingDiscard = false
     @State private var choosingGym = false
     @State private var afterChooser: GymChooserAction?
+    /// 2.0: the warm-up cover, its chip's sheet, and Stretch now after the machines.
+    @State private var warming = false
+    @State private var editingWarm = false
+    @State private var stretchingVisit: StretchVisitRef?
+    @State private var summaryAfterStretch: UUID?
 
     private var gymID: UUID? { library.gym.currentGym?.id }
     private var visit: GymVisit? { library.gym.openVisit(on: day, gym: gymID) }
@@ -340,6 +348,39 @@ struct GymScreen: View {
             }
             .id(ref.id)
         }
+        .fullScreenCover(isPresented: $warming) {
+            WarmUpFlow(gymID: gymID, day: day) { warming = false }
+                .environment(library)
+        }
+        .fullScreenCover(item: $stretchingVisit, onDismiss: {
+            // Stretching is over (or closed): on to the Well done page, as after End session.
+            guard let id = summaryAfterStretch else { return }
+            summaryAfterStretch = nil
+            Cues.shared.finished("Well done")
+            summary = library.gym.visits.first { $0.id == id }
+        }) { ref in
+            let id = ref.id
+            StretchSessionEntry(visitID: id) { part in
+                if let part { library.changeGym { $0.setStretching(visitID: id, part: part) } }
+                summaryAfterStretch = id
+                stretchingVisit = nil
+            }
+            .environment(library)
+        }
+        .sheet(isPresented: $editingWarm) {
+            if let v = visit, let w = v.warmup {
+                NavigationStack {
+                    WarmUpChipSheet(visitID: v.id, part: w, hasLevel: w.machineID.flatMap { library.gym.machine($0) }?.hasLevel ?? true) { edit in
+                        editingWarm = false
+                        if let edit {
+                            library.changeGym { $0.editWarmup(visitID: v.id, minutes: edit.minutes, speed: edit.speed,
+                                                              level: edit.level, heartRate: edit.heartRate) }
+                        }
+                    }
+                }
+                .environment(library)
+            }
+        }
         .fullScreenCover(isPresented: $camera) {
             CameraPicker { data in
                 camera = false
@@ -448,6 +489,11 @@ struct GymScreen: View {
         // End on the green line and Finish this session at the bottom ask first (since 1.27, his ask);
         // the other button keeps the session going.
         .alert("End this session?", isPresented: $askingEnd) {
+            // 2.0: stretch right away — the machines end exactly as with End session, then the stretching opens.
+            if hasContent {
+                Button("Stretch now") { endSession(stretch: true) }
+                    .accessibilityIdentifier("gym-end-stretch")
+            }
             Button("End session", role: .destructive) { endSession() }
                 .accessibilityIdentifier("gym-end-confirm")
             // Since 1.30 (his ask): throw the session away instead — it asks once more, as sets are lost.
@@ -459,7 +505,8 @@ struct GymScreen: View {
                 .accessibilityIdentifier("gym-end-continue")
         } message: {
             Text((visit?.setCount ?? 0) > 0 ? "Are you sure? Your sets are saved and the clock stops."
-                                            : "Are you sure? There are no sets yet, so nothing is saved.")
+                 : visit?.warmup != nil ? "Are you sure? Your warm-up is saved and the clock stops."
+                 : "Are you sure? There are no sets yet, so nothing is saved.")
         }
         .alert("Discard this session?", isPresented: $askingDiscard) {
             Button("Discard session", role: .destructive) {
@@ -567,32 +614,78 @@ struct GymScreen: View {
     /// Since 1.30 (his ask) both green and alike (before: Repeat was full indigo), as tall as the gym button;
     /// Save as template moved to the Well done summary after Finish.
     @ViewBuilder private var actionRow: some View {
-        if plan == nil, !machines.isEmpty, sessionStart == nil, (visit?.setCount ?? 0) == 0 {
-            // Only before the session (since 1.23 build 2, his ask): once it is going, planning tiles are in the way.
+        // Only before the session (since 1.23 build 2, his ask): once it is going, planning tiles are in the way.
+        let planTiles = plan == nil && !machines.isEmpty && sessionStart == nil && (visit?.setCount ?? 0) == 0
+        // 2.0: Warm up stands in the same row until the first set, and until a warm-up has been done.
+        let warmTile = isToday && (visit?.setCount ?? 0) == 0 && visit?.warmup?.end == nil
+        if planTiles || warmTile {
             let repeatOrder = library.gym.lastOrder(gym: gymID, before: day)
             HStack(spacing: 8) {
-                Button { planning = true } label: {
-                    GymActionTile(title: "Plan today") {
-                        ControlMarkView(.list, size: 21, colour: SessionGoingLine.green)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("gym-plan")
-                // Same machines, same order as last time — a plan in one tap (since 1.7).
-                if !repeatOrder.isEmpty {
-                    Button {
-                        library.changeGym { $0.setPlan(repeatOrder, on: day, gym: gymID) }
-                    } label: {
-                        GymActionTile(title: "Repeat last visit") {
-                            ControlMarkView(.play, size: 21, colour: SessionGoingLine.green)
+                if planTiles {
+                    Button { planning = true } label: {
+                        GymActionTile(title: "Plan today") {
+                            ControlMarkView(.list, size: 21, colour: SessionGoingLine.green)
                         }
                     }
                     .buttonStyle(.plain)
-                    .accessibilityIdentifier("gym-repeat")
+                    .accessibilityIdentifier("gym-plan")
+                    // Same machines, same order as last time — a plan in one tap (since 1.7).
+                    if !repeatOrder.isEmpty {
+                        Button {
+                            library.changeGym { $0.setPlan(repeatOrder, on: day, gym: gymID) }
+                        } label: {
+                            GymActionTile(title: "Repeat last visit") {
+                                ControlMarkView(.play, size: 21, colour: SessionGoingLine.green)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("gym-repeat")
+                    }
+                }
+                if warmTile {
+                    Button { warming = true } label: {
+                        GymActionTile(title: "Warm up") {
+                            AppMarkView(.warmup, size: 21, colour: SessionGoingLine.green)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("gym-warmup")
                 }
             }
             .frame(height: GymScreen.headHeight)
         }
+        if let w = visit?.warmup, w.end != nil {
+            warmChip(w)
+        }
+    }
+
+    /// "Warm-up · 8 min · Treadmill" — what was done; tap to change minutes, speed and heart rate (since 2.0).
+    private func warmChip(_ w: VisitPart) -> some View {
+        var parts = ["Warm-up", "\(max(1, w.minutes)) min"]
+        switch w.kind {
+        case .cardio: if let n = w.machineID.flatMap({ library.gym.machine($0)?.name }) { parts.append(n) }
+        case .moves: parts.append("Moves")
+        default: parts.append("Walk or run")
+        }
+        let text = parts.joined(separator: " · ")
+        return Button { editingWarm = true } label: {
+            HStack(spacing: 8) {
+                AppMarkView(.warmup, size: 18, colour: SessionGoingLine.green)
+                Text(text)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(SessionGoingLine.green)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                ControlMarkView(.chevron, size: 12, colour: SessionGoingLine.green)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 32)
+            .background(SessionGoingLine.green.opacity(0.14), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(text)
+        .accessibilityIdentifier("gym-warmup-chip")
     }
 
     private func planRow(_ i: Int, _ m: Machine, plan: DayPlan, isNext: Bool) -> some View {
@@ -810,16 +903,24 @@ struct GymScreen: View {
 
     /// Finish this session, from the button at the bottom or End on the green line: with sets it is
     /// finished and Session done opens; with none it just ends and nothing is saved.
-    private func endSession() {
-        if let visit, visit.setCount > 0 { finish(visit) } else { library.changeGym { $0.leave() } }
+    private func endSession(stretch: Bool = false) {
+        if let visit, visit.setCount > 0 || visit.warmup != nil { finish(visit, stretch: stretch) } else { library.changeGym { $0.leave() } }
     }
 
-    private func finish(_ visit: GymVisit) {
+    /// Sets, or a warm-up: there is something to keep (since 2.0).
+    private var hasContent: Bool { (visit?.setCount ?? 0) > 0 || visit?.warmup != nil }
+
+    private func finish(_ visit: GymVisit, stretch: Bool = false) {
         let now = Date()
         beforeFinish = library.gym
         library.changeGym { $0.finish(visit: visit.id, at: now) }
-        Cues.shared.finished("Well done")
         GymNudge.sync(library.gym)
+        if stretch {
+            // Stretch now (since 2.0): the stretching opens full screen; Well done follows it.
+            stretchingVisit = StretchVisitRef(id: visit.id)
+            return
+        }
+        Cues.shared.finished("Well done")
         summary = library.gym.visits.first { $0.id == visit.id }
     }
 }
