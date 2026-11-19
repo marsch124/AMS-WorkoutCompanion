@@ -14,6 +14,9 @@ public struct StretchPhase: Hashable, Sendable {
     public let seconds: Int
     /// Said when the phase begins.
     public let spoken: String
+    /// Since 2.0: which pick it belongs to, and the library figure to draw.
+    public var pickID: String = ""
+    public var figureID: String?
 }
 
 public enum StretchTimer {
@@ -42,32 +45,9 @@ public enum StretchTimer {
         return (min(600, max(5, seconds ?? usualHold)), sides)
     }
 
-    private static func said(_ seconds: Int) -> String {
-        seconds % 60 == 0 && seconds >= 60
-            ? (seconds == 60 ? "one minute" : "\(seconds / 60) minutes")
-            : "\(seconds) seconds"
-    }
-
     /// Every phase of the list, in order. Stretches with no name are left out.
     public static func phases(for exercises: [Exercise]) -> [StretchPhase] {
-        let list = exercises.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
-        var out: [StretchPhase] = []
-        for (i, e) in list.enumerated() {
-            let (secs, sides) = hold(of: e.amount)
-            let first = i == 0 ? "First" : i == list.count - 1 ? "Last one" : "Next"
-            let each = sides == 2 ? "\(said(secs)) each side" : said(secs)
-            out.append(StretchPhase(kind: .ready, index: i, name: e.name, side: sides == 2 ? 1 : 0, sides: sides,
-                                    seconds: readySeconds, spoken: "\(first): \(e.name). \(each). Get into position."))
-            out.append(StretchPhase(kind: .hold, index: i, name: e.name, side: sides == 2 ? 1 : 0, sides: sides,
-                                    seconds: secs, spoken: sides == 2 ? "Hold. First side." : "Hold."))
-            if sides == 2 {
-                out.append(StretchPhase(kind: .switchSides, index: i, name: e.name, side: 2, sides: 2,
-                                        seconds: switchSeconds, spoken: "Switch sides."))
-                out.append(StretchPhase(kind: .hold, index: i, name: e.name, side: 2, sides: 2,
-                                        seconds: secs, spoken: "Hold. Second side."))
-            }
-        }
-        return out
+        phases(for: picks(for: exercises))
     }
 
     /// The whole list's time in seconds.
