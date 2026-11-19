@@ -10,6 +10,18 @@ import WorkoutCore
 final class Cues {
     static let shared = Cues()
 
+    /// Tells the cues when a word or a sound has finished, so the music can come back up (since 2.0).
+    private final class Finisher: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate {
+        var finished: (() -> Void)?
+        func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) { finished?() }
+        func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel u: AVSpeechUtterance) { finished?() }
+        func audioPlayerDidFinishPlaying(_ p: AVAudioPlayer, successfully: Bool) { finished?() }
+    }
+    private let finisher = Finisher()
+    /// Words and sounds playing right now; the audio session stays ducked only while this is above 0.
+    private var busy = 0
+    private var releasing: Task<Void, Never>?
+
     let quiet = ProcessInfo.processInfo.arguments.contains("-uitest")
     private let speech = AVSpeechSynthesizer()
     private var players: [String: AVAudioPlayer] = [:]
@@ -17,8 +29,39 @@ final class Cues {
     /// His sound choices (since 1.23), read again each time a workout or the gym opens.
     private(set) var sounds = SoundChoice.load()
 
+    private init() {
+        speech.delegate = finisher
+        finisher.finished = { [weak self] in
+            Task { @MainActor in self?.cueFinished() }
+        }
+    }
+
+    /// His music dips and a word or sound plays over it (since 2.0). Needs a matching `cueFinished()`.
+    private func cueStarted() {
+        releasing?.cancel()
+        busy += 1
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .default,
+                                 options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
+        try? session.setActive(true)
+    }
+
+    /// The word or sound is over: when nothing else plays, the music goes back up.
+    private func cueFinished() {
+        busy = max(0, busy - 1)
+        guard busy == 0 else { return }
+        releasing?.cancel()
+        // A short pause, so Three, Two, One do not make the music pump up and down between words.
+        releasing = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled, self.busy == 0 else { return }
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+    }
+
     func begin() {
         UIApplication.shared.isIdleTimerDisabled = true
+        busy = 0
         sounds = SoundChoice.load()
         prepare()
     }
@@ -26,13 +69,12 @@ final class Cues {
     /// Audio session and sounds ready; also used by the Sounds screen to let him hear a choice.
     private func prepare() {
         guard !quiet else { return }
-        // Plays with the silent switch on, alongside his music.
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-        try? session.setActive(true)
-        for name in ["tick", "go", "done", "bell", "beep"] where players[name] == nil {
+        // The audio session is only opened while a word or sound plays (see cueStarted),
+        // so his music keeps its full volume the rest of the time.
+        for name in ["tick", "go", "done", "bell", "beep", "restend"] where players[name] == nil {
             if let url = Bundle.main.url(forResource: name, withExtension: "wav"),
                let p = try? AVAudioPlayer(contentsOf: url) {
+                p.delegate = finisher
                 p.prepareToPlay()
                 players[name] = p
             }
@@ -45,6 +87,8 @@ final class Cues {
         UIApplication.shared.isIdleTimerDisabled = false
         speech.stopSpeaking(at: .immediate)
         guard !quiet else { return }
+        releasing?.cancel()
+        busy = 0
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
@@ -52,6 +96,17 @@ final class Cues {
     func countdown(spoken: String? = nil) {
         if let spoken { speak(spoken) } else { play("tick") }
         impact(.medium)
+    }
+
+    /// A mark of the rest countdown (since 2.0): Thirty seconds, Twenty, Ten, Three, Two, One.
+    /// With the spoken countdown off, the last three marks tick as before and the others stay quiet.
+    func restMark(_ mark: Int) {
+        if sounds.spokenCountdown, let words = RestCuePlan.words(for: mark) {
+            speak(words)
+            if mark <= 3 { impact(.medium) }
+        } else if mark <= 3 {
+            countdown()
+        }
     }
 
     /// A spoken word of the interval countdown (Three, Two, One, Halfway, Ten seconds).
@@ -94,6 +149,7 @@ final class Cues {
 
     private func playRestOver(_ sound: RestSound) {
         switch sound {
+        case .soft: play("restend")
         case .chime: play("go")
         case .bell: play("bell")
         case .beep: play("beep")
@@ -126,6 +182,7 @@ final class Cues {
     private func say(_ words: String) {
         guard !quiet else { return }
         speech.stopSpeaking(at: .word)
+        cueStarted()
         let u = AVSpeechUtterance(string: words)
         u.voice = AVSpeechSynthesisVoice(language: "en-US")
         u.rate = AVSpeechUtteranceDefaultSpeechRate
@@ -134,8 +191,10 @@ final class Cues {
 
     private func play(_ name: String) {
         guard !quiet, let p = players[name] else { return }
+        // A sound cut short by itself never reports "finished", so it is not counted twice.
+        if !p.isPlaying { cueStarted() }
         p.currentTime = 0
-        p.play()
+        if !p.play() { cueFinished() }
     }
 }
 
@@ -160,6 +219,7 @@ enum RestAlarm {
             content.title = "Rest over"
             content.body = words
             switch SoundChoice.load().restSound {
+            case .soft: content.sound = UNNotificationSound(named: UNNotificationSoundName("restend.wav"))
             case .chime: content.sound = .default
             case .bell: content.sound = UNNotificationSound(named: UNNotificationSoundName("bell.wav"))
             case .beep: content.sound = UNNotificationSound(named: UNNotificationSoundName("beep.wav"))

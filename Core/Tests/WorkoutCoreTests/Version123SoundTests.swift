@@ -5,7 +5,7 @@ import XCTest
 final class Version123SoundTests: XCTestCase {
     func testSoundChoiceDecodesFromEmptyWithDefaults() throws {
         let c = try JSONDecoder().decode(SoundChoice.self, from: Data("{}".utf8))
-        XCTAssertEqual(c, SoundChoice(restSound: .chime, buzz: .strong, spokenCountdown: true))
+        XCTAssertEqual(c, SoundChoice(restSound: .soft, buzz: .strong, spokenCountdown: true))
     }
 
     func testSpokenCueWords() {

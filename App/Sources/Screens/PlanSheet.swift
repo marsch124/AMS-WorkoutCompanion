@@ -11,6 +11,8 @@ struct PlanSheet: View {
     let done: ([UUID]?) -> Void
     @State private var namingTemplate = false
     @State private var templateName = ""
+    /// The machine whose how-to is open full screen (since 2.0).
+    @State private var howTo: Machine?
 
     private var templates: [PlanTemplate] { library.gym.templates(gym: gymID) }
 
@@ -54,13 +56,13 @@ struct PlanSheet: View {
                                     .foregroundStyle(Gym.ink)
                                     .frame(width: 26, height: 26)
                                     .background(Gym.fill, in: Circle())
-                                MachinePhoto(name: m.photo, height: 36, icon: m.icon)
-                                    .frame(width: 36)
+                                Button { howTo = m } label: { HowToThumb(machine: m, size: 36) }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("How to use \(m.name)")
+                                    .accessibilityIdentifier("plan-howto-\(i + 1)")
                                 Text(m.name).foregroundStyle(Theme.ink)
+                                    .accessibilityIdentifier("plan-order-\(i + 1)")
                             }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("\(i + 1), \(m.name)")
-                            .accessibilityIdentifier("plan-order-\(i + 1)")
                         }
                     }
                     .onMove { order.move(fromOffsets: $0, toOffset: $1) }
@@ -90,25 +92,36 @@ struct PlanSheet: View {
             Section {
                 ForEach(machines) { m in
                     let n = order.firstIndex(of: m.id).map { $0 + 1 }
-                    Button {
+                    let toggle = {
                         if let i = order.firstIndex(of: m.id) { order.remove(at: i) } else { order.append(m.id) }
-                    } label: {
-                        HStack(spacing: 10) {
+                    }
+                    // The picture opens the how-to; the rest of the row ticks the machine.
+                    HStack(spacing: 10) {
+                        Button(action: toggle) {
                             Text(n.map(String.init) ?? "")
                                 .font(.subheadline.weight(.bold))
                                 .foregroundStyle(Gym.ink)
                                 .frame(width: 26, height: 26)
                                 .background(n == nil ? AnyShapeStyle(Color.clear) : AnyShapeStyle(Gym.fill), in: Circle())
                                 .overlay(Circle().stroke(Gym.fill, lineWidth: n == nil ? 1.5 : 0))
-                            MachinePhoto(name: m.photo, height: 36, icon: m.icon)
-                                .frame(width: 36)
-                            Text(m.name).foregroundStyle(Theme.ink)
-                            Spacer()
+                                .contentShape(Rectangle())
                         }
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        .accessibilityHidden(true)
+                        Button { howTo = m } label: { HowToThumb(machine: m, size: 36) }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("How to use \(m.name)")
+                            .accessibilityIdentifier(n.map { "plan-howto-\($0)" } ?? "plan-howto-list-\(m.name)")
+                        Button(action: toggle) {
+                            HStack {
+                                Text(m.name).foregroundStyle(Theme.ink)
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("plan-machine-\(m.name)")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("plan-machine-\(m.name)")
                 }
                 .moveDisabled(true)
                 .deleteDisabled(true)
@@ -135,6 +148,10 @@ struct PlanSheet: View {
             .accessibilityIdentifier("plan-template-name-save")
         } message: {
             Text("The same name in this gym is replaced.")
+        }
+        .fullScreenCover(item: $howTo) { m in
+            InstructionViewScreen(machine: m) { howTo = nil }
+                .environment(library)
         }
         // Always in edit mode, so the handles show without an Edit button.
         .environment(\.editMode, .constant(.active))

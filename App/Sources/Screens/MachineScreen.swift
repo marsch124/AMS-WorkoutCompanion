@@ -27,6 +27,9 @@ struct MachineScreen: View {
     @State private var editing = false
     @State private var changingSet: Int?
     @State private var zoom = false
+    /// The how-to full screen, and the rest marks already said in this rest (since 2.0).
+    @State private var showHowTo = false
+    @State private var restSaid: Set<Int> = []
     @State private var newBest = false
     /// The next set is a warm-up (since 1.11); off again after that set.
     @State private var warmup = false
@@ -175,6 +178,21 @@ struct MachineScreen: View {
         .toolbar {
             // How long the session has been going, small at the top left (since 1.31, his ask).
             ToolbarItem(placement: .topBarLeading) { SessionClockPill(day: day, gymID: gymID) }
+            // A small picture beside the machine name opens how to use it (since 2.0).
+            ToolbarItem(placement: .principal) {
+                if let machine {
+                    HStack(spacing: 8) {
+                        Button { showHowTo = true } label: { HowToThumb(machine: machine, size: 34) }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("How to use \(machine.name)")
+                            .accessibilityIdentifier("machine-howto-thumb")
+                        Text(machine.name)
+                            .font(.headline)
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { editing = true } label: { ControlMarkView(.edit, size: 22, colour: Gym.tint) }
                     .accessibilityLabel("Edit machine")
@@ -218,9 +236,18 @@ struct MachineScreen: View {
                 if left <= 0 {
                     restEnd = nil
                     Cues.shared.go("Set \(today.count + 1)")
-                } else if left < 3.2, Int(left.rounded(.up)) != Int((left + 0.25).rounded(.up)) {
-                    Cues.shared.countdown()
+                } else if let mark = RestCuePlan.due(secondsLeft: left, marks: RestCuePlan.marks(restSeconds: Int(restLength)),
+                                                     said: restSaid) {
+                    // Thirty, Twenty, Ten seconds, Three, Two, One: each once per rest (since 2.0).
+                    restSaid.insert(mark)
+                    Cues.shared.restMark(mark)
                 }
+            }
+        }
+        .fullScreenCover(isPresented: $showHowTo) {
+            if let machine {
+                InstructionViewScreen(machine: machine) { showHowTo = false }
+                    .environment(library)
             }
         }
         .sheet(isPresented: $editing) {
@@ -789,6 +816,7 @@ struct MachineScreen: View {
         if isHold {
             // A hold rests like a set (since 1.23).
             restLength = Double(library.gym.rest(for: machine))
+            restSaid = []
             restEnd = restLength > 0 ? Date().addingTimeInterval(restLength) : nil
             now = Date()
         }
@@ -809,6 +837,7 @@ struct MachineScreen: View {
         }
         restLength = Double(library.gym.rest(for: machine))
         // A machine with no rest goes straight on to the next set.
+        restSaid = []
         restEnd = restLength > 0 ? Date().addingTimeInterval(restLength) : nil
         now = Date()
         Cues.shared.rest("Rest")
@@ -1070,6 +1099,18 @@ struct MachineForm: View {
                 Text("How it is set up")
             } footer: {
                 Text("Shown each time you use the machine.")
+            }
+            Section {
+                TextField("A few words on how to use it", text: Binding(
+                    get: { draft.howTo ?? "" },
+                    set: { draft.howTo = $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+                ), axis: .vertical)
+                    .lineLimit(3...8)
+                    .accessibilityIdentifier("machine-howto-field")
+            } header: {
+                Text("How to use it")
+            } footer: {
+                Text("Shown with the instruction photo when you tap the small picture beside the machine name.")
             }
             Section {
                 Picker("Muscle group", selection: $draft.muscle) {
