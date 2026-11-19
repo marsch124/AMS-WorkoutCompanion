@@ -13,7 +13,7 @@ settings:
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "2.0"
     # Build number, short since 1.19 (his ask): 1 for each new version, then 2, 3 … for another build of it.
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
 packages:
   # The model — workouts, their phases and the clock, with no screen in it.
   WorkoutCore:
@@ -64,6 +64,8 @@ targets:
         NSCameraUsageDescription: A photo of each gym machine, so you recognise it and its setting next time.
         # 2.0: the heart rate of a warm-up, read from Apple Health (a Garmin watch writes it there through Garmin Connect).
         NSHealthShareUsageDescription: Reads your heart rate during a warm-up, so the warm-up shows how hard you worked.
+        # Apple asks for this sentence too whenever Apple Health is switched on; the app never writes to Health.
+        NSHealthUpdateUsageDescription: Workout Companion does not write anything to Apple Health; it only reads your heart rate during a warm-up.
         UILaunchScreen:
           UIColorName: ""
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
