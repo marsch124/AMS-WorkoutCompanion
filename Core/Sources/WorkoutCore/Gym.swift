@@ -1082,8 +1082,13 @@ public struct GymLog: Codable, Equatable, Sendable {
     }
 
     public var photosInUse: Set<String> {
-        Set(machines.compactMap(\.photo) + machines.compactMap(\.instructions) + visits.flatMap { $0.photos ?? [] }
-            + gyms.compactMap(\.photo) + (stretchBook?.custom.compactMap(\.photo) ?? []))
+        // In steps: as one long sum the compiler gave up on it (GitHub run, 21 Nov 2026).
+        var names: [String] = machines.compactMap(\.photo)
+        names += machines.compactMap(\.instructions)
+        names += visits.flatMap { $0.photos ?? [] }
+        names += gyms.compactMap(\.photo)
+        names += stretchBook?.custom.compactMap(\.photo) ?? []
+        return Set(names)
     }
 
     /// Adds a photo of the session (since 1.13).
