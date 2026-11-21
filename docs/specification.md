@@ -98,7 +98,7 @@ Version 2.0. iPhone only, portrait, iOS 17+, light and dark. The name under the 
 - A card per exercise: photo (tap to enlarge), number, name, amount pill, note, a tick circle. Tapping ticks it off and scrolls to the next one. "n of N done" and a bar at the top. All ticked: Well done and Close.
 
 ## Cues
-- Start of a set/round: a tone, a vibration and words ("Set 2 of 5. 20 reps.", "Round 3. Go!", "Last round. Go!"). Rest: a vibration and "Rest". Last 3 seconds: a tick and a tap. End: a three-note tone and "Well done".
+- Start of a set/round: a tone, a vibration and words ("Set 2 of 5. 20 reps.", "Round 3. Go!", "Last round. Go!"). Rest: a vibration and "Rest". Last 3 seconds: a tick and a tap (since 2.2, with "Spoken countdown" on, a rest between sets and an off round also say "Thirty seconds", "Twenty seconds", "Ten seconds" where they fit, then "Three, Two, One"; see Version 2.2). End: a three-note tone and "Well done".
 - Plays with the silent switch on and mixes with music. The screen stays on during a workout. US English voice.
 
 ## Settings
@@ -298,7 +298,7 @@ His two approved ideas after 1.17: see that a session is going from the Train pa
 - **Session done.** How did it feel: pills `gym-feel-great|good|ok|tired|rough` (Great/Good/OK/Tired/Rough), kept with the session, shown on its page and in Earlier visits. "Against last visit": Machines, Sets, Time, Lifted in all (`gym-compare-machines|sets|time|total`) with the change ("+2", "−6 min", "+250 kg", "same"); more is green; not shown on the first visit to a gym. "Stretch now" `gym-stretch` opens a stretch list to tick off; the first time the app makes an ordinary exercise list "After-gym stretch" (six stretches: chest in a doorway, shoulder across the body, hip flexor lunge, hamstring, thigh standing, child's pose), shown as a tile on Train and editable like any list. The list is chosen in Settings → "Reminder and stretch" ("None" hides the button).
 - **Gym reminder.** Settings → "Reminder and stretch" (`settings-gym-extras`): "Remind me after N days without the gym", Off or 2–14 days, 4 to begin with; the phone shows "4 days since your last gym visit" at 10:00 that day. Cancel and Save.
 - **Sounds.** Settings → "Sounds" (`settings-sounds`): rest-end sound Chime (as before), Bell, Beep or None (the locked-phone rest alarm uses the same); vibration Strong, Light or Off; "Spoken countdown" on/off. Each choice plays or buzzes once when tapped. Cancel and Save.
-- **Spoken countdown (interval timer).** The voice says "Three, two, one" at the end of every phase; "Halfway" in work rounds of 20 s or longer; "Ten seconds" in work rounds of 30 s or longer. The tick stays quiet while the voice counts.
+- **Spoken countdown (interval timer).** The voice says "Three, two, one" at the end of every phase; "Halfway" in work rounds of 20 s or longer; "Ten seconds" in work rounds of 30 s or longer. The tick stays quiet while the voice counts. Since 2.2 an off (rest) round also says the rest marks of a gym rest (see Version 2.2).
 - **Presets (interval workouts).** A "Presets" menu in the editor fills rounds, work and rest: Tabata (8 × 20 s / 10 s), 30 / 30, 40 / 20, 45 / 15, Every minute (10 × 60 s / 0 s). "Save as preset" keeps his own under a name; "Remove my preset" deletes one.
 - **Planning tiles only before the session (build 2).** In `GymScreen.planSection`, the tiles "Plan today" `gym-plan`, "Repeat last visit" `gym-repeat` and "Save as template" `gym-repeat-template` show only when there is no plan yet and no session is going (`sessionStart == nil` and no set logged today). Once a machine has been opened or a set logged (the green "Session going" line, `gym-session-going`) they are hidden and the hint reads "Tap the machine you'll use next."; a plan made earlier still shows as "Today's plan" with "Change" (also `gym-plan`). After Finish the tiles return. Before, they stayed during the whole session. UI test `Version123UITests.testPlanningTilesHideOnceTheSessionIsGoing`.
 - **Texts.** What's new (1.23) and How it works (Interval timers, Sounds and words, At the gym, Plan today, Logging a set, Machines for time, Next time and notes, Session time, Earlier visits, Two sessions in a day, Rest on the lock screen, Rest alarm, Where things are kept) updated; version lists in Core `WorkoutCoreTests` and UI `testSettingsShowsTheVersionAndWhatsNew` now expect 1.23.
@@ -462,7 +462,7 @@ Version 2.0 (build 1). Data envelopes stay `"version":1`; every new field is opt
 - One page, at the very end (after End session or after the stretching). Top: `done-photo` (first session photo big) with the trophy badge `done-trophy` on its corner; no photo = trophy large and centred. Trophy every visit: gold after a personal best, blue otherwise.
 - `done-timebar`: Warm-up (orange), Machines (blue), Stretching (green) with minutes (`done-time-warmup`, `done-time-machines`, `done-time-stretch`); parts at 0 are left out; no bar with machine time only.
 - `done-week`: tile "Sessions this week" (Monday start, this one included).
-- `gym-stretch` "Stretch now" on Well done only when not stretched yet; opens the same stretching for this visit.
+- `gym-stretch` "Stretch now" on Well done only when not stretched yet; opens the same stretching for this visit. Since 2.2 the card sits right under the picture and title (see Version 2.2 for the whole order).
 - Share picture and `VisitShare`: lines "Warm-up 8 min · Treadmill" and "Stretching 9 min · 6 stretches" when present. Visit page: Warm-up row (kind, minutes, "9.5 km/h · 128 bpm") and Stretching row.
 
 ### Instruction view
@@ -470,7 +470,7 @@ Version 2.0 (build 1). Data envelopes stay `"version":1`; every new field is opt
 - Thumb `machine-howto-thumb` beside the machine name; `plan-howto-<n>` on each Plan today row. Source: instruction photo, else machine photo, else the machine's mark. Tap = `InstructionViewScreen`: `howto-name`, `howto-plate` (pinch to zoom, double-tap resets), `howto-photo`, `howto-setting` "Your setting: …", `howto-words`, `howto-close`. Nothing: `howto-empty` "No instructions yet — add a photo or a few words in the machine's settings."
 
 ### Rest voice
-- `RestCuePlan.marks(restSeconds:)`: 30, 20, 10 where mark ≤ rest − 2, plus 3, 2, 1 when rest ≥ 4 (90 s → 30, 20, 10, 3, 2, 1; 25 s → 20, 10, 3, 2, 1; 5 s → 3, 2, 1; 3 s → none). Words "Thirty seconds", "Twenty seconds", "Ten seconds", "Three", "Two", "One". Each said once, also after −15 s / +15 s (`due(secondsLeft:marks:said:)`). Settings → Sounds → "Spoken countdown" (`sounds-spoken`) off: ticks only.
+- `RestCuePlan.marks(restSeconds:)`: 30, 20, 10 where mark ≤ rest − 2, plus 3, 2, 1 when rest ≥ 4 (90 s → 30, 20, 10, 3, 2, 1; 25 s → 20, 10, 3, 2, 1; 5 s → 3, 2, 1; 3 s → none). Words "Thirty seconds", "Twenty seconds", "Ten seconds", "Three", "Two", "One". Each said once, also after −15 s / +15 s (`due(secondsLeft:marks:said:)`). Settings → Sounds → "Spoken countdown" (`sounds-spoken`) off: ticks only. Since 2.2 the same marks are also said in Sets & reps rests and Interval off rounds (see Version 2.2).
 - Ducking: `Cues` ducks other audio while speaking; music returns about 0.4 s after. Needs a real device to hear.
 - `RestSound.soft` "Soft chime" is the new default (older settings with another value decode as before); also the lock-screen rest sound.
 
@@ -502,3 +502,25 @@ Version 2.1 (build 1; the build number goes back to 1). Data envelopes unchanged
 - Core `Version21Tests`: one data test per rule (suggested moves from plan, from last visit, none; merge with remembered ticks and order; nothing remembered → only suggested).
 - UI `Version21UITests`: one screen test finding `warmup-suggested-line` and `warmup-move-suggested-N`.
 - **Texts.** What's new (2.1), How it works (Warm-up; Signs in this app: the blue dot and "suggested" widened to warm-up moves).
+
+## Version 2.2 — Stretch now and Save as template up top, rest voice in every rest (21 Nov 2026)
+
+Version 2.2 (build 1). Data envelopes unchanged; no new stored fields. Both changes are the owner's ask.
+
+### Session done: new order (`App/Sources/Screens/SessionDoneScreen.swift`)
+- **Before (2.1).** Well done (picture and title), `done-timebar` / `done-week`, How did it feel (`gym-feel-*`), Title and notes, Photos, the numbers, Against last visit, Save as template, Stretch now, New bests.
+- **Now (2.2).** Well done (picture and title), then the "Stretch now" card (`gym-stretch`, with "How to do the stretches"), then the "Save as template" card (`gym-summary-template`, footer "Keep this session's machines and order for another day."), then `done-timebar` / `done-week`, How did it feel, Title and notes, Photos, the numbers, Against last visit, New bests.
+- **Rules unchanged.** "Stretch now" still shows only when the visit has not been stretched yet (so then the Save as template card is directly under the picture and title); Save as template still saves this session's machines in the order used (`GymVisit.templateOrder(in:)`), same name replaces, "Saved as template · <name>" afterwards. Nothing else on the page changed: same cards, buttons, texts and identifiers, only moved. Why: both were far below the numbers and needed scrolling right after a session.
+- **Side effect on the UI tests.** Items now below the two cards can be off screen on a small iPhone, so the tests scroll to them with `app.reveal` before tapping or reading: `Version125UITests`, `Version20DoneUITests` (the `done-week` tile), `WorkoutCompanionUITests` (the title field) and `ScreenTour`. `Version123ScreensUITests` now checks that "Stretch now" is above "How did it feel" (it was below before).
+
+### Rest voice in Sets & reps and Interval workouts (`SpokenCue.word`, `Core/Sources/WorkoutCore/Sounds.swift`)
+- **Before 2.2.** A rest between sets in a Sets & reps workout and an off (rest) round of an Interval workout said only "Three", "Two", "One". Only a gym machine rest (since 2.0, `RestCuePlan`) said "Thirty seconds", "Twenty seconds", "Ten seconds" first.
+- **Now.** Both say the same marks as a gym rest, from `RestCuePlan.marks(restSeconds:)`: 30, 20, 10 where mark ≤ rest − 2 (each only when it falls at least 2 s inside the rest), then 3, 2, 1. Words "Thirty seconds", "Twenty seconds", "Ten seconds", "Three", "Two", "One". Examples: a 20 s rest says "Ten seconds", 3, 2, 1; a 90 s rest says all six.
+- **Setting.** Follows Settings → Sounds → "Spoken countdown" (`sounds-spoken`); off: a tick at 3, 2, 1 as before. The tick stays quiet while the voice counts.
+- **Unchanged.** Work rounds of an Interval workout: "Halfway" (work 20 s or longer), "Ten seconds" (work 30 s or longer), Three, Two, One. The gym machine rest is as in 2.0 (also after −15 s / +15 s, each said once).
+
+### Tests (lean)
+- Core `Version22Tests`: data tests for the new rest marks in `SpokenCue.word` (20 s and 90 s rests).
+- `Version123SoundTests`: two lines changed to expect the new rest words.
+- UI: see the scroll changes above (`app.reveal`); `Version123ScreensUITests` order check.
+- **Texts.** What's new (2.2) and How it works (Two sessions in a day, Stretching, Plan templates, Sets & reps, Interval timers, Sounds and words, Rest voice) updated.

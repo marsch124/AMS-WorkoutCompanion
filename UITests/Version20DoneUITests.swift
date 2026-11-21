@@ -19,6 +19,7 @@ final class Version20DoneUITests: XCTestCase {
         finish.tap()
         app.confirmEnd()
         XCTAssertTrue(app.descendants(matching: .any)["done-trophy"].firstMatch.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["done-week"].firstMatch.exists)
+        // 2.2: Stretch now and Save as template sit above the week tile — scroll to it.
+        app.reveal(app.descendants(matching: .any)["done-week"].firstMatch)
     }
 }

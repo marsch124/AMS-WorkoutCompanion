@@ -61,7 +61,12 @@ public enum SpokenCue {
         case 1: return "One"
         default: break
         }
-        guard isWork else { return nil }
+        guard isWork else {
+            // A rest in Sets & reps or an interval workout (since 2.2, his ask): the same marks as a
+            // gym rest — Thirty, Twenty, Ten seconds when they fall well inside the rest.
+            guard secondsLeft >= 10, RestCuePlan.marks(restSeconds: phaseLength).contains(secondsLeft) else { return nil }
+            return RestCuePlan.words(for: secondsLeft)
+        }
         if phaseLength >= 30, secondsLeft == 10 { return "Ten seconds" }
         if phaseLength >= 20, secondsLeft == phaseLength / 2 { return "Halfway" }
         return nil

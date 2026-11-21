@@ -75,13 +75,15 @@ final class Version123ScreensUITests: XCTestCase {
         XCTAssertTrue(finish.waitForExistence(timeout: 5))
         finish.tap()
         app.confirmEnd()
+        // 2.2: Stretch now and Save as template come first, right under Well done.
+        let stretchNow = app.buttons["gym-stretch"]
+        XCTAssertTrue(stretchNow.waitForExistence(timeout: 5))
         let good = app.buttons["gym-feel-good"]
-        XCTAssertTrue(good.waitForExistence(timeout: 5))
+        app.reveal(good)
+        XCTAssertLessThan(stretchNow.frame.minY, good.frame.minY, "Stretch now above How did it feel")
         good.tap()
         picture("123-session-done")
-        app.swipeUp()
-        XCTAssertTrue(any("gym-compare-sets").waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["gym-stretch"].waitForExistence(timeout: 5))
+        app.reveal(any("gym-compare-sets"))
         picture("123-session-done-lower")
         app.buttons["gym-summary-done"].tap()
 

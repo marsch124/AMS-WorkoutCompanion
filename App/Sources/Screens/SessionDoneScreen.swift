@@ -41,6 +41,78 @@ struct SummaryScreen: View {
                 .listRowBackground(Color.clear)
             }
             if let visit {
+                // Since 2.2 (his ask, a marked screenshot): Stretch now, then Save as template, right under
+                // Well done. Before, both were near the bottom, under the numbers and Against last visit.
+                if library.gym.stretchID != GymLog.noStretch, visit.stretching == nil {
+                    Section {
+                        Button(action: stretch) {
+                            HStack(spacing: 8) {
+                                IconMark(.hand("yoga"), size: 22, colour: Gym.tint)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Stretch now").fontWeight(.semibold).foregroundStyle(Gym.tint)
+                                    Text("Timer with voice cues in your AirPods").font(.caption).foregroundStyle(Theme.muted)
+                                }
+                                Spacer()
+                                ControlMarkView(.chevron, size: 14, colour: Gym.tint)
+                            }
+                        }
+                        .accessibilityIdentifier("gym-stretch")
+                        // The guide: how to do each stretch (since 1.30, his ask).
+                        NavigationLink {
+                            StretchGuideScreen(libraryIDs: library.gym.stretchBook?.ticked.filter { StretchLibrary.item($0) != nil })
+                        } label: {
+                            HStack(spacing: 8) {
+                                AppMarkView(.template, size: 20, colour: Gym.tint)
+                                Text("How to do the stretches").foregroundStyle(Gym.tint)
+                            }
+                        }
+                        .accessibilityIdentifier("gym-stretch-guide")
+                    }
+                }
+                // Save as template — part of finishing since 1.30 (his ask; before: a tile on the gym screen's head).
+                let order = visit.templateOrder(in: library.gym)
+                if !order.isEmpty {
+                    Section {
+                        Button {
+                            templateName = ""
+                            namingTemplate = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                if savedTemplate != nil {
+                                    ControlMarkView(.check, size: 20, colour: SessionGoingLine.green)
+                                } else {
+                                    AppMarkView(.template, size: 22, colour: Gym.tint)
+                                }
+                                Text(savedTemplate.map { "Saved as template · \($0)" } ?? "Save as template")
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(savedTemplate != nil ? SessionGoingLine.green : Gym.tint)
+                                    .lineLimit(1)
+                                Spacer()
+                                if savedTemplate == nil { ControlMarkView(.chevron, size: 14, colour: Gym.tint) }
+                            }
+                        }
+                        .disabled(savedTemplate != nil)
+                        .accessibilityIdentifier("gym-summary-template")
+                        .alert("Save as template", isPresented: $namingTemplate) {
+                            TextField("For example: Leg day", text: $templateName)
+                            Button("Cancel", role: .cancel) {}
+                            Button("Save") {
+                                let name = templateName.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard !name.isEmpty else { return }
+                                let g = visit.gymID
+                                library.changeGym { _ = $0.saveTemplate(named: name, order: order, gym: g) }
+                                savedTemplate = name
+                            }
+                            .accessibilityIdentifier("gym-summary-template-save")
+                        } message: {
+                            Text("This session's machines, in the order you used them. Use it later under Plan today. The same name in this gym is replaced.")
+                        }
+                    } footer: {
+                        Text("Keep this session's machines and order for another day.")
+                    }
+                }
+            }
+            if let visit {
                 let split = visit.split
                 let hasBar = split.warmup > 0 || split.stretch > 0
                 do {
@@ -108,74 +180,6 @@ struct SummaryScreen: View {
                                     .accessibilityIdentifier("gym-compare-\(line.id)")
                             }
                         }
-                    }
-                }
-                // Save as template — part of finishing since 1.30 (his ask; before: a tile on the gym screen's head).
-                let order = visit.templateOrder(in: library.gym)
-                if !order.isEmpty {
-                    Section {
-                        Button {
-                            templateName = ""
-                            namingTemplate = true
-                        } label: {
-                            HStack(spacing: 8) {
-                                if savedTemplate != nil {
-                                    ControlMarkView(.check, size: 20, colour: SessionGoingLine.green)
-                                } else {
-                                    AppMarkView(.template, size: 22, colour: Gym.tint)
-                                }
-                                Text(savedTemplate.map { "Saved as template · \($0)" } ?? "Save as template")
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(savedTemplate != nil ? SessionGoingLine.green : Gym.tint)
-                                    .lineLimit(1)
-                                Spacer()
-                                if savedTemplate == nil { ControlMarkView(.chevron, size: 14, colour: Gym.tint) }
-                            }
-                        }
-                        .disabled(savedTemplate != nil)
-                        .accessibilityIdentifier("gym-summary-template")
-                        .alert("Save as template", isPresented: $namingTemplate) {
-                            TextField("For example: Leg day", text: $templateName)
-                            Button("Cancel", role: .cancel) {}
-                            Button("Save") {
-                                let name = templateName.trimmingCharacters(in: .whitespacesAndNewlines)
-                                guard !name.isEmpty else { return }
-                                let g = visit.gymID
-                                library.changeGym { _ = $0.saveTemplate(named: name, order: order, gym: g) }
-                                savedTemplate = name
-                            }
-                            .accessibilityIdentifier("gym-summary-template-save")
-                        } message: {
-                            Text("This session's machines, in the order you used them. Use it later under Plan today. The same name in this gym is replaced.")
-                        }
-                    } footer: {
-                        Text("Keep this session's machines and order for another day.")
-                    }
-                }
-                if library.gym.stretchID != GymLog.noStretch, visit.stretching == nil {
-                    Section {
-                        Button(action: stretch) {
-                            HStack(spacing: 8) {
-                                IconMark(.hand("yoga"), size: 22, colour: Gym.tint)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text("Stretch now").fontWeight(.semibold).foregroundStyle(Gym.tint)
-                                    Text("Timer with voice cues in your AirPods").font(.caption).foregroundStyle(Theme.muted)
-                                }
-                                Spacer()
-                                ControlMarkView(.chevron, size: 14, colour: Gym.tint)
-                            }
-                        }
-                        .accessibilityIdentifier("gym-stretch")
-                        // The guide: how to do each stretch (since 1.30, his ask).
-                        NavigationLink {
-                            StretchGuideScreen(libraryIDs: library.gym.stretchBook?.ticked.filter { StretchLibrary.item($0) != nil })
-                        } label: {
-                            HStack(spacing: 8) {
-                                AppMarkView(.template, size: 20, colour: Gym.tint)
-                                Text("How to do the stretches").foregroundStyle(Gym.tint)
-                            }
-                        }
-                        .accessibilityIdentifier("gym-stretch-guide")
                     }
                 }
                 if !bests.isEmpty {

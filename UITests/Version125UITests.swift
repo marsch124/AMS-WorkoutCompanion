@@ -33,7 +33,9 @@ final class Version125UITests: XCTestCase {
         // Since 1.27 End asks first.
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
         app.alerts.firstMatch.buttons["End session"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["gym-feel-good"].waitForExistence(timeout: 5))
+        // 2.2: Stretch now and Save as template sit above How did it feel — scroll to it.
+        _ = any("done-trophy").waitForExistence(timeout: 5)
+        app.reveal(app.buttons["gym-feel-good"])
         app.buttons["gym-summary-done"].tap()
         XCTAssertFalse(any("gym-session-going").waitForExistence(timeout: 2))
     }
