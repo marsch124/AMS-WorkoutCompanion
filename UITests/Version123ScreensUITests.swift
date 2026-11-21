@@ -48,8 +48,11 @@ final class Version123ScreensUITests: XCTestCase {
         let row = app.buttons["settings-gym-extras"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         row.tap()
-        XCTAssertTrue(any("extras-days-value").waitForExistence(timeout: 5))
-        XCTAssertTrue(any("extras-days-value").label.contains("4 days"))
+        let days = any("extras-days-value")
+        XCTAssertTrue(days.waitForExistence(timeout: 5))
+        // Waits for the words instead of reading them once (failed once on GitHub, 18 Nov 2026).
+        let four = expectation(for: NSPredicate(format: "label CONTAINS %@", "4 days"), evaluatedWith: days)
+        XCTAssertEqual(XCTWaiter.wait(for: [four], timeout: 5), .completed, days.label)
         picture("123-extras")
         app.buttons["extras-save"].tap()
         XCTAssertTrue(row.waitForExistence(timeout: 5))

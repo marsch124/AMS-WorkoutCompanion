@@ -204,6 +204,8 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.confirmEnd()
 
         let add = any("session-photo-add")
+        // Since 1.35 Stretch now and Save as template come first, so the photos sit lower.
+        app.scrollTo(add)
         XCTAssertTrue(add.waitForExistence(timeout: 5))
         add.tap()
         add.tap()
