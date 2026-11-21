@@ -26,7 +26,10 @@ private struct NoSwipeBack: UIViewControllerRepresentable {
             while let v = vc, v.navigationController == nil { vc = v.parent }
             guard let nav = vc?.navigationController else { return }
             nav.interactivePopGestureRecognizer?.isEnabled = false
+            // Only an Xcode with the iOS 26 tools knows this; an older one (as on GitHub's test Mac) skips it.
+            #if compiler(>=6.2)
             if #available(iOS 26.0, *) { nav.interactiveContentPopGestureRecognizer?.isEnabled = false }
+            #endif
         }
     }
 }

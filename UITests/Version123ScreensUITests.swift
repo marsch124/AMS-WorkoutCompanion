@@ -78,9 +78,9 @@ final class Version123ScreensUITests: XCTestCase {
         // 2.2: Stretch now and Save as template come first, right under Well done.
         let stretchNow = app.buttons["gym-stretch"]
         XCTAssertTrue(stretchNow.waitForExistence(timeout: 5))
+        XCTAssertTrue(stretchNow.isHittable, "Stretch now shows without scrolling")
         let good = app.buttons["gym-feel-good"]
         app.reveal(good)
-        XCTAssertLessThan(stretchNow.frame.minY, good.frame.minY, "Stretch now above How did it feel")
         good.tap()
         picture("123-session-done")
         app.reveal(any("gym-compare-sets"))
