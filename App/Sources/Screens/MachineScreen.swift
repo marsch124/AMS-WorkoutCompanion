@@ -23,12 +23,13 @@ struct MachineScreen: View {
     @State private var zoomInstructions = false
     @State private var restEnd: Date?
     @State private var restLength: Double = Double(GymLog.restSeconds)
-    /// The last whole second a rest cue was given for, so none is said twice (since 1.35).
-    @State private var restCueSaid: Int?
     @State private var now = Date()
     @State private var editing = false
     @State private var changingSet: Int?
     @State private var zoom = false
+    /// The how-to full screen, and the rest marks already said in this rest (since 2.0).
+    @State private var showHowTo = false
+    @State private var restSaid: Set<Int> = []
     @State private var newBest = false
     /// The next set is a warm-up (since 1.11); off again after that set.
     @State private var warmup = false
@@ -177,6 +178,21 @@ struct MachineScreen: View {
         .toolbar {
             // How long the session has been going, small at the top left (since 1.31, his ask).
             ToolbarItem(placement: .topBarLeading) { SessionClockPill(day: day, gymID: gymID) }
+            // A small picture beside the machine name opens how to use it (since 2.0).
+            ToolbarItem(placement: .principal) {
+                if let machine {
+                    HStack(spacing: 8) {
+                        Button { showHowTo = true } label: { HowToThumb(machine: machine, size: 34) }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("How to use \(machine.name)")
+                            .accessibilityIdentifier("machine-howto-thumb")
+                        Text(machine.name)
+                            .font(.headline)
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { editing = true } label: { ControlMarkView(.edit, size: 22, colour: Gym.tint) }
                     .accessibilityLabel("Edit machine")
@@ -220,17 +236,18 @@ struct MachineScreen: View {
                 if left <= 0 {
                     restEnd = nil
                     Cues.shared.go("Set \(today.count + 1)")
-                } else if left < 20.2, Int(left.rounded(.up)) != Int((left + 0.25).rounded(.up)) {
-                    // "Twenty seconds left", "Ten seconds left", then three-two-one (since 1.35, his ask).
-                    // With the spoken countdown off: a tick at 3, 2, 1 as before.
-                    let s = Int(left.rounded(.up))
-                    if s != restCueSaid {
-                        restCueSaid = s
-                        let word = Cues.shared.sounds.spokenCountdown
-                            ? SpokenCue.word(secondsLeft: s, phaseLength: Int(restLength.rounded()), isWork: false) : nil
-                        if s <= 3 { Cues.shared.countdown(spoken: word) } else if let word { Cues.shared.speak(word) }
-                    }
+                } else if let mark = RestCuePlan.due(secondsLeft: left, marks: RestCuePlan.marks(restSeconds: Int(restLength)),
+                                                     said: restSaid) {
+                    // Thirty, Twenty, Ten seconds, Three, Two, One: each once per rest (since 2.0).
+                    restSaid.insert(mark)
+                    Cues.shared.restMark(mark)
                 }
+            }
+        }
+        .fullScreenCover(isPresented: $showHowTo) {
+            if let machine {
+                InstructionViewScreen(machine: machine) { showHowTo = false }
+                    .environment(library)
             }
         }
         .sheet(isPresented: $editing) {
@@ -327,10 +344,11 @@ struct MachineScreen: View {
                             Text(effort.title).font(.caption.weight(.semibold)).foregroundStyle(Gym.tint)
                         }
                         Text(said(s)).fontWeight(s.isWarmup ? .regular : .semibold).foregroundStyle(s.isWarmup ? Theme.muted : Theme.ink)
-                        // A tick in a filled circle (since 1.16; before, a bare tick).
-                        ControlMarkView(.check, size: 11, colour: s.isWarmup ? Warmup.swatch.inkColor : Gym.ink)
-                            .frame(width: 20, height: 20)
-                            .background(s.isWarmup ? Warmup.swatch.fillColor : Gym.fill, in: Circle())
+                        // A pencil and "Change": tapping the row changes the set. The tick means a finished machine (2.0).
+                        HStack(spacing: 3) {
+                            ControlMarkView(.edit, size: 12, colour: Gym.tint)
+                            Text("Change").font(.caption).foregroundStyle(Gym.tint)
+                        }
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
@@ -799,6 +817,7 @@ struct MachineScreen: View {
         if isHold {
             // A hold rests like a set (since 1.23).
             restLength = Double(library.gym.rest(for: machine))
+            restSaid = []
             restEnd = restLength > 0 ? Date().addingTimeInterval(restLength) : nil
             now = Date()
         }
@@ -819,6 +838,7 @@ struct MachineScreen: View {
         }
         restLength = Double(library.gym.rest(for: machine))
         // A machine with no rest goes straight on to the next set.
+        restSaid = []
         restEnd = restLength > 0 ? Date().addingTimeInterval(restLength) : nil
         now = Date()
         Cues.shared.rest("Rest")
@@ -1105,6 +1125,18 @@ struct MachineForm: View {
                 Text(draft.logs == .time ? "Minutes, level and incline — for a treadmill, rowing machine or bike. A plank: Time, with level and incline off."
                      : draft.logs == .reps ? "Reps per set, no weight — push-ups, sit-ups, pull-ups."
                      : "Weight and reps per set.")
+            }
+            Section {
+                TextField("A few words on how to use it", text: Binding(
+                    get: { draft.howTo ?? "" },
+                    set: { draft.howTo = $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+                ), axis: .vertical)
+                    .lineLimit(3...8)
+                    .accessibilityIdentifier("machine-howto-field")
+            } header: {
+                Text("How to use it")
+            } footer: {
+                Text("Shown with the instruction photo when you tap the small picture beside the machine name.")
             }
             if draft.logs == .time {
                 Section {

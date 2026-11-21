@@ -1,6 +1,6 @@
 # AMS WorkoutCompanion — specification
 
-Version 1.11.3. iPhone only, portrait, iOS 17+, light and dark. The name under the app icon is "Workout Companion" since 1.22 (1.5–1.21: "Workouts"; plain "Companion" is refused by Apple, error 90129).
+Version 2.0. iPhone only, portrait, iOS 17+, light and dark. The name under the app icon is "Workout Companion" since 1.22 (1.5–1.21: "Workouts"; plain "Companion" is refused by Apple, error 90129).
 
 ## Workouts (home, since 1.5: three tabs)
 - A tab bar at the bottom with hand-drawn marks: Train, History, Settings. Train keeps its place when switching tabs (the gym screen stays where you were); History and Settings open fresh each time their tab is chosen. The Train tab is headed "Workout Companion"; the name under the app icon is "Workout Companion" since 1.22.
@@ -298,7 +298,7 @@ His two approved ideas after 1.17: see that a session is going from the Train pa
 - **Session done.** How did it feel: pills `gym-feel-great|good|ok|tired|rough` (Great/Good/OK/Tired/Rough), kept with the session, shown on its page and in Earlier visits. "Against last visit": Machines, Sets, Time, Lifted in all (`gym-compare-machines|sets|time|total`) with the change ("+2", "−6 min", "+250 kg", "same"); more is green; not shown on the first visit to a gym. "Stretch now" `gym-stretch` opens a stretch list to tick off; the first time the app makes an ordinary exercise list "After-gym stretch" (six stretches: chest in a doorway, shoulder across the body, hip flexor lunge, hamstring, thigh standing, child's pose), shown as a tile on Train and editable like any list. The list is chosen in Settings → "Reminder and stretch" ("None" hides the button).
 - **Gym reminder.** Settings → "Reminder and stretch" (`settings-gym-extras`): "Remind me after N days without the gym", Off or 2–14 days, 4 to begin with; the phone shows "4 days since your last gym visit" at 10:00 that day. Cancel and Save.
 - **Sounds.** Settings → "Sounds" (`settings-sounds`): rest-end sound Chime (as before), Bell, Beep or None (the locked-phone rest alarm uses the same); vibration Strong, Light or Off; "Spoken countdown" on/off. Each choice plays or buzzes once when tapped. Cancel and Save.
-- **Spoken countdown (interval timer).** The voice says "Three, two, one" at the end of every phase; "Halfway" in work rounds of 20 s or longer; "Ten seconds" in work rounds of 30 s or longer. The tick stays quiet while the voice counts. Since 1.35 also in rests, see Version 1.35.
+- **Spoken countdown (interval timer).** The voice says "Three, two, one" at the end of every phase; "Halfway" in work rounds of 20 s or longer; "Ten seconds" in work rounds of 30 s or longer. The tick stays quiet while the voice counts.
 - **Presets (interval workouts).** A "Presets" menu in the editor fills rounds, work and rest: Tabata (8 × 20 s / 10 s), 30 / 30, 40 / 20, 45 / 15, Every minute (10 × 60 s / 0 s). "Save as preset" keeps his own under a name; "Remove my preset" deletes one.
 - **Planning tiles only before the session (build 2).** In `GymScreen.planSection`, the tiles "Plan today" `gym-plan`, "Repeat last visit" `gym-repeat` and "Save as template" `gym-repeat-template` show only when there is no plan yet and no session is going (`sessionStart == nil` and no set logged today). Once a machine has been opened or a set logged (the green "Session going" line, `gym-session-going`) they are hidden and the hint reads "Tap the machine you'll use next."; a plan made earlier still shows as "Today's plan" with "Change" (also `gym-plan`). After Finish the tiles return. Before, they stayed during the whole session. UI test `Version123UITests.testPlanningTilesHideOnceTheSessionIsGoing`.
 - **Texts.** What's new (1.23) and How it works (Interval timers, Sounds and words, At the gym, Plan today, Logging a set, Machines for time, Next time and notes, Session time, Earlier visits, Two sessions in a day, Rest on the lock screen, Rest alarm, Where things are kept) updated; version lists in Core `WorkoutCoreTests` and UI `testSettingsShowsTheVersionAndWhatsNew` now expect 1.23.
@@ -419,14 +419,86 @@ His two approved ideas after 1.17: see that a session is going from the Train pa
 - **Checked.** Warm-up sets are saved with the gym session and show in History as chips with a "W" and a frame on the visit, in the machine's history lines, and in the "Warm-up and cardio" card; a stretch session shows as its own History row (verified by a test).
 - **Texts.** What's new (1.34) and How it works (Two sessions in a day; Exercise done and one-hand buttons) updated.
 
-## Version 1.35 — spoken cues during a rest; Stretch now and Save as template first on Session done (18 Nov 2026)
+## Version 1.35 — At the gym card without the gym name (18 Nov 2026)
 
-- **Session done order (his ask, with a marked screenshot).** In `GymScreen` (Session done, `List`), the Stretch section (`gym-stretch`, `gym-stretch-guide`) and then the Save as template section (`gym-summary-template`, with its footer) now come right after the Well done section. Before: Well done, How did it feel, Title and notes, Photos, numbers, Against last visit, Save as template, Stretch, New bests. Now: Well done, Stretch, Save as template, How did it feel, Title and notes, Photos, numbers, Against last visit, New bests. Nothing else changed. UI tests that read the numbers scroll down first (`XCUIApplication.scrollTo`, in `UITests/ConfirmEnd.swift`); `Version123ScreensUITests` checks that Stretch now is above How did it feel.
+- **At the gym card (Workouts), second line.** Before (1.27 to 1.34): when nothing was logged today and no opening hours were set, the second line showed the name of the chosen gym (for example "City gym"). Now: that case shows no second line, only "At the gym".
+- **Unchanged lines.** The second line still appears only when it says something: "Today: N machines · N sets" after sets today, the open-now / opening line (for example "Open until 22:00") when the gym's opening hours are set, and "Photo, weight and reps per machine" before any machine exists. The gym's name is still shown on the gym screen (`gym-place-menu`) and on the Choose gym plate.
+- **Texts.** What's new (1.35) and How it works (At the gym) updated; the version list in Core `WorkoutCoreTests` and UI `testSettingsShowsTheVersionAndWhatsNew` now expect 1.35.
 
-- **Rest cues.** Every rest now speaks: "Twenty seconds left" at 20 s left, "Ten seconds left" at 10 s left, then "Three", "Two", "One". It covers the rest after a set on a machine page, the rest between sets in a Sets & reps workout and the "off" rounds of an Interval workout. Before: a machine rest only ticked (tick sound plus tap) at 3, 2, 1 with no voice; a Sets & reps / interval rest said only "Three, Two, One".
-- **Short rests.** "Twenty seconds left" only when the rest is longer than 20 s; "Ten seconds left" only when it is longer than 10 s (no cue right at the start of a short rest).
-- **Setting.** Follows Settings → Sounds → "Spoken countdown" (on by default). Off: rests tick at 3, 2, 1 as before and say nothing at 20 and 10.
-- **−15 s / +15 s.** On a gym rest the cues follow the new time left.
-- **Audio.** Voice plays into AirPods or the speaker alongside music, like all other cues.
-- **Unchanged.** Work rounds (Halfway, Ten seconds, 3-2-1), the stretch timer and the plank-style hold countdown.
-- **Texts.** What's new (1.35) and How it works (Sounds and words) updated.
+## Version 2.0 — warm-up, one stretch library, pictures, one Well done, instruction view, rest voice (19 Nov 2026)
+
+- **Signs in this app (How it works chapter, 2.0).** `AppText.howItWorks` has a chapter "Signs in this app" listing every mark and colour with its meaning (tick = finished machine, pencil + "Change" = change a logged set, green session line, red End, orange Busy pill, yellow Warm-up pill, gold arrow, Pain pill, rest button tints, star, suggested dot, drag handle, trophy gold, time bar colours, instruction picture, mirrored figure). On a logged set the filled-circle tick was replaced by a pencil (`ControlMark.edit`) and the word "Change" (caption, tint); identifier `gym-set-N` unchanged. How it works › History now says five tiles (Sessions, Minutes, Exercises, Sets, Lifted) and a 12-week chart.
+
+Version 2.0 (build 1). Data envelopes stay `"version":1`; every new field is optional and decoded with `decodeIfPresent`, so old files and old backups load unchanged.
+
+### Warm-up
+- **Tile.** `gym-warmup-start`, green, "Warm up", in the Plan today / Repeat last visit row. Shown on today's gym page before the first set and until a warm-up has ended (`warmup.end == nil`). Before 2.0 there was no warm-up part, only single warm-up sets (`GymSet.warmup`, unchanged).
+- **Chooser (`WarmUpScreen`, cover "Warm-up").** Chips: one per time machine of the gym, `warmup-choose-outside` ("Walk or run to the gym"), `warmup-choose-moves` ("Warm-up moves"). Minutes `warmup-minutes` with `warmup-minutes-minus` / `warmup-minutes-plus` (default 8, remembered). Moves list (`warmup-moves`, rows `warmup-move-<n>`): about 10 `DynamicMove`s, tick, hold and drag to reorder; none ticked = all moves. `warmup-start`, `warmup-cancel`. Last kind, minutes, machine and moves are remembered in `StretchBook.warm` (`WarmPrefs`).
+- **Start = session start.** `GymLog` start creates or gets today's visit the way the first set does, stores `GymVisit.warmup` (never as sets) and starts the session clock. Without a warm-up the clock starts at the first machine, as before.
+- **Run (`WarmUpRunScreen`).** Session clock pill, ring `warmup-clock` (mm:ss), `warmup-minus` / `warmup-plus` ("−1 min" / "+1 min"), `warmup-pause`, `warmup-skip`, fields `warmup-speed` (Speed), `warmup-level` (Level), `warmup-hr` (Heart rate, cardio), full-blue `warmup-done` ("Done — to the machines"). Moves: `warmup-figure` (animated), `warmup-name`, "n of N", voice "Next: <name>", "Other side", "Warm-up done"; −/+ change the current move by 10 s ("−10 s" / "+10 s"); Skip goes to the next move.
+- **Heart rate.** When a cardio warm-up ends with no typed number, the app reads the average from Apple Health (heart rate, window warm-up start to end; read permission asked once, `NSHealthShareUsageDescription`). Line `warmup-hr-note`: "Heart rate comes from Apple Health when your Garmin syncs." A typed number wins; a refusal never blocks the warm-up. Nothing is written to Health.
+- **Data.** `GymVisit.warmup: VisitPart?` with `kind` (`cardio`, `moves`, `outside`), `start`, `end`, `machineID`, `plannedMinutes`, `speed`, `level`, `heartRate`, `names` (move ids), `held`, `skipped`. Warm-up minutes are warm-up time only: never cardio minutes, records or New best.
+- **Chip.** `gym-warmup-chip`: "Warm-up · 8 min · Treadmill" (or "· Moves", "· Walk or run"). Tap = sheet "Warm-up": `warmup-chip-minutes` / `warmup-chip-stepper`, `warmup-chip-speed`, `warmup-chip-level`, `warmup-chip-hr`, `warmup-hr-read` ("Read again"), `warmup-chip-cancel`, `warmup-chip-save`.
+- **Edge cases.** A warm-up-only visit is kept (never removed as entry-less) and shows in Earlier visits and History with its minutes. The 20-minute idle pause does not apply during warm-up or stretching.
+
+### End box, stretching and the session end
+- **End box.** "End this session?" (red End and "Finish this session"): `gym-end-stretch` "Stretch now" (hidden when there are no sets and no warm-up), `gym-end-confirm` "End session", `gym-end-discard` "Discard session" (only with sets), `gym-end-continue` "Continue the session". End session on a warm-up-only visit: "Your warm-up is saved and the clock stops." With no sets and no warm-up, End still saves nothing.
+- **Stretch now.** The machines end at that moment (`GymVisit.finished`, rule of 1.20), the stretch chooser opens, the clock runs through the stretching; when the timer ends or Save is tapped, `GymVisit.stretching = VisitPart(kind: stretch, start, end, names, held, skipped)` is stored and the one Well done opens. A stretch inside a visit makes no separate `SessionRecord`. Stretch-only from the Workouts tab is unchanged (its own `SessionRecord`).
+- **Time rules (Core, `GymVisit`).** Start = `warmup.start` else first set; end = `stretching.end` else the Finish / last-set rule. `minutes` includes warm-up and stretching. The split (warm-up, machines, stretching) is whole minutes; old visits: (0, minutes, 0).
+
+### Stretching
+- **Library (`StretchLibrary`, Core, code not data).** 30 `StretchItem`s with fixed ids, in areas Neck and shoulders, Arms, Back and core, Hips and glutes, Legs, Finish; each has name, muscles, default hold, sides, figure and the 1.30 guide fields; plus 10 `DynamicMove`s for the warm-up. Old stretch names resolve through an alias table.
+- **Chooser "Stretches" (`StretchChooser`).** `stretch-suggested-line` "Suggested for today: legs, back" (from the muscle groups of today's machines; those stretches pre-ticked, with a dot). "My stretches" (`stretch-mine-<n>`): his order, handle `stretch-drag-<n>` ("Hold the handle and drag to change the order."), circle `stretch-choose-<n>` unticks, star `stretch-fav-<n>` = favourite, tap row = hold sheet (`stretch-hold-sheet`, `stretch-hold-minus` / `stretch-hold-plus`, `stretch-hold-value`, 5-second steps, Cancel `stretch-hold-cancel` / Save `stretch-hold-save`). Library by area (`stretch-area-<key>`), favourites first, tap to add (`stretch-add-<id>`). `stretch-choose-count`, `stretch-choose-all`, `stretch-choose-close`, full-green `stretch-choose-start` "Start · about N min". "Own stretch" `stretch-own-add`.
+- **Own stretch (`CustomStretchForm`).** Fields `stretch-own-name`, `stretch-own-seconds`, `stretch-own-sides` (One side / Both sides), `stretch-own-note`, `stretch-own-area`, `stretch-own-photo`; `stretch-own-delete`, `stretch-own-cancel`, `stretch-own-save`. Id "my-<uuid>".
+- **Memory: `StretchBook`** (in gym.json, key `book`, `GymLog.stretchBook`): `ticked [String]` (order = list order), `holds [String:Int]`, `favourites [String]`, `custom [CustomStretch]` (id, name, seconds, sides, note, area, photo), `warm WarmPrefs`, `migratedFrom UUID?`. Own-stretch photos count in `photosInUse`.
+- **Migration.** First 2.0 launch with no book: the old list (`GymLog.stretchID`) is taken over once: each exercise in order → library id, else a new own stretch (name, amount, note, photo kept); `migratedFrom` makes it idempotent. The old list is never edited. Settings → Reminder and stretch keeps its "Stretch list" picker.
+- **Timer (`StretchTimerScreen`).** `stretch-figure` (big, mirrored on side 2) or his photo; `stretch-skip` "Skip" (next stretch, counted as skipped); the 1.34 controls and `stretch-timer-*` ids unchanged. Guide `StretchGuideScreen`: `stretch-guide-figure-<n>` on top of each stretch.
+- **History.** Detail text adds "· N skipped" when N > 0. Visit page: Stretching row (minutes, "N held · N skipped").
+
+### Figures
+- One string per figure in Core `FigureData` (hand-drawn, one flowing line, no fill; head, limbs, curved back, props), parsed by `FigureParser`; grid 64×64; `FigureView(size:, mirrored:)` in `App/Sources/Figures/`; colour from the area. A warm-up move has two frames, animated in a slow loop (frame 1 when Reduce Motion is on). Side 2 = mirrored, no second drawing. Core tests: every item has a figure, every figure parses and stays inside the grid.
+
+### Well done (`SessionDoneScreen`)
+- One page, at the very end (after End session or after the stretching). Top: `done-photo` (first session photo big) with the trophy badge `done-trophy` on its corner; no photo = trophy large and centred. Trophy every visit: gold after a personal best, blue otherwise.
+- `done-timebar`: Warm-up (orange), Machines (blue), Stretching (green) with minutes (`done-time-warmup`, `done-time-machines`, `done-time-stretch`); parts at 0 are left out; no bar with machine time only.
+- `done-week`: tile "Sessions this week" (Monday start, this one included).
+- `gym-stretch` "Stretch now" on Well done only when not stretched yet; opens the same stretching for this visit.
+- Share picture and `VisitShare`: lines "Warm-up 8 min · Treadmill" and "Stretching 9 min · 6 stretches" when present. Visit page: Warm-up row (kind, minutes, "9.5 km/h · 128 bpm") and Stretching row.
+
+### Instruction view
+- `Machine.howTo: String?` (CodingKeys and `init(from:)`); field `machine-howto-field` "How to use it" in the machine settings, footer "Shown with the instruction photo when you tap the small picture beside the machine name."
+- Thumb `machine-howto-thumb` beside the machine name; `plan-howto-<n>` on each Plan today row. Source: instruction photo, else machine photo, else the machine's mark. Tap = `InstructionViewScreen`: `howto-name`, `howto-plate` (pinch to zoom, double-tap resets), `howto-photo`, `howto-setting` "Your setting: …", `howto-words`, `howto-close`. Nothing: `howto-empty` "No instructions yet — add a photo or a few words in the machine's settings."
+
+### Rest voice
+- `RestCuePlan.marks(restSeconds:)`: 30, 20, 10 where mark ≤ rest − 2, plus 3, 2, 1 when rest ≥ 4 (90 s → 30, 20, 10, 3, 2, 1; 25 s → 20, 10, 3, 2, 1; 5 s → 3, 2, 1; 3 s → none). Words "Thirty seconds", "Twenty seconds", "Ten seconds", "Three", "Two", "One". Each said once, also after −15 s / +15 s (`due(secondsLeft:marks:said:)`). Settings → Sounds → "Spoken countdown" (`sounds-spoken`) off: ticks only.
+- Ducking: `Cues` ducks other audio while speaking; music returns about 0.4 s after. Needs a real device to hear.
+- `RestSound.soft` "Soft chime" is the new default (older settings with another value decode as before); also the lock-screen rest sound.
+
+### Garmin Board file (format stays 1)
+- `BoardFile.Session` gains optional `warmupMinutes`, `warmupKind`, `warmupSpeed`, `warmupHeartRate`, `stretchMinutes`, `stretchCount`. `minutes` and `end` include warm-up and stretching; `cardioMinutes` excludes the warm-up. Old readers ignore the new fields.
+
+### Data and backup
+- gym.json: `Machine.howTo`; `GymVisit.warmup`, `GymVisit.stretching` (`VisitPart`); `StretchBook` under `book`. Backup files stay `workouts.json`, `gym.json`, `history.json` (the book travels in gym.json); an older backup restores as before and the stretch page then takes over the old list again. Check my data keeps own-stretch photos.
+
+### Tests (lean)
+- Core, one per rule: old JSON decodes and new fields round-trip; split and minutes; warm-up-only visit kept; book migration; suggested stretches; rest marks; figures parse; Board fields only when set. UI (by identifier): warm-up to `gym-warmup-chip`; End box buttons; chooser and `stretch-drag-1`; timer `stretch-figure` and `stretch-skip`; Well done `done-trophy`, `done-timebar`, `done-week`; `machine-howto-thumb`; the version list expects 2.0.
+- **Texts.** What's new (2.0) and How it works (new chapters Warm-up, Stretching, Instruction pictures, Rest voice; changed Sounds and words, At the gym, Plan today, Instructions photo, Machines for time, Session time, Two sessions in a day, Garmin Board, Sharing a visit, Warm-up sets, Backups, Where things are kept) updated.
+
+## Version 2.1 — warm-up moves that fit today's plan (19 Nov 2026)
+
+Version 2.1 (build 1; the build number goes back to 1). Data envelopes unchanged; no new stored fields.
+
+### Suggested warm-up moves
+- **Where.** Gym page, tile `gym-warmup-start`, then chip `warmup-choose-moves` ("Warm-up moves"): the list of the 10 moves (`WarmUpScreen`).
+- **Core rule.** `GymLog.suggestedWarmupMoves(gym:on:)` in `Core/Sources/WorkoutCore/Version21Warmup.swift` returns the move ids that suit today's muscle groups. Today's muscle groups are the groups of the machines in today's plan at this gym (machines skipped or removed from the plan do not count); with no plan for today, the machines of the last visit at this gym. Groups: chest, back, shoulders, arms, legs, core; Martin's own group names count when the name says so. With no plan and no last visit the result is empty and everything works as in 2.0.
+- **Merge rule.** `WarmPrefs.movesShown(saved:suggested:)` (same file): his remembered ticks and their order stay; suggestions only ADD ticks; suggested moves he does not have yet come right after his own ones. With nothing remembered, only the suggested moves are ticked (before 2.1: all 10 were ticked).
+- **Marks.** A suggested move carries a small blue dot and the blue word "suggested" (id `warmup-move-suggested-N`, N = the move's place in the list; the tick button `warmup-move-N` reads "<name>, suggested, ticked"), the same mark the stretch chooser uses. The mark means one thing for stretches and warm-up moves: suggested for today's machines.
+- **Line.** Under the list title, `warmup-suggested-line`: "Suggested for today: legs, back" (the groups found). Hidden when nothing is suggested.
+- **Start.** The ticked moves are remembered for next time, as before; with none ticked all moves are done (unchanged from 2.0).
+- **Library data.** `StretchLibrary` moves: Arm circles now counts for shoulders, chest and arms; Inchworm for legs, core, shoulders and chest (before: no move was linked to chest or arms). The stretches are unchanged.
+- **Demo check.** With `-gymdemo -gymextras` the last demo visit did Chest press and Lat pulldown, so the line reads "Suggested for today: chest, back" and Arm circles, Inchworm, Torso turns and World's greatest stretch come first, ticked.
+
+### Tests (lean)
+- Core `Version21Tests`: one data test per rule (suggested moves from plan, from last visit, none; merge with remembered ticks and order; nothing remembered → only suggested).
+- UI `Version21UITests`: one screen test finding `warmup-suggested-line` and `warmup-move-suggested-N`.
+- **Texts.** What's new (2.1), How it works (Warm-up; Signs in this app: the blue dot and "suggested" widened to warm-up moves).

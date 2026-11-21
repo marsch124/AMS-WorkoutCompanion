@@ -34,6 +34,9 @@ enum Gym {
     static let place = swatch
 }
 
+/// The session whose stretching is open (since 2.0).
+struct StretchVisitRef: Identifiable { let id: UUID }
+
 /// A machine on the gym screen, to open it.
 struct MachineRef: Hashable {
     let id: UUID
@@ -45,7 +48,8 @@ struct GymCard: View {
     let open: () -> Void
     @State private var changingIcon = false
 
-    private var summary: String {
+    /// The second line under "At the gym", or nil for none.
+    private var summary: String? {
         let today = library.gym.visits.filter { Calendar.current.isDateInToday($0.date) && $0.setCount > 0 }
         if !today.isEmpty {
             let sets = today.reduce(0) { $0 + $1.setCount }
@@ -55,8 +59,8 @@ struct GymCard: View {
         let n = library.gym.machines.count
         // Open now, or when it opens (since 1.23) — once hours are given for the gym.
         if n > 0, let line = library.gym.currentGym?.openLine(at: Date()) { return line.text }
-        // Since 1.27 (his ask) the card no longer counts the machines: it names the gym instead.
-        return n == 0 ? "Photo, weight and reps per machine" : (library.gym.currentGym?.name ?? GymLog.firstGymName)
+        // 1.27 named the gym here; since 1.35 (his ask, he crossed it out) the card shows no gym name.
+        return n == 0 ? "Photo, weight and reps per machine" : nil
     }
 
     var body: some View {
@@ -69,10 +73,12 @@ struct GymCard: View {
                     Text("At the gym")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(Gym.ink)
-                    Text(summary)
-                        .font(.subheadline)
-                        .foregroundStyle(Gym.ink.opacity(0.85))
-                        .lineLimit(1)
+                    if let summary {
+                        Text(summary)
+                            .font(.subheadline)
+                            .foregroundStyle(Gym.ink.opacity(0.85))
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 8)
                 ControlMarkView(.chevron, size: 16, colour: Gym.ink)
@@ -84,7 +90,7 @@ struct GymCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("At the gym, \(summary)")
+        .accessibilityLabel(summary.map { "At the gym, \($0)" } ?? "At the gym")
         .accessibilityIdentifier("open-gym")
         .contextMenu {
             Button("Change icon…") { changingIcon = true }
@@ -124,6 +130,11 @@ struct GymScreen: View {
     @State private var askingDiscard = false
     @State private var choosingGym = false
     @State private var afterChooser: GymChooserAction?
+    /// 2.0: the warm-up cover, its chip's sheet, and Stretch now after the machines.
+    @State private var warming = false
+    @State private var editingWarm = false
+    @State private var stretchingVisit: StretchVisitRef?
+    @State private var summaryAfterStretch: UUID?
 
     private var gymID: UUID? { library.gym.currentGym?.id }
     private var visit: GymVisit? { library.gym.openVisit(on: day, gym: gymID) }
@@ -337,6 +348,39 @@ struct GymScreen: View {
             }
             .id(ref.id)
         }
+        .fullScreenCover(isPresented: $warming) {
+            WarmUpFlow(gymID: gymID, day: day) { warming = false }
+                .environment(library)
+        }
+        .fullScreenCover(item: $stretchingVisit, onDismiss: {
+            // Stretching is over (or closed): on to the Well done page, as after End session.
+            guard let id = summaryAfterStretch else { return }
+            summaryAfterStretch = nil
+            Cues.shared.finished("Well done")
+            summary = library.gym.visits.first { $0.id == id }
+        }) { ref in
+            let id = ref.id
+            StretchSessionEntry(visitID: id) { part in
+                if let part { library.changeGym { $0.setStretching(visitID: id, part: part) } }
+                summaryAfterStretch = id
+                stretchingVisit = nil
+            }
+            .environment(library)
+        }
+        .sheet(isPresented: $editingWarm) {
+            if let v = visit, let w = v.warmup {
+                NavigationStack {
+                    WarmUpChipSheet(visitID: v.id, part: w, hasLevel: w.machineID.flatMap { library.gym.machine($0) }?.hasLevel ?? true) { edit in
+                        editingWarm = false
+                        if let edit {
+                            library.changeGym { $0.editWarmup(visitID: v.id, minutes: edit.minutes, speed: edit.speed,
+                                                              level: edit.level, heartRate: edit.heartRate) }
+                        }
+                    }
+                }
+                .environment(library)
+            }
+        }
         .fullScreenCover(isPresented: $camera) {
             CameraPicker { data in
                 camera = false
@@ -445,6 +489,11 @@ struct GymScreen: View {
         // End on the green line and Finish this session at the bottom ask first (since 1.27, his ask);
         // the other button keeps the session going.
         .alert("End this session?", isPresented: $askingEnd) {
+            // 2.0: stretch right away — the machines end exactly as with End session, then the stretching opens.
+            if hasContent {
+                Button("Stretch now") { endSession(stretch: true) }
+                    .accessibilityIdentifier("gym-end-stretch")
+            }
             Button("End session", role: .destructive) { endSession() }
                 .accessibilityIdentifier("gym-end-confirm")
             // Since 1.30 (his ask): throw the session away instead — it asks once more, as sets are lost.
@@ -456,7 +505,8 @@ struct GymScreen: View {
                 .accessibilityIdentifier("gym-end-continue")
         } message: {
             Text((visit?.setCount ?? 0) > 0 ? "Are you sure? Your sets are saved and the clock stops."
-                                            : "Are you sure? There are no sets yet, so nothing is saved.")
+                 : visit?.warmup != nil ? "Are you sure? Your warm-up is saved and the clock stops."
+                 : "Are you sure? There are no sets yet, so nothing is saved.")
         }
         .alert("Discard this session?", isPresented: $askingDiscard) {
             Button("Discard session", role: .destructive) {
@@ -564,32 +614,78 @@ struct GymScreen: View {
     /// Since 1.30 (his ask) both green and alike (before: Repeat was full indigo), as tall as the gym button;
     /// Save as template moved to the Well done summary after Finish.
     @ViewBuilder private var actionRow: some View {
-        if plan == nil, !machines.isEmpty, sessionStart == nil, (visit?.setCount ?? 0) == 0 {
-            // Only before the session (since 1.23 build 2, his ask): once it is going, planning tiles are in the way.
+        // Only before the session (since 1.23 build 2, his ask): once it is going, planning tiles are in the way.
+        let planTiles = plan == nil && !machines.isEmpty && sessionStart == nil && (visit?.setCount ?? 0) == 0
+        // 2.0: Warm up stands in the same row until the first set, and until a warm-up has been done.
+        let warmTile = isToday && (visit?.setCount ?? 0) == 0 && visit?.warmup?.end == nil
+        if planTiles || warmTile {
             let repeatOrder = library.gym.lastOrder(gym: gymID, before: day)
             HStack(spacing: 8) {
-                Button { planning = true } label: {
-                    GymActionTile(title: "Plan today") {
-                        ControlMarkView(.list, size: 21, colour: SessionGoingLine.green)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("gym-plan")
-                // Same machines, same order as last time — a plan in one tap (since 1.7).
-                if !repeatOrder.isEmpty {
-                    Button {
-                        library.changeGym { $0.setPlan(repeatOrder, on: day, gym: gymID) }
-                    } label: {
-                        GymActionTile(title: "Repeat last visit") {
-                            ControlMarkView(.play, size: 21, colour: SessionGoingLine.green)
+                if planTiles {
+                    Button { planning = true } label: {
+                        GymActionTile(title: "Plan today") {
+                            ControlMarkView(.list, size: 21, colour: SessionGoingLine.green)
                         }
                     }
                     .buttonStyle(.plain)
-                    .accessibilityIdentifier("gym-repeat")
+                    .accessibilityIdentifier("gym-plan")
+                    // Same machines, same order as last time — a plan in one tap (since 1.7).
+                    if !repeatOrder.isEmpty {
+                        Button {
+                            library.changeGym { $0.setPlan(repeatOrder, on: day, gym: gymID) }
+                        } label: {
+                            GymActionTile(title: "Repeat last visit") {
+                                ControlMarkView(.play, size: 21, colour: SessionGoingLine.green)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("gym-repeat")
+                    }
+                }
+                if warmTile {
+                    Button { warming = true } label: {
+                        GymActionTile(title: "Warm up") {
+                            AppMarkView(.warmup, size: 21, colour: SessionGoingLine.green)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("gym-warmup-start")
                 }
             }
             .frame(height: GymScreen.headHeight)
         }
+        if let w = visit?.warmup, w.end != nil {
+            warmChip(w)
+        }
+    }
+
+    /// "Warm-up · 8 min · Treadmill" — what was done; tap to change minutes, speed and heart rate (since 2.0).
+    private func warmChip(_ w: VisitPart) -> some View {
+        var parts = ["Warm-up", "\(max(1, w.minutes)) min"]
+        switch w.kind {
+        case .cardio: if let n = w.machineID.flatMap({ library.gym.machine($0)?.name }) { parts.append(n) }
+        case .moves: parts.append("Moves")
+        default: parts.append("Walk or run")
+        }
+        let text = parts.joined(separator: " · ")
+        return Button { editingWarm = true } label: {
+            HStack(spacing: 8) {
+                AppMarkView(.warmup, size: 18, colour: SessionGoingLine.green)
+                Text(text)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(SessionGoingLine.green)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                ControlMarkView(.chevron, size: 12, colour: SessionGoingLine.green)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 32)
+            .background(SessionGoingLine.green.opacity(0.14), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(text)
+        .accessibilityIdentifier("gym-warmup-chip")
     }
 
     private func planRow(_ i: Int, _ m: Machine, plan: DayPlan, isNext: Bool) -> some View {
@@ -807,16 +903,24 @@ struct GymScreen: View {
 
     /// Finish this session, from the button at the bottom or End on the green line: with sets it is
     /// finished and Session done opens; with none it just ends and nothing is saved.
-    private func endSession() {
-        if let visit, visit.setCount > 0 { finish(visit) } else { library.changeGym { $0.leave() } }
+    private func endSession(stretch: Bool = false) {
+        if let visit, visit.setCount > 0 || visit.warmup != nil { finish(visit, stretch: stretch) } else { library.changeGym { $0.leave() } }
     }
 
-    private func finish(_ visit: GymVisit) {
+    /// Sets, or a warm-up: there is something to keep (since 2.0).
+    private var hasContent: Bool { (visit?.setCount ?? 0) > 0 || visit?.warmup != nil }
+
+    private func finish(_ visit: GymVisit, stretch: Bool = false) {
         let now = Date()
         beforeFinish = library.gym
         library.changeGym { $0.finish(visit: visit.id, at: now) }
-        Cues.shared.finished("Well done")
         GymNudge.sync(library.gym)
+        if stretch {
+            // Stretch now (since 2.0): the stretching opens full screen; Well done follows it.
+            stretchingVisit = StretchVisitRef(id: visit.id)
+            return
+        }
+        Cues.shared.finished("Well done")
         summary = library.gym.visits.first { $0.id == visit.id }
     }
 }
@@ -1028,149 +1132,6 @@ private struct DayPicker: View {
     }
 }
 
-/// Plan today: tap the machines in the order you want them. Nothing is kept until Save.
-private struct PlanSheet: View {
-    @Environment(Library.self) private var library
-    let machines: [Machine]
-    let gymID: UUID?
-    @State var order: [UUID]
-    let done: ([UUID]?) -> Void
-    @State private var namingTemplate = false
-    @State private var templateName = ""
-
-    private var templates: [PlanTemplate] { library.gym.templates(gym: gymID) }
-
-    var body: some View {
-        List {
-            if !templates.isEmpty {
-                Section {
-                    ForEach(templates) { t in
-                        // Deleting a template lives in Settings → Plan templates (since 1.14).
-                        HStack {
-                            Button {
-                                order = library.gym.order(of: t)
-                            } label: {
-                                HStack {
-                                    Text(t.name).foregroundStyle(Theme.ink)
-                                    Spacer()
-                                    let n = library.gym.order(of: t).count
-                                    Text(n == 1 ? "1 machine" : "\(n) machines")
-                                        .font(.subheadline).foregroundStyle(.secondary)
-                                }
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("plan-template-\(t.name)")
-                        }
-                    }
-                    .moveDisabled(true)
-                    .deleteDisabled(true)
-                } header: {
-                    Text("Use a template")
-                }
-            }
-            // Today's order with drag handles (1.9.3, his "adjust the plan — maybe with drag handles?").
-            if !order.isEmpty {
-                Section {
-                    ForEach(Array(order.enumerated()), id: \.element) { i, id in
-                        if let m = machines.first(where: { $0.id == id }) {
-                            HStack(spacing: 10) {
-                                Text("\(i + 1)")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(Gym.ink)
-                                    .frame(width: 26, height: 26)
-                                    .background(Gym.fill, in: Circle())
-                                MachinePhoto(name: m.photo, height: 36, icon: m.icon)
-                                    .frame(width: 36)
-                                Text(m.name).foregroundStyle(Theme.ink)
-                            }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("\(i + 1), \(m.name)")
-                            .accessibilityIdentifier("plan-order-\(i + 1)")
-                        }
-                    }
-                    .onMove { order.move(fromOffsets: $0, toOffset: $1) }
-                    .onDelete { order.remove(atOffsets: $0) }
-                } header: {
-                    Text("Today's order")
-                } footer: {
-                    Text("Drag the handles to change the order; the red minus takes a machine out.")
-                }
-                // Right under the order, so it is never hidden behind Cancel and Save (1.10).
-                Section {
-                    Button {
-                        templateName = ""
-                        namingTemplate = true
-                    } label: {
-                        Text("Save as template…")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Gym.ink)
-                            .frame(maxWidth: .infinity, minHeight: 36)
-                            .background(Gym.fill, in: RoundedRectangle(cornerRadius: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                    .accessibilityIdentifier("plan-save-template")
-                }
-            }
-            Section {
-                ForEach(machines) { m in
-                    let n = order.firstIndex(of: m.id).map { $0 + 1 }
-                    Button {
-                        if let i = order.firstIndex(of: m.id) { order.remove(at: i) } else { order.append(m.id) }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Text(n.map(String.init) ?? "")
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(Gym.ink)
-                                .frame(width: 26, height: 26)
-                                .background(n == nil ? AnyShapeStyle(Color.clear) : AnyShapeStyle(Gym.fill), in: Circle())
-                                .overlay(Circle().stroke(Gym.fill, lineWidth: n == nil ? 1.5 : 0))
-                            MachinePhoto(name: m.photo, height: 36, icon: m.icon)
-                                .frame(width: 36)
-                            Text(m.name).foregroundStyle(Theme.ink)
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("plan-machine-\(m.name)")
-                }
-                .moveDisabled(true)
-                .deleteDisabled(true)
-            } header: {
-                Text(order.isEmpty ? "Machines" : "Add or take out")
-            } footer: {
-                Text("Tap the machines in the order you want them; tap again to take one out. You can still use any machine at the gym.")
-            }
-            if !order.isEmpty {
-                Section {
-                    Button("Clear the plan", role: .destructive) { order = [] }
-                        .accessibilityIdentifier("plan-clear")
-                }
-            }
-        }
-        .alert("Save as template", isPresented: $namingTemplate) {
-            TextField("For example: Leg day", text: $templateName)
-            Button("Cancel", role: .cancel) {}
-                .accessibilityIdentifier("plan-template-cancel")
-            Button("Save") {
-                let name = templateName, o = order, g = gymID
-                library.changeGym { _ = $0.saveTemplate(named: name, order: o, gym: g) }
-            }
-            .accessibilityIdentifier("plan-template-name-save")
-        } message: {
-            Text("The same name in this gym is replaced.")
-        }
-        // Always in edit mode, so the handles show without an Edit button.
-        .environment(\.editMode, .constant(.active))
-        .navigationTitle("Plan today")
-        .navigationBarTitleDisplayMode(.inline)
-        .bottomActions(cancel: { done(nil) }, save: { done(order) }, tint: Gym.fill,
-                       cancelID: "plan-cancel", saveID: "plan-save")
-    }
-}
-
 /// A machine's photo with its name and how far it is today.
 private struct MachineTile: View {
     @Environment(Library.self) private var library
@@ -1337,231 +1298,6 @@ extension GymVisit {
     }
 }
 
-
-/// After Finish: what this session came to, and a title and notes for it.
-struct SummaryScreen: View {
-    @Environment(Library.self) private var library
-    let visitID: UUID
-    /// Undo Finish — tapped by mistake: the session goes on (since 1.14).
-    var undo: (() -> Void)? = nil
-    /// Discard session — throw it away after all (since 1.30, his ask); asks once more first.
-    var discard: (() -> Void)? = nil
-    let done: () -> Void
-    @State private var askingDiscard = false
-    @State private var title = ""
-    @State private var notes = ""
-    @State private var stretching: Workout?
-    @State private var namingTemplate = false
-    @State private var templateName = ""
-    @State private var savedTemplate: String?
-
-    /// The stretch list for after a session: the one chosen in Settings, else the app's own, made on first use.
-    private func stretch() {
-        if let w = library.workouts.first(where: { $0.id == library.gym.stretchID }) {
-            stretching = w
-            return
-        }
-        let w = Workout.afterGymStretch()
-        library.save(w)
-        library.changeGym { $0.stretchID = w.id }
-        stretching = w
-    }
-
-    var body: some View {
-        let visit = library.gym.visits.first { $0.id == visitID }
-        let bests = visit.map { library.gym.newBests(in: $0) } ?? []
-        List {
-            Section {
-                VStack(spacing: 8) {
-                    IconMark(.hand(bests.isEmpty ? "strength" : "trophy"), size: 56, colour: Gym.tint)
-                    Text("Well done")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(Theme.ink)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-            }
-            if let visit {
-                // Since 1.35 (his ask) Stretch now and Save as template come first, right under Well done;
-                // before, they were near the bottom, under the numbers and Against last visit.
-                if library.gym.stretchID != GymLog.noStretch {
-                    Section {
-                        Button(action: stretch) {
-                            HStack(spacing: 8) {
-                                IconMark(.hand("yoga"), size: 22, colour: Gym.tint)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text("Stretch now").fontWeight(.semibold).foregroundStyle(Gym.tint)
-                                    Text("Timer with voice cues in your AirPods").font(.caption).foregroundStyle(Theme.muted)
-                                }
-                                Spacer()
-                                ControlMarkView(.chevron, size: 14, colour: Gym.tint)
-                            }
-                        }
-                        .accessibilityIdentifier("gym-stretch")
-                        // The guide: how to do each stretch (since 1.30, his ask).
-                        NavigationLink {
-                            StretchGuideScreen(workout: library.workouts.first { $0.id == library.gym.stretchID }
-                                               ?? StretchRoutine.all[0].workout())
-                        } label: {
-                            HStack(spacing: 8) {
-                                AppMarkView(.template, size: 20, colour: Gym.tint)
-                                Text("How to do the stretches").foregroundStyle(Gym.tint)
-                            }
-                        }
-                        .accessibilityIdentifier("gym-stretch-guide")
-                    }
-                }
-                // Save as template — part of finishing since 1.30 (his ask; before: a tile on the gym screen's head).
-                let order = visit.templateOrder(in: library.gym)
-                if !order.isEmpty {
-                    Section {
-                        Button {
-                            templateName = ""
-                            namingTemplate = true
-                        } label: {
-                            HStack(spacing: 8) {
-                                if savedTemplate != nil {
-                                    ControlMarkView(.check, size: 20, colour: SessionGoingLine.green)
-                                } else {
-                                    AppMarkView(.template, size: 22, colour: Gym.tint)
-                                }
-                                Text(savedTemplate.map { "Saved as template · \($0)" } ?? "Save as template")
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(savedTemplate != nil ? SessionGoingLine.green : Gym.tint)
-                                    .lineLimit(1)
-                                Spacer()
-                                if savedTemplate == nil { ControlMarkView(.chevron, size: 14, colour: Gym.tint) }
-                            }
-                        }
-                        .disabled(savedTemplate != nil)
-                        .accessibilityIdentifier("gym-summary-template")
-                        .alert("Save as template", isPresented: $namingTemplate) {
-                            TextField("For example: Leg day", text: $templateName)
-                            Button("Cancel", role: .cancel) {}
-                            Button("Save") {
-                                let name = templateName.trimmingCharacters(in: .whitespacesAndNewlines)
-                                guard !name.isEmpty else { return }
-                                let g = visit.gymID
-                                library.changeGym { _ = $0.saveTemplate(named: name, order: order, gym: g) }
-                                savedTemplate = name
-                            }
-                            .accessibilityIdentifier("gym-summary-template-save")
-                        } message: {
-                            Text("This session's machines, in the order you used them. Use it later under Plan today. The same name in this gym is replaced.")
-                        }
-                    } footer: {
-                        Text("Keep this session's machines and order for another day.")
-                    }
-                }
-                // How the whole session felt (since 1.23): one tap, the same again takes it away.
-                Section {
-                    ChoicePills(options: Feel.allCases.map { ($0, $0.title, $0.rawValue) }, chosen: visit.feel,
-                                id: "gym-feel", fill: Gym.fill, ink: Gym.ink, tint: Gym.tint) { f in
-                        library.changeGym { $0.feel(visit: visitID, visit.feel == f ? nil : f) }
-                    }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-                } header: {
-                    Text("How did it feel?")
-                }
-                Section {
-                    TextField(visit.suggestedTitle(in: library.gym), text: $title)
-                        .font(.headline)
-                        .accessibilityIdentifier("gym-summary-title")
-                    TextField("Notes — how it went, what to remember", text: $notes, axis: .vertical)
-                        .lineLimit(2...6)
-                        .accessibilityIdentifier("gym-summary-notes")
-                } header: {
-                    Text("Title and notes")
-                }
-                Section {
-                    SessionPhotos(visitID: visit.id)
-                } header: {
-                    Text("Photos of this session")
-                }
-                Section {
-                    row("Machines", "\(visit.entries.count)", id: "gym-summary-machines")
-                    row("Sets", "\(visit.setCount)", id: "gym-summary-sets")
-                    if let minutes = visit.minutes {
-                        row("Time", "\(minutes) min", id: "gym-summary-time")
-                    }
-                    if visit.minutesOnMachines > 0 {
-                        row("On time machines", "\(visit.minutesOnMachines) min", id: "gym-summary-cardio")
-                    }
-                    if visit.totalKg > 0 {
-                        row("Lifted in all", "\(GymSet.number(visit.totalKg)) kg", id: "gym-summary-total")
-                    }
-                }
-                // Today against the visit before, at this gym (since 1.23).
-                let lines = library.gym.compare(visit)
-                if !lines.isEmpty, let before = library.gym.previous(of: visit) {
-                    Section("Against last visit · \(before.date.formatted(.dateTime.day().month(.abbreviated)))") {
-                        ForEach(lines) { line in
-                            HStack {
-                                Text(line.title)
-                                Spacer()
-                                Text(line.now).foregroundStyle(Theme.muted)
-                                Text(line.change)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(line.better == true ? SessionGoingLine.green : line.better == false ? Gym.busyTint : Theme.muted)
-                                    .frame(minWidth: 64, alignment: .trailing)
-                                    .accessibilityIdentifier("gym-compare-\(line.id)")
-                            }
-                        }
-                    }
-                }
-                if !bests.isEmpty {
-                    Section("New bests") {
-                        ForEach(bests, id: \.self) { id in
-                            let top = library.gym.top(id, in: visit)
-                            let isReps = library.gym.machine(id)?.logs == .reps
-                            HStack {
-                                IconMark(.hand("trophy"), size: 20, colour: Gym.tint)
-                                Text(library.gym.machine(id)?.name ?? "Machine")
-                                Spacer()
-                                Text(isReps ? "\(Int(top)) reps" : GymSet.weight(top)).foregroundStyle(Gym.tint).fontWeight(.semibold)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .navigationTitle("Session done")
-        .navigationBarTitleDisplayMode(.inline)
-        // Since 1.32 (his ask) Stretch now starts the guided timer with voice cues.
-        .fullScreenCover(item: $stretching) { w in
-            StretchTimerScreen(workout: w) { stretching = nil }
-                .environment(library)
-        }
-        .onAppear {
-            title = visit?.title ?? ""
-            notes = visit?.notes ?? ""
-        }
-        .bottomActions(cancel: undo.map { u in {
-            library.changeGym { $0.describe(visit: visitID, title: title, notes: notes) }
-            u()
-        } }, cancelTitle: "Undo Finish", save: {
-            library.changeGym { $0.describe(visit: visitID, title: title, notes: notes) }
-            done()
-        }, saveTitle: "Done", tint: Gym.fill, cancelID: "gym-summary-undo", saveID: "gym-summary-done",
-           discard: discard.map { _ in { askingDiscard = true } }, discardTitle: "Discard", discardID: "gym-summary-discard")
-        .alert("Discard this session?", isPresented: $askingDiscard) {
-            Button("Discard session", role: .destructive) { discard?() }
-                .accessibilityIdentifier("gym-summary-discard-confirm")
-            Button("Keep the session", role: .cancel) { }
-        } message: {
-            let n = library.gym.visits.first { $0.id == visitID }?.setCount ?? 0
-            Text("All \(n == 1 ? "1 set" : "\(n) sets") of this session are deleted, with its title, notes and photos. It will not show in Earlier visits or History. This cannot be undone.")
-        }
-    }
-
-    private func row(_ title: String, _ value: String, id: String) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Text(value).fontWeight(.semibold).accessibilityIdentifier(id)
-        }
-    }
-}
 
 extension GymLog {
     /// Made-up machines and visits for the screen tour (-gymdemo) — never real data.

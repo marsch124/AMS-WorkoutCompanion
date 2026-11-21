@@ -75,7 +75,9 @@ final class LookUITests: XCTestCase {
             XCTAssertEqual(tile.frame.height, gymButton.frame.height, accuracy: 1, id)
         }
         XCTAssertEqual(gymButton.frame.minX, app.buttons["gym-plan"].frame.minX, accuracy: 1)
-        XCTAssertEqual(gymButton.frame.maxX, app.buttons["gym-repeat"].frame.maxX, accuracy: 1)
+        // 2.0: the Warm up tile is the third tile of the row; the row still spans the gym button's width.
+        let last = app.buttons["gym-warmup-start"].exists ? app.buttons["gym-warmup-start"] : app.buttons["gym-repeat"]
+        XCTAssertEqual(gymButton.frame.maxX, last.frame.maxX, accuracy: 1)
         XCTAssertFalse(app.buttons["gym-repeat-template"].exists)
         let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); a.name = "130-head"; a.lifetime = .keepAlways; add(a)
     }

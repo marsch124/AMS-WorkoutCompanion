@@ -2,10 +2,12 @@ import Foundation
 
 /// Which sound plays when a rest ends (since 1.23).
 public enum RestSound: String, CaseIterable, Codable, Sendable {
-    case chime, bell, beep, none
+    /// A soft two-note rising chime (since 2.0), the rest-over sound for anyone who never chose one.
+    case soft, chime, bell, beep, none
 
     public var title: String {
         switch self {
+        case .soft: return "Soft chime"
         case .chime: return "Chime"
         case .bell: return "Bell"
         case .beep: return "Beep"
@@ -33,7 +35,7 @@ public struct SoundChoice: Codable, Equatable, Sendable {
     public var buzz: Buzz
     public var spokenCountdown: Bool
 
-    public init(restSound: RestSound = .chime, buzz: Buzz = .strong, spokenCountdown: Bool = true) {
+    public init(restSound: RestSound = .soft, buzz: Buzz = .strong, spokenCountdown: Bool = true) {
         self.restSound = restSound
         self.buzz = buzz
         self.spokenCountdown = spokenCountdown
@@ -43,7 +45,7 @@ public struct SoundChoice: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        restSound = (try? c.decodeIfPresent(RestSound.self, forKey: .restSound)) ?? .chime
+        restSound = (try? c.decodeIfPresent(RestSound.self, forKey: .restSound)) ?? .soft
         buzz = (try? c.decodeIfPresent(Buzz.self, forKey: .buzz)) ?? .strong
         spokenCountdown = (try? c.decodeIfPresent(Bool.self, forKey: .spokenCountdown)) ?? true
     }
@@ -59,13 +61,7 @@ public enum SpokenCue {
         case 1: return "One"
         default: break
         }
-        guard isWork else {
-            // A rest (since 1.35, his ask): twenty and ten seconds left, then three-two-one.
-            // Only when the rest is longer, so a short rest gets no cue right at its start.
-            if phaseLength > 20, secondsLeft == 20 { return "Twenty seconds left" }
-            if phaseLength > 10, secondsLeft == 10 { return "Ten seconds left" }
-            return nil
-        }
+        guard isWork else { return nil }
         if phaseLength >= 30, secondsLeft == 10 { return "Ten seconds" }
         if phaseLength >= 20, secondsLeft == phaseLength / 2 { return "Halfway" }
         return nil

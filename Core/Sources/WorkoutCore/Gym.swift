@@ -85,6 +85,8 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
     public var heavy: Bool?
     /// Superset partner (since 1.11): the machine done in turn with this one, with no rest in between.
     public var partner: UUID?
+    /// His own short how-to words, shown with the instruction picture (since 2.0).
+    public var howTo: String?
 
     public var isHeavy: Bool { heavy == true }
 
@@ -114,7 +116,7 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
         self.instructions = instructions
     }
 
-    enum CodingKeys: String, CodingKey { case id, gymID, name, photo, setting, logs, instructions, restSeconds, step, topReps, noLevel, noIncline, icon, muscle, heavy, partner }
+    enum CodingKeys: String, CodingKey { case id, gymID, name, photo, setting, logs, instructions, restSeconds, step, topReps, noLevel, noIncline, icon, muscle, heavy, partner, howTo }
 
     /// Files from before 1.4 have no gym, no `logs` and no instructions.
     public init(from decoder: Decoder) throws {
@@ -136,6 +138,7 @@ public struct Machine: Codable, Identifiable, Hashable, Sendable {
         muscle = (try? c.decodeIfPresent(String.self, forKey: .muscle)) ?? nil
         heavy = (try? c.decodeIfPresent(Bool.self, forKey: .heavy)) ?? nil
         partner = (try? c.decodeIfPresent(UUID.self, forKey: .partner)) ?? nil
+        howTo = (try? c.decodeIfPresent(String.self, forKey: .howTo)) ?? nil
     }
 }
 
@@ -278,6 +281,9 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
     public var photos: [String]?
     /// How the whole session felt, chosen after Finish (since 1.23).
     public var feel: Feel?
+    /// The warm-up before the machines and the stretching after them (since 2.0). See VisitPart.swift.
+    public var warmup: VisitPart?
+    public var stretching: VisitPart?
 
     public init(id: UUID = UUID(), gymID: UUID? = nil, date: Date, entries: [MachineEntry] = [],
                 started: Date? = nil, finished: Date? = nil) {
@@ -322,7 +328,9 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
         for set in entries.flatMap(\.sets) {
             if let at = set.at, let s = set.seconds, s > 0 { started = min(started, at.addingTimeInterval(-Double(s))) }
         }
-        let end: Date
+        // 2.0: a warm-up starts the visit earlier.
+        if let w = warmup?.start { started = min(started, w) }
+        var end: Date
         if let last = lastSetAt {
             if let finished, finished >= last, finished <= last.addingTimeInterval(Self.finishGrace) {
                 end = finished
@@ -330,9 +338,14 @@ public struct GymVisit: Codable, Identifiable, Hashable, Sendable {
                 end = last
             }
         } else {
-            guard let finished, finished.timeIntervalSince(started) <= Self.longestOldVisit else { return nil }
-            end = finished
+            if let finished, finished.timeIntervalSince(started) <= Self.longestOldVisit {
+                end = finished
+            } else if let w = warmup?.end ?? stretching?.end {
+                end = w   // 2.0: a warm-up (or stretch) with no set yet
+            } else { return nil }
         }
+        // 2.0: stretching after the machines ends the visit later.
+        if let s = stretching?.end { end = max(end, s) }
         // Never shorter than the minutes on time machines (sets typed in afterwards).
         return max(1, Int(end.timeIntervalSince(started) / 60), minutesOnMachines)
     }
@@ -476,6 +489,8 @@ public struct GymLog: Codable, Equatable, Sendable {
     public var nudgeDays: Int?
     /// The exercise list offered as the stretch after a session (since 1.23).
     public var stretchID: UUID?
+    /// His stretches and warm-up choices: ticks, order, hold times, favourites, own stretches (since 2.0).
+    public var stretchBook: StretchBook?
 
     public init(machines: [Machine] = [], visits: [GymVisit] = [], busyMarks: [BusyMark] = [],
                 gyms: [GymPlace] = [], currentGymID: UUID? = nil, plans: [DayPlan] = [], homeIcon: String? = nil,
@@ -515,7 +530,7 @@ public struct GymLog: Codable, Equatable, Sendable {
     /// Opening the gym screen starts the session's clock (since 1.20, his ask) — unless a session is already
     /// going or one was finished today (a second session still starts with its first set). Saves no visit.
     public mutating func arrive(gym: UUID?, at now: Date = Date(), calendar: Calendar = .current) {
-        if openVisit(on: now, gym: gym, calendar: calendar).map({ $0.setCount > 0 }) == true { return }
+        if openVisit(on: now, gym: gym, calendar: calendar).map({ $0.setCount > 0 || $0.warmup != nil }) == true { return }
         if visits(on: now, gym: gym, calendar: calendar).contains(where: { $0.finished != nil && $0.setCount > 0 }) { return }
         if let a = arrived, a.gymID == gym, calendar.isDate(a.at, inSameDayAs: now) { return }
         arrived = Arrival(gymID: gym, at: now)
@@ -526,8 +541,11 @@ public struct GymLog: Codable, Equatable, Sendable {
 
     /// When the session going on this day at this gym began: its visit's start, or when the gym screen opened.
     public func sessionStart(on day: Date, gym: UUID?, calendar: Calendar = .current) -> Date? {
-        if let v = openVisit(on: day, gym: gym, calendar: calendar), v.setCount > 0 {
-            return v.started ?? v.entries.flatMap(\.sets).compactMap(\.at).min()
+        if let v = openVisit(on: day, gym: gym, calendar: calendar), v.setCount > 0 || v.warmup != nil {
+            // 2.0: the warm-up starts the clock.
+            let first = v.started ?? v.entries.flatMap(\.sets).compactMap(\.at).min()
+            guard let w = v.warmup?.start else { return first }
+            return first.map { min($0, w) } ?? w
         }
         if let a = arrived, a.gymID == gym, calendar.isDate(a.at, inSameDayAs: day) { return a.at }
         return nil
@@ -811,6 +829,7 @@ public struct GymLog: Codable, Equatable, Sendable {
     public mutating func undoFinish(visit visitID: UUID, before: GymLog) {
         guard var v = visits.first(where: { $0.id == visitID }) else { return }
         v.finished = before.visits.first { $0.id == visitID }?.finished
+        v.stretching = before.visits.first { $0.id == visitID }?.stretching   // 2.0: Undo Finish also clears the stretching
         put(v)
         busyMarks = before.busyMarks
         plans = before.plans
@@ -884,7 +903,8 @@ public struct GymLog: Codable, Equatable, Sendable {
             v.entries[e].sets[index] = set
         } else { v.entries[e].sets.remove(at: index) }
         if v.entries[e].sets.isEmpty { v.entries.remove(at: e) }
-        if v.entries.isEmpty { visits.removeAll { $0.id == visitID } } else { put(v) }
+        // 2.0: a visit that holds a warm-up stays, even with no set yet.
+        if v.entries.isEmpty && v.warmup == nil { visits.removeAll { $0.id == visitID } } else { put(v) }
     }
 
     public mutating func put(_ visit: GymVisit) {
@@ -902,7 +922,7 @@ public struct GymLog: Codable, Equatable, Sendable {
     public mutating func delete(machine id: UUID) {
         machines.removeAll { $0.id == id }
         for i in visits.indices { visits[i].entries.removeAll { $0.machineID == id } }
-        visits.removeAll { $0.entries.isEmpty }
+        visits.removeAll { $0.entries.isEmpty && $0.warmup == nil }
         busyMarks.removeAll { $0.machineID == id }
         for i in machines.indices where machines[i].partner == id { machines[i].partner = nil }
         for i in templates.indices { templates[i].order.removeAll { $0 == id } }
@@ -1057,12 +1077,13 @@ public struct GymLog: Codable, Equatable, Sendable {
               v.entries[e].sets.indices.contains(index) else { return }
         if let set { v.entries[e].sets[index] = set } else { v.entries[e].sets.remove(at: index) }
         if v.entries[e].sets.isEmpty { v.entries.remove(at: e) }
-        if v.entries.isEmpty { visits.removeAll { $0.id == visitID } } else { put(v) }
+        // 2.0: a visit that holds a warm-up stays, even with no set yet.
+        if v.entries.isEmpty && v.warmup == nil { visits.removeAll { $0.id == visitID } } else { put(v) }
     }
 
     public var photosInUse: Set<String> {
         Set(machines.compactMap(\.photo) + machines.compactMap(\.instructions) + visits.flatMap { $0.photos ?? [] }
-            + gyms.compactMap(\.photo))
+            + gyms.compactMap(\.photo) + (stretchBook?.custom.compactMap(\.photo) ?? []))
     }
 
     /// Adds a photo of the session (since 1.13).
@@ -1102,6 +1123,7 @@ public enum GymFile {
         var carried: [Carry]?
         var nudgeDays: Int?
         var stretch: UUID?
+        var book: StretchBook?
     }
 
     public static func encode(_ log: GymLog) throws -> Data {
@@ -1114,7 +1136,7 @@ public enum GymFile {
                                         muscles: log.muscles, templates: log.templates, rests: log.rests,
                                         arrived: log.arrived,
                                         carried: log.carried.isEmpty ? nil : log.carried,
-                                        nudgeDays: log.nudgeDays, stretch: log.stretchID))
+                                        nudgeDays: log.nudgeDays, stretch: log.stretchID, book: log.stretchBook))
     }
 
     public static func decode(_ data: Data) throws -> GymLog {
@@ -1129,6 +1151,7 @@ public enum GymFile {
         log.carried = e.carried ?? []
         log.nudgeDays = e.nudgeDays
         log.stretchID = e.stretch
+        log.stretchBook = e.book
         log.ensureGym()
         return log
     }

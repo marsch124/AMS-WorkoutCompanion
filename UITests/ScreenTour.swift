@@ -140,7 +140,6 @@ final class ScreenTour: XCTestCase {
         goBack()
         app.buttons["gym-finish"].tap()
         app.confirmEnd()
-        app.scrollTo(app.staticTexts["gym-summary-sets"])
         XCTAssertTrue(app.staticTexts["gym-summary-sets"].waitForExistence(timeout: 5))
         snap("14 Summary")
         app.buttons["gym-summary-done"].tap()

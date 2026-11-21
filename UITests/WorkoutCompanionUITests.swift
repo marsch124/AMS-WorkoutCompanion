@@ -108,9 +108,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("1.35 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("2.1 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-1.35"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-2.1"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -181,8 +181,11 @@ final class WorkoutCompanionUITests: XCTestCase {
         waitFor(app.buttons["gym-finish"], label: "Finish this session")
         app.buttons["gym-finish"].tap()
         app.confirmEnd()
-        app.scrollTo(app.staticTexts["gym-summary-sets"])
-        waitFor(app.staticTexts["gym-summary-sets"], label: "2")
+        // 2.0: the trophy, time bar and week tile sit above the numbers — scroll down to them.
+        let sets = app.staticTexts["gym-summary-sets"]
+        _ = app.descendants(matching: .any)["done-trophy"].firstMatch.waitForExistence(timeout: 5)
+        app.reveal(sets)
+        waitFor(sets, label: "2")
         waitFor(app.staticTexts["gym-summary-machines"], label: "1")
         app.buttons["gym-summary-done"].tap()
         XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
@@ -204,9 +207,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.confirmEnd()
 
         let add = any("session-photo-add")
-        // Since 1.35 Stretch now and Save as template come first, so the photos sit lower.
-        app.scrollTo(add)
-        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        // 2.0: the trophy, time bar and week tile sit above the photos now — scroll down to them.
+        _ = any("done-trophy").waitForExistence(timeout: 5)
+        app.reveal(add)
         add.tap()
         add.tap()
         XCTAssertTrue(any("session-photo-2").waitForExistence(timeout: 5))
@@ -563,7 +566,8 @@ final class WorkoutCompanionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["machine-Push-ups"].waitForExistence(timeout: 5))
         app.buttons["gym-finish"].tap()
         app.confirmEnd()
-        app.scrollTo(app.staticTexts["gym-summary-sets"])
+        _ = app.descendants(matching: .any)["done-trophy"].firstMatch.waitForExistence(timeout: 5)
+        app.reveal(app.staticTexts["gym-summary-sets"])
         waitFor(app.staticTexts["gym-summary-sets"], label: "1")
         XCTAssertFalse(app.staticTexts["gym-summary-total"].exists)
     }

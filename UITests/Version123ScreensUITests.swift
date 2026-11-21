@@ -48,11 +48,8 @@ final class Version123ScreensUITests: XCTestCase {
         let row = app.buttons["settings-gym-extras"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         row.tap()
-        let days = any("extras-days-value")
-        XCTAssertTrue(days.waitForExistence(timeout: 5))
-        // Waits for the words instead of reading them once (failed once on GitHub, 18 Nov 2026).
-        let four = expectation(for: NSPredicate(format: "label CONTAINS %@", "4 days"), evaluatedWith: days)
-        XCTAssertEqual(XCTWaiter.wait(for: [four], timeout: 5), .completed, days.label)
+        XCTAssertTrue(any("extras-days-value").waitForExistence(timeout: 5))
+        XCTAssertTrue(any("extras-days-value").label.contains("4 days"))
         picture("123-extras")
         app.buttons["extras-save"].tap()
         XCTAssertTrue(row.waitForExistence(timeout: 5))
@@ -81,12 +78,10 @@ final class Version123ScreensUITests: XCTestCase {
         let good = app.buttons["gym-feel-good"]
         XCTAssertTrue(good.waitForExistence(timeout: 5))
         good.tap()
-        // Since 1.35 Stretch now is at the top, the comparison further down.
-        XCTAssertTrue(app.buttons["gym-stretch"].exists)
-        XCTAssertLessThan(app.buttons["gym-stretch"].frame.minY, good.frame.minY, "Stretch now above How did it feel")
         picture("123-session-done")
-        app.scrollTo(any("gym-compare-sets"))
+        app.swipeUp()
         XCTAssertTrue(any("gym-compare-sets").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["gym-stretch"].waitForExistence(timeout: 5))
         picture("123-session-done-lower")
         app.buttons["gym-summary-done"].tap()
 

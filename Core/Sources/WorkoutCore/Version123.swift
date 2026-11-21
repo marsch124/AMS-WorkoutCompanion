@@ -200,7 +200,15 @@ extension GymLog {
     /// The session clock on this day at this gym: seconds, and whether it stands still.
     public func sessionClock(on day: Date, gym: UUID?, now: Date, calendar: Calendar = .current) -> (seconds: Int, paused: Bool)? {
         guard let start = sessionStart(on: day, gym: gym, calendar: calendar) else { return nil }
-        let sets = openVisit(on: day, gym: gym, calendar: calendar)?.entries.flatMap(\.sets) ?? []
+        let visit = openVisit(on: day, gym: gym, calendar: calendar)
+        let sets = visit?.entries.flatMap(\.sets) ?? []
+        // 2.0: the warm-up counts in full (a long walk to the gym is not "idle"); the 20-minute rule starts after it.
+        if let w = visit?.warmup, w.start <= start {
+            guard let wend = w.end else { return (max(0, Int(now.timeIntervalSince(start))), false) }
+            if now <= wend { return (max(0, Int(now.timeIntervalSince(start))), false) }
+            let a = GymVisit.active(start: wend, sets: sets, now: now)
+            return (Int(wend.timeIntervalSince(start)) + a.seconds, a.paused)
+        }
         return GymVisit.active(start: start, sets: sets, now: now)
     }
 

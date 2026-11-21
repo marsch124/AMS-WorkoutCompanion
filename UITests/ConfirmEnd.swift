@@ -7,15 +7,19 @@ extension XCUIApplication {
         XCTAssertTrue(box.waitForExistence(timeout: 5), "the End this session? box shows", file: file, line: line)
         box.buttons["End session"].firstMatch.tap()
     }
+}
 
-    /// Scrolls down until the element is there (at most four swipes). Since 1.35 the Session done
-    /// page starts with Stretch now and Save as template, so the numbers sit lower.
-    func scrollTo(_ e: XCUIElement, timeout: TimeInterval = 5) {
-        _ = descendants(matching: .any)["gym-summary-done"].firstMatch.waitForExistence(timeout: timeout)
-        var swipes = 0
-        while !e.exists && swipes < 4 {
-            swipeUp()
-            swipes += 1
+extension XCUIApplication {
+    /// 2.0: scroll in small steps until the element sits clear of the bottom button bar
+    /// (a big swipe overshoots in a List, and a row under the bar is "hittable" but the tap lands on the bar).
+    func reveal(_ e: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let bottom = frame.maxY - 150
+        for _ in 0..<14 {
+            if e.exists, e.isHittable, e.frame.maxY < bottom, e.frame.minY > 90 { return }
+            let from = coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.68))
+            let to = coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: e.exists && e.frame.minY <= 90 ? 0.85 : 0.48))
+            from.press(forDuration: 0.05, thenDragTo: to)
         }
+        XCTAssertTrue(e.exists, "\(e) shows", file: file, line: line)
     }
 }

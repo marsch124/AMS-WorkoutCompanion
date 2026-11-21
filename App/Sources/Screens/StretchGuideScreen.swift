@@ -15,9 +15,45 @@ struct StretchChoiceRow: View {
 }
 
 /// How to do each stretch of a list, step by step (since 1.30, his ask: a guide for the after-gym stretch).
-/// Stretches the app knows get their steps, where you feel it and what to watch; his own just their note.
+/// Since 2.0 each stretch has its drawn figure on top, and the whole library has a guide too
+/// (`StretchGuideScreen(libraryIDs:)`). Stretches the app knows get their steps, where you feel it and
+/// what to watch; his own just their note.
 struct StretchGuideScreen: View {
-    let workout: Workout
+    struct Entry: Identifiable {
+        let id: Int
+        let name: String
+        let amount: String
+        let figure: String?
+        let note: String
+        let steps: [String]
+        let feel: String?
+        let careful: String?
+    }
+
+    let title: String
+    let entries: [Entry]
+
+    init(workout: Workout) {
+        title = workout.name.isEmpty ? "Stretch guide" : workout.name
+        entries = workout.exercises.enumerated().map { i, e in
+            let move = StretchRoutine.move(named: e.name)
+            let lib = StretchLibrary.alias(for: e.name)
+            return Entry(id: i, name: e.name, amount: e.amount, figure: lib, note: e.note,
+                         steps: move?.steps ?? [], feel: move?.feel, careful: move?.careful)
+        }
+    }
+
+    /// The guide for library stretches and warm-up moves (all of them when no ids are given).
+    init(libraryIDs: [String]? = nil, title: String = "Stretch guide") {
+        self.title = title
+        let items = libraryIDs.map { ids in ids.compactMap(StretchLibrary.item) } ?? StretchLibrary.all
+        entries = items.enumerated().map { i, item in
+            let g = StretchLibrary.guide(item.id)
+            return Entry(id: i, name: item.name, amount: "\(item.seconds) s" + (item.sides == 2 ? " each side" : ""),
+                         figure: item.id, note: g?.note ?? "", steps: g?.steps ?? [], feel: g?.feel, careful: g?.careful)
+        }
+    }
+
     var body: some View {
         List {
             Section {
@@ -25,12 +61,16 @@ struct StretchGuideScreen: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
             }
-            ForEach(Array(workout.exercises.enumerated()), id: \.element.id) { i, e in
-                let move = StretchRoutine.move(named: e.name)
+            ForEach(entries) { e in
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
+                        if let fig = e.figure {
+                            FigureView(id: fig, size: 120)
+                                .frame(maxWidth: .infinity)
+                                .accessibilityIdentifier("stretch-guide-figure-\(e.id + 1)")
+                        }
                         HStack(alignment: .firstTextBaseline) {
-                            Text("\(i + 1)")
+                            Text("\(e.id + 1)")
                                 .font(.subheadline.weight(.bold))
                                 .foregroundStyle(Gym.ink)
                                 .frame(width: 24, height: 24)
@@ -41,29 +81,29 @@ struct StretchGuideScreen: View {
                                 Text(e.amount).font(.subheadline.weight(.semibold)).foregroundStyle(Gym.tint)
                             }
                         }
-                        if let move {
-                            ForEach(Array(move.steps.enumerated()), id: \.offset) { n, step in
+                        if !e.steps.isEmpty {
+                            ForEach(Array(e.steps.enumerated()), id: \.offset) { n, step in
                                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                                     Text("\(n + 1).").font(.subheadline.weight(.semibold)).foregroundStyle(Gym.tint)
                                         .frame(width: 18, alignment: .trailing)
                                     Text(step).font(.subheadline)
                                 }
                             }
-                            guideLine("Where you feel it", move.feel, colour: SessionGoingLine.green)
-                            guideLine("Careful", move.careful, colour: Gym.busyTint)
+                            if let feel = e.feel { guideLine("Where you feel it", feel, colour: SessionGoingLine.green) }
+                            if let careful = e.careful { guideLine("Careful", careful, colour: Gym.busyTint) }
                         } else if !e.note.isEmpty {
                             Text(e.note).font(.subheadline)
                         }
                     }
                     .padding(.vertical, 4)
                     .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("stretch-guide-\(i + 1)")
+                    .accessibilityIdentifier("stretch-guide-\(e.id + 1)")
                 }
             }
         }
         .scrollContentBackground(.hidden)
         .background(Theme.bg.ignoresSafeArea())
-        .navigationTitle(workout.name.isEmpty ? "Stretch guide" : workout.name)
+        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
     }
 
