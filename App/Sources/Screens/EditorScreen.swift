@@ -11,6 +11,7 @@ struct EditorScreen: View {
     let onDone: () -> Void
     @State private var askDelete = false
     @State private var needsName = false
+    @State private var needsSteps = false
     @State private var mine = IntervalPreset.mine()
     @State private var askPresetName = false
     @State private var presetName = ""
@@ -52,6 +53,7 @@ struct EditorScreen: View {
                     Text("Sets").tag(WorkoutKind.reps)
                     Text("List").tag(WorkoutKind.checklist)
                     Text("Intervals").tag(WorkoutKind.intervals)
+                    Text("Tailored").tag(WorkoutKind.tailored)
                 }
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("editor-kind")
@@ -77,6 +79,8 @@ struct EditorScreen: View {
                 } footer: {
                     Text("Total \(Clock.text(draft.intervalTotal)), after a 5-second get ready.")
                 }
+            case .tailored:
+                stepsSection
             case .checklist:
                 ForEach($draft.exercises) { $exercise in
                     let n = (draft.exercises.firstIndex { $0.id == exercise.id } ?? 0) + 1
@@ -107,6 +111,8 @@ struct EditorScreen: View {
                 }
             }
         }
+        // The steps of a Tailored workout show their ≡ grip and red minus all the time: drag and drop, no arrows.
+        .environment(\.editMode, .constant(draft.kind == .tailored ? .active : .inactive))
         .scrollContentBackground(.hidden)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle(isNew ? draft.kind.title : "Edit workout")
@@ -114,6 +120,7 @@ struct EditorScreen: View {
         .bottomActions(cancel: onDone, save: {
             // Never a grey, disabled Save: it says what is missing instead.
             guard canSave else { needsName = true; return }
+            if draft.kind == .tailored, draft.steps.isEmpty { needsSteps = true; return }
             library.save(draft)
             onDone()
         }, cancelID: "editor-cancel", saveID: "editor-save")
@@ -121,6 +128,43 @@ struct EditorScreen: View {
             Button("Delete", role: .destructive) {
                 library.delete(draft)
                 onDone()
+            }
+        }
+    }
+
+    /// The steps of a Tailored intervals workout (since 2.3): his word, the length, − and +; the ≡ grip
+    /// drags a line, the red minus removes it.
+    @ViewBuilder private var stepsSection: some View {
+        Section {
+            ForEach($draft.steps) { $step in
+                StepRow(step: $step, number: (draft.steps.firstIndex { $0.id == step.id } ?? 0) + 1)
+            }
+            .onMove { draft.steps.move(fromOffsets: $0, toOffset: $1) }
+            .onDelete { draft.steps.remove(atOffsets: $0) }
+            if draft.steps.count < IntervalStep.most {
+                Button {
+                    needsSteps = false
+                    withAnimation { draft.steps.append(draft.nextStep()) }
+                } label: {
+                    MarkLabel(title: "Add step", mark: .addCircle, colour: Theme.accent)
+                        .font(.body.weight(.semibold))
+                }
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("editor-add-step")
+            }
+            if needsSteps {
+                Text("Add a step first.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.problem)
+                    .accessibilityIdentifier("editor-steps-needed")
+            }
+        } header: {
+            Text("Steps")
+        } footer: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Total \(Clock.text(draft.tailoredTotal)), after a 5-second get ready.")
+                    .accessibilityIdentifier("editor-steps-total")
+                Text("Tap a time to choose a length; − and + change it in small steps. Hold ≡ and drag to put the steps in order. The red minus removes a step.")
             }
         }
     }
@@ -192,6 +236,7 @@ struct EditorScreen: View {
         case .reps: return "For example: Push-ups"
         case .checklist: return "For example: Knee exercises"
         case .intervals: return "For example: Tabata"
+        case .tailored: return "For example: Jog and walk"
         }
     }
 
@@ -253,6 +298,41 @@ private struct NumberRow: View {
             }
         }
         .accessibilityIdentifier(id)
+    }
+}
+
+/// One step of a Tailored intervals workout: his word for it, its length (a tap offers ready lengths), − and +.
+private struct StepRow: View {
+    @Binding var step: IntervalStep
+    let number: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            TextField("Step \(number)", text: $step.name)
+                .font(.body.weight(.semibold))
+                .accessibilityIdentifier("step-name-\(number)")
+            Menu {
+                ForEach(IntervalStep.lengths, id: \.self) { s in
+                    Button(Clock.text(s)) { step.seconds = s }
+                }
+            } label: {
+                Text(Clock.text(step.seconds))
+                    .font(.system(.body, design: .rounded, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Theme.accent.opacity(0.14), in: Capsule())
+            }
+            .accessibilityIdentifier("step-time-\(number)")
+            Stepper("Length of step \(number)") {
+                step.seconds = IntervalStep.stepped(step.seconds, up: true)
+            } onDecrement: {
+                step.seconds = IntervalStep.stepped(step.seconds, up: false)
+            }
+            .labelsHidden()
+            .accessibilityIdentifier("step-stepper-\(number)")
+        }
     }
 }
 

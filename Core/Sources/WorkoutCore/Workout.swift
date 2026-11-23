@@ -1,6 +1,6 @@
 import Foundation
 
-/// The three kinds of workout the app runs.
+/// The four kinds of workout the app runs.
 public enum WorkoutKind: String, Codable, CaseIterable, Sendable {
     /// Sets of one exercise with a rest between them — push-ups 5 × 20.
     case reps
@@ -8,12 +8,15 @@ public enum WorkoutKind: String, Codable, CaseIterable, Sendable {
     case checklist
     /// Work and rest rounds against the clock.
     case intervals
+    /// A free list of steps, each with its own name and length — jog 1:00, walk 1:00, jog 2:00 … (since 2.3).
+    case tailored
 
     public var title: String {
         switch self {
         case .reps: return "Sets & reps"
         case .checklist: return "Exercise list"
         case .intervals: return "Interval timer"
+        case .tailored: return "Tailored intervals"
         }
     }
 
@@ -22,6 +25,7 @@ public enum WorkoutKind: String, Codable, CaseIterable, Sendable {
         case .reps: return "One exercise in sets, with a rest timer between them."
         case .checklist: return "Exercises with a note and a photo, ticked off one by one."
         case .intervals: return "Work and rest rounds, called out loud."
+        case .tailored: return "Your own steps, each with its own name and length."
         }
     }
 
@@ -31,6 +35,7 @@ public enum WorkoutKind: String, Codable, CaseIterable, Sendable {
         case .reps: return "kettlebell"
         case .checklist: return "yoga"
         case .intervals: return "stopwatch"
+        case .tailored: return "run"
         }
     }
 
@@ -40,6 +45,7 @@ public enum WorkoutKind: String, Codable, CaseIterable, Sendable {
         case .reps: return "orange"
         case .checklist: return "pink"
         case .intervals: return "green"
+        case .tailored: return "violet"
         }
     }
 }
@@ -92,12 +98,14 @@ public struct Workout: Codable, Identifiable, Hashable, Sendable {
     public var offSeconds: Int
     // Exercise list
     public var exercises: [Exercise]
+    // Tailored intervals (since 2.3)
+    public var steps: [IntervalStep]
 
     public init(
         id: UUID = UUID(), name: String = "", kind: WorkoutKind, colour: String? = nil,
         sets: Int = 5, reps: Int = 10, restSeconds: Int = 90,
         rounds: Int = 8, workSeconds: Int = 40, offSeconds: Int = 20,
-        exercises: [Exercise] = [], icon: String? = nil
+        exercises: [Exercise] = [], steps: [IntervalStep] = [], icon: String? = nil
     ) {
         self.icon = icon
         self.id = id
@@ -111,6 +119,7 @@ public struct Workout: Codable, Identifiable, Hashable, Sendable {
         self.workSeconds = workSeconds
         self.offSeconds = offSeconds
         self.exercises = exercises
+        self.steps = steps
     }
 
     public init(from decoder: Decoder) throws {
@@ -128,6 +137,7 @@ public struct Workout: Codable, Identifiable, Hashable, Sendable {
             workSeconds: try c.decodeIfPresent(Int.self, forKey: .workSeconds) ?? 40,
             offSeconds: try c.decodeIfPresent(Int.self, forKey: .offSeconds) ?? 20,
             exercises: try c.decodeIfPresent([Exercise].self, forKey: .exercises) ?? [],
+            steps: try c.decodeIfPresent([IntervalStep].self, forKey: .steps) ?? [],
             icon: try c.decodeIfPresent(String.self, forKey: .icon)
         )
     }
@@ -146,6 +156,12 @@ public struct Workout: Codable, Identifiable, Hashable, Sendable {
         case .intervals:
             let off = offSeconds > 0 ? " / \(Clock.text(offSeconds)) rest" : ""
             return "\(rounds) × \(Clock.text(workSeconds)) work\(off) · \(Clock.text(intervalTotal))"
+        case .tailored:
+            switch steps.count {
+            case 0: return "No steps yet"
+            case 1: return "1 step · \(Clock.text(tailoredTotal))"
+            default: return "\(steps.count) steps · \(Clock.text(tailoredTotal))"
+            }
         case .checklist:
             switch exercises.count {
             case 0: return "No exercises yet"

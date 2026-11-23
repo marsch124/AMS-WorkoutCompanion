@@ -45,6 +45,10 @@ public struct SessionRecord: Codable, Identifiable, Hashable, Sendable {
             let n = phasesDone.filter { if case .work = $0 { return true } else { return false } }.count
             guard n > 0 else { return nil }
             detail = "\(n) of \(w.rounds) rounds"
+        case .tailored:
+            let n = phasesDone.filter { if case .step = $0 { return true } else { return false } }.count
+            guard n > 0 else { return nil }
+            detail = "\(n) of \(w.steps.count) steps"
         case .checklist:
             return nil
         }

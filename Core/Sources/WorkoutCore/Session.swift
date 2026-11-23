@@ -12,11 +12,13 @@ public enum Phase: Equatable, Sendable {
     case work(seconds: Int, round: Int, of: Int)
     /// Rest between rounds.
     case off(seconds: Int, nextRound: Int, of: Int)
+    /// A step of a Tailored intervals workout, with his own word for it (since 2.3).
+    case step(seconds: Int, name: String, number: Int, of: Int)
 
     /// Length of a timed phase; nil for a set.
     public var seconds: Int? {
         switch self {
-        case .getReady(let s), .rest(let s, _, _), .work(let s, _, _), .off(let s, _, _): return s
+        case .getReady(let s), .rest(let s, _, _), .work(let s, _, _), .off(let s, _, _), .step(let s, _, _, _): return s
         case .set: return nil
         }
     }
@@ -25,7 +27,7 @@ public enum Phase: Equatable, Sendable {
     public var isRest: Bool {
         switch self {
         case .rest, .off, .getReady: return true
-        case .set, .work: return false
+        case .set, .work, .step: return false
         }
     }
 }
@@ -53,6 +55,12 @@ public enum Plan {
                 if r < rounds, w.offSeconds > 0 {
                     out.append(.off(seconds: w.offSeconds, nextRound: r + 1, of: rounds))
                 }
+            }
+        case .tailored:
+            guard !w.steps.isEmpty else { break }
+            out.append(.getReady(seconds: getReadySeconds))
+            for (i, step) in w.steps.enumerated() {
+                out.append(.step(seconds: max(1, step.seconds), name: w.stepName(at: i), number: i + 1, of: w.steps.count))
             }
         case .checklist:
             break

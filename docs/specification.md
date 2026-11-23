@@ -8,6 +8,7 @@ Version 2.0. iPhone only, portrait, iOS 17+, light and dark. The name under the 
 - Tap the tile: the workout starts (full screen). Pencil: the editor. Touch and hold: Edit, Duplicate, Delete (Delete asks first). + (top right) also makes a new workout.
 - History is its own tab (no longer a card among the workouts). Settings is a tab: no Done button, and the gear at the top left is gone.
 - A fresh install has three starters: Push-ups (Sets & reps, 5 × 20, rest 1:30, orange), Intervals (8 × 0:40 work / 0:20 rest, green), Doctor's exercises (Exercise list, empty, pink).
+- Since 2.3 there is a fourth kind, Tailored intervals; its summary is `10 steps · 18:00` (`1 step · 1:00`, `No steps yet`). The fresh-install starters are unchanged (still three). See Version 2.3.
 - Summaries: `5 × 20 · rest 1:30`; `8 × 0:40 work / 0:20 rest · 7:40`; `No exercises yet` / `1 exercise` / `4 exercises`.
 
 ## At the gym (since 1.2)
@@ -78,8 +79,8 @@ Version 2.0. iPhone only, portrait, iOS 17+, light and dark. The name under the 
 - Apple Health is not used (the owner logs on a Garmin watch, which syncs to Health).
 
 ## New workout and editor
-- New workout: three cards — Sets & reps, Exercise list, Interval timer — then the editor. Cancel on both.
-- Editor: Name, Colour (the fifteen AMS-Icons colours, two rows of eight), Type (Sets / List / Intervals). Cancel and Save; Save is a full-colour pill and without a name it says "Give it a name first." instead of being greyed out. Nothing is kept before Save.
+- New workout: three cards — Sets & reps, Exercise list, Interval timer — then the editor. Cancel on both. Since 2.3 there are four cards: Tailored intervals (`new-tailored`) is added, and it opens the editor with the example steps filled in (see Version 2.3).
+- Editor: Name, Colour (the fifteen AMS-Icons colours, two rows of eight), Type (Sets / List / Intervals). Since 2.3 the Type switch has a fourth entry, Tailored (Sets / List / Intervals / Tailored). Cancel and Save; Save is a full-colour pill and without a name it says "Give it a name first." instead of being greyed out. Nothing is kept before Save.
 - Sets & reps: Sets 1–50, Reps per set 1–500, Rest 0–10:00 in 15 s steps (0 = None).
 - Interval timer: Rounds 1–99, Work 0:05–15:00 and Rest 0:00–15:00 in 5 s steps; the total is shown.
 - Exercise list: per exercise Name, Amount (free text), Note, Photo (from Photos, stored scaled to 1600 px). ••• moves it up, down, or removes it. Add exercise adds one.
@@ -93,6 +94,8 @@ Version 2.0. iPhone only, portrait, iOS 17+, light and dark. The name under the 
 ## Running an Interval timer
 - 5-second Get ready, then Work and Rest rounds; the ring shows the time left (work in the workout's colour, rest grey). Pause/Resume and Skip rest (during rest; "Skip" otherwise). Ends with Well done.
 - The clock is kept as end times, so a late tick never loses time.
+
+Since 2.3 a Tailored intervals workout runs on the same screen with one phase per step (see Version 2.3).
 
 ## Running an Exercise list
 - A card per exercise: photo (tap to enlarge), number, name, amount pill, note, a tick circle. Tapping ticks it off and scrolls to the next one. "n of N done" and a bar at the top. All ticked: Well done and Close.
@@ -524,3 +527,53 @@ Version 2.2 (build 1). Data envelopes unchanged; no new stored fields. Both chan
 - `Version123SoundTests`: two lines changed to expect the new rest words.
 - UI: see the scroll changes above (`app.reveal`); `Version123ScreensUITests` order check.
 - **Texts.** What's new (2.2) and How it works (Two sessions in a day, Stretching, Plan templates, Sets & reps, Interval timers, Sounds and words, Rest voice) updated.
+
+## Version 2.3 — Tailored intervals (23 Nov 2026)
+
+Version 2.3. A fourth workout type, "Tailored intervals": intervals where every part has its own length, for example jog 1 min, walk 1 min, jog 2, walk 2, jog 3, walk 3, jog 2, walk 2, jog 1, walk 1. The owner asked for it on 23 Nov 2026. In a question round he chose three things: a free list of steps (each step its own name and time, rather than jog + walk pairs), a voice that says his word plus the length, and the name "Tailored intervals". The other three types are Sets & reps, Exercise list and Interval timer.
+
+### Data (package Core / WorkoutCore)
+- **Kind.** `WorkoutKind.tailored`, raw value "tailored", title "Tailored intervals", blurb "Your own steps, each with its own name and length.", usual colour violet, usual icon the runner ("run").
+- **Fields.** `IntervalStep` { id, name, seconds } and `Workout.steps: [IntervalStep]`. A file from before 2.3 has no `steps`: it reads as an empty list. Every kind keeps all its fields, as before.
+- **Rules** in `Core/Sources/WorkoutCore/Version23Tailored.swift`:
+  - `Workout.tailoredTotal`: the sum of the steps' seconds.
+  - `Workout.stepName(at:)`: the trimmed name, or "Step N" when the name is empty.
+  - `Workout.nextStep()`: the step that Add step appends. Its name is the name of the step two lines up, else empty; its seconds are those of the last step, else 60.
+  - `IntervalStep.lengths`: the ready lengths in the menu: 0:10, 0:15, 0:20, 0:30, 0:45, 1:00, 1:30, 2:00, 2:30, 3:00, 4:00, 5:00, 6:00, 8:00, 10:00, 12:00, 15:00, 20:00, 30:00, 45:00, 60:00.
+  - `IntervalStep.stepped(_:up:)` (the − and + buttons): 5 s under one minute, 15 s up to five minutes, 60 s above; never below 0:05 and never above 60:00.
+  - `IntervalStep.most` = 60 steps.
+  - `IntervalStep.example`: the ten jog/walk steps of 1-1-2-2-3-3-2-2-1-1 minutes, 18:00 in all.
+  - `Workout.starting(_ kind:)`: a new workout of a kind; a Tailored one starts with the example.
+  - `SpokenLength.words(_:)`: "45 seconds", "1 minute", "2 minutes", "1 minute 30 seconds".
+  - `TailoredCue.start(name:seconds:isLast:)`: "Jog. 2 minutes." and, for the last step, "Last step. Walk. 1 minute."
+  - `Plan.notices(...)`: the notifications still to come: one per later step and one for the end.
+- **Phases.** `Phase.step(seconds:name:number:of:)`. `Plan.phases` for a Tailored workout = Get ready 5 s, then one step phase per step; no steps, no phases.
+- **Summary line.** "10 steps · 18:00"; "1 step · 1:00"; "No steps yet". Plan page: one line per step ("1 · Jog" with "1:00") and "Total time".
+- **History record.** "N of M steps"; none when the workout ended before the first step was over.
+
+### New workout and editor
+- **Chooser.** The new-workout chooser lists four types; the new card has the identifier `new-tailored`. A new Tailored intervals workout opens the editor with the example filled in.
+- **Type switch.** Sets / List / Intervals / Tailored.
+- **Section "Steps".** Per line: the name field (`step-name-N`); the length as a menu button (`step-time-N`) that opens the ready lengths; − / + (`step-stepper-N`). The ≡ grip at the right drags the line to a new place (drag and drop; the owner's rule of 23 Nov 2026: never arrow buttons for ordering). The red minus at the left removes the line.
+- **Add step** (`editor-add-step`).
+- **Footer.** The total (`editor-steps-total`) and one sentence saying what a tap on the time, − / + and the ≡ grip do.
+- **Save.** With no steps it shows "Add a step first." (`editor-steps-needed`). Save is never grey.
+
+### Run screen (the same `TimerScreen` as the Interval timer)
+- **Get ready** shows "First: Jog 1:00".
+- **Each step.** The step's name in capitals as the phase word (`run-phase`); the countdown ring in the workout's colour; "Step 3 of 10" under the time; "Next: Walk 2:00" or "Last step" (`run-next`). Pause / Resume and Skip.
+
+### Voice
+- At each step start: the rest-over sound and, for example, "Jog. 2 minutes."
+- Inside a step: Halfway (step 20 s or longer), Ten seconds (step 30 s or longer), then Three, Two, One.
+- At the end: "Well done. Workout complete."
+
+### Phone locked or app in the background
+- One notification per coming step change ("Walk · 2:00" with "Step 4 of 10 · <workout name>") and one for the end, with the chosen rest-over sound. They are set again after Pause, Resume and Skip and removed when the workout closes.
+- The current step also shows as the lock-screen card (Live Activity) with its end time and what comes next.
+- The spoken words need the app open: there is no background audio.
+
+### Tests (lean)
+- Core `Core/Tests/WorkoutCoreTests/Version23Tests.swift`: data tests for the rules above.
+- UI `UITests/Version23UITests.swift`: one screen test: make a Tailored workout, save it, start it, see the first step.
+- **Not proven on a real phone:** the voice outdoors, and the notifications with the phone locked.

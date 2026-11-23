@@ -46,6 +46,7 @@ struct TimerScreen: View {
         .onDisappear {
             Cues.shared.end()
             RestAlarm.set(nil, "")
+            StepAlarms.set([])
             RestLive.show(nil)
         }
         .onReceive(clock) { t in
@@ -120,6 +121,8 @@ struct TimerScreen: View {
                     .font(.system(size: 20, weight: .heavy, design: .rounded))
                     .tracking(3)
                     .foregroundStyle(phase.isRest ? Theme.muted : Theme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .accessibilityIdentifier("run-phase")
                 Text(Clock.text(Int(left.rounded(.up))))
                     .font(.system(size: 88, weight: .bold, design: .rounded))
@@ -131,6 +134,17 @@ struct TimerScreen: View {
                 Text(sub)
                     .font(.system(.headline, design: .rounded))
                     .foregroundStyle(Theme.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                // A Tailored step also says what comes after it (since 2.3).
+                if case .step = phase {
+                    Text(comingUp)
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .accessibilityIdentifier("run-next")
+                }
                 if session.isPaused {
                     Text("PAUSED")
                         .font(.caption.weight(.heavy))
@@ -209,7 +223,12 @@ struct TimerScreen: View {
 
     private func words(for phase: Phase) -> (String, String) {
         switch phase {
-        case .getReady: return ("GET READY", "Round 1 of \(workout.rounds)")
+        case .getReady:
+            if case .step(let s, let name, _, _)? = session.phases.dropFirst(session.index + 1).first {
+                return ("GET READY", "First: \(name) \(Clock.text(s))")
+            }
+            return ("GET READY", "Round 1 of \(workout.rounds)")
+        case .step(_, let name, let n, let of): return (name.uppercased(), "Step \(n) of \(of)")
         case .rest(_, let next, let of): return ("REST", "Next: set \(next) of \(of)")
         case .work(_, let r, let of): return ("WORK", "Round \(r) of \(of)")
         case .off(_, let next, let of): return ("REST", "Next: round \(next) of \(of)")
@@ -217,8 +236,40 @@ struct TimerScreen: View {
         }
     }
 
+    /// What follows the step on the screen: "Next: Walk 2:00", or "Last step".
+    private var comingUp: String {
+        if case .step(let s, let name, _, _)? = session.phases.dropFirst(session.index + 1).first {
+            return "Next: \(name) \(Clock.text(s))"
+        }
+        return "Last step"
+    }
+
+    /// A Tailored intervals workout (since 2.3): a notification for every coming change of step, and
+    /// the step itself on the lock screen — the voice cannot speak while the phone is locked.
+    private func armSteps() {
+        let t = Date()
+        guard !session.isPaused, let phase = session.current, let left = session.remaining(at: t) else {
+            StepAlarms.set([])
+            RestLive.show(nil)
+            return
+        }
+        StepAlarms.set(Plan.notices(phases: session.phases, index: session.index, left: left, name: workout.name))
+        let heading: String
+        if case .step(_, let name, _, _) = phase { heading = name } else { heading = "Get ready" }
+        var next = "Finish"
+        if case .step(let s, let name, _, _)? = session.phases.dropFirst(session.index + 1).first {
+            next = "\(name) \(Clock.text(s))"
+        }
+        RestLive.show(RestCard(kind: .workout, title: workout.name, next: next,
+                               start: t, end: t.addingTimeInterval(left), heading: heading))
+    }
+
     /// During a rest, get ready or an off round: the phone's alarm for its end (since 1.8).
     private func armAlarm() {
+        if workout.kind == .tailored {
+            armSteps()
+            return
+        }
         let t = Date()
         guard !session.isPaused, let phase = session.current, let left = session.remaining(at: t) else {
             RestAlarm.set(nil, "")
@@ -261,6 +312,8 @@ struct TimerScreen: View {
             cues.rest("Rest")
         case .work(_, let r, let of)?:
             cues.go(r == of ? "Last round. Go!" : "Round \(r). Go!")
+        case .step(let s, let name, let n, let of)?:
+            cues.go(TailoredCue.start(name: name, seconds: s, isLast: n == of))
         }
     }
 

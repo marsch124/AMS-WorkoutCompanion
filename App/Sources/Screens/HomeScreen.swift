@@ -293,7 +293,7 @@ struct KindPicker: View {
             }
         }
         .navigationDestination(for: WorkoutKind.self) { kind in
-            EditorScreen(workout: Workout(kind: kind), isNew: true, onDone: done)
+            EditorScreen(workout: Workout.starting(kind), isNew: true, onDone: done)
         }
     }
 }

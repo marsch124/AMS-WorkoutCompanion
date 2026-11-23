@@ -48,7 +48,7 @@ struct RestLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
                         IconMark(.hand("stopwatch"), size: 20, colour: card.islandTint)
-                        Text(card.title).font(.headline).lineLimit(1)
+                        Text(card.heading ?? card.title).font(.headline).lineLimit(1)
                     }
                     .padding(.leading, 4)
                 }
@@ -124,7 +124,7 @@ private struct LockScreenRest: View {
             HStack(alignment: .center, spacing: 10) {
                 IconMark(.hand("stopwatch"), size: 26, colour: card.tint)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(over ? "Rest over" : "Rest · \(card.title)")
+                    Text(card.heading.map { "\($0) · \(card.title)" } ?? (over ? "Rest over" : "Rest · \(card.title)"))
                         .font(.headline)
                         .lineLimit(1)
                     Text(over ? "Go: \(card.next)" : "Next: \(card.next)")

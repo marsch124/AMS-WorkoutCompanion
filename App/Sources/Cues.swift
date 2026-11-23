@@ -240,6 +240,49 @@ enum RestAlarm {
     }
 }
 
+/// The changes of step of a Tailored intervals workout as phone notifications (since 2.3), so a jog
+/// or a walk is marked on a locked iPhone or while another app is open, where the voice cannot speak.
+/// All coming changes are set at once and set again after Pause, Resume and Skip.
+@MainActor
+enum StepAlarms {
+    private static let ids = (0...IntervalStep.most).map { "step-\($0)" }
+    private static var asked = false
+
+    static func set(_ notices: [StepNotice]) {
+        let centre = UNUserNotificationCenter.current()
+        centre.removePendingNotificationRequests(withIdentifiers: ids)
+        centre.removeDeliveredNotifications(withIdentifiers: ids)
+        guard !notices.isEmpty, !Cues.shared.quiet else { return }
+        let schedule = {
+            let sound: UNNotificationSound?
+            switch SoundChoice.load().restSound {
+            case .soft: sound = UNNotificationSound(named: UNNotificationSoundName("restend.wav"))
+            case .chime: sound = .default
+            case .bell: sound = UNNotificationSound(named: UNNotificationSoundName("bell.wav"))
+            case .beep: sound = UNNotificationSound(named: UNNotificationSoundName("beep.wav"))
+            case .none: sound = nil
+            }
+            for (i, notice) in notices.prefix(ids.count).enumerated() where notice.after > 1 {
+                let content = UNMutableNotificationContent()
+                content.title = notice.title
+                content.body = notice.body
+                content.sound = sound
+                content.interruptionLevel = .timeSensitive
+                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: notice.after, repeats: false)
+                centre.add(UNNotificationRequest(identifier: ids[i], content: content, trigger: trigger))
+            }
+        }
+        if asked {
+            schedule()
+        } else {
+            asked = true
+            centre.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                if granted { Task { @MainActor in schedule() } }
+            }
+        }
+    }
+}
+
 /// The rest on the lock screen and in the Dynamic Island (since 1.15): one at a time.
 /// A new rest updates it, a skipped or finished rest ends it. The time ticks on by itself,
 /// even while the app sleeps; at the end it says "Go" until the app ends it.

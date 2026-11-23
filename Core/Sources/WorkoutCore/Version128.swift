@@ -30,6 +30,9 @@ extension Workout {
                 PlanLine("Rest", offSeconds > 0 ? Clock.text(offSeconds) : "None"),
                 PlanLine("Total time", Clock.text(intervalTotal)),
             ]
+        case .tailored:
+            return steps.indices.map { PlanLine("\($0 + 1) · \(stepName(at: $0))", Clock.text(steps[$0].seconds)) }
+                + [PlanLine("Total time", Clock.text(tailoredTotal))]
         case .checklist:
             return []
         }

@@ -13,8 +13,12 @@ public struct RestCard: Codable, Hashable, Sendable {
     public var next: String
     public var start: Date
     public var end: Date
+    /// A step of a Tailored intervals workout is no rest (since 2.3): its own word, "Jog", stands
+    /// where a rest says "Rest · Leg press". Nil for a rest.
+    public var heading: String?
 
-    public init(kind: Kind, title: String, next: String, start: Date, end: Date) {
+    public init(kind: Kind, title: String, next: String, start: Date, end: Date, heading: String? = nil) {
+        self.heading = heading
         self.kind = kind
         self.title = title
         self.next = next
