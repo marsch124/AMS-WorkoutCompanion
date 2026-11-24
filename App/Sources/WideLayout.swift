@@ -101,7 +101,7 @@ struct SideList: View {
     private var syncLine: some View {
         let status = library.syncStatus
         return HStack(spacing: 7) {
-            Circle().fill(Self.colour(of: status.dot)).frame(width: 9, height: 9)
+            SyncDot(status: status)
             Text(status.words)
                 .font(.footnote)
                 .foregroundStyle(Theme.muted)
@@ -113,14 +113,5 @@ struct SideList: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(status.words)
         .accessibilityIdentifier("sync-status")
-    }
-
-    private static func colour(of dot: SyncStatus.Dot) -> Color {
-        switch dot {
-        case .green: return Color(hex: "#16a34a")
-        case .orange: return Color(hex: "#ea580c")
-        case .grey: return Theme.muted
-        case .red: return Theme.problem
-        }
     }
 }

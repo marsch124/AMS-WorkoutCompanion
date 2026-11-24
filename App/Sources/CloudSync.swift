@@ -11,7 +11,7 @@ import WorkoutCore
 /// that is missing, still downloading or unreadable is never taken for "empty".
 @MainActor
 final class CloudSync {
-    static let containerID = "iCloud.com.schabbauer.AMSWorkoutCompanion"
+    nonisolated static let containerID = "iCloud.com.schabbauer.AMSWorkoutCompanion"
     private static let joinedKey = "iCloudJoined"
 
     private unowned let library: Library

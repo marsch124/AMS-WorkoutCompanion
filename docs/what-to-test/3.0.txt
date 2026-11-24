@@ -1,0 +1,20 @@
+3.0 - the same data on iPhone, iPad and Mac
+
+What to try:
+1. Install 3.0 on the iPhone first and open it once. Then install it on the Mac and the iPad and open it there.
+2. On the phone, log a set at the gym. Watch it appear on the Mac within about a minute (the app open on both).
+3. Change something on the Mac (a workout's name, a machine). See it on the phone.
+4. Settings > Your data > iCloud: the dot and words (green "Same on all devices"), and the green Sync now button.
+5. Settings > Backups > "From before iCloud": the copy each device kept before it first met iCloud.
+6. On the iPad and the Mac: the side list on the left (Workouts, At the gym, History, Settings) and the iCloud dot at its foot.
+7. iPhone only: the lock screen rest, the gym reminder, heart rate from Apple Health.
+Not yet tried on a real iPad or Mac with iCloud. Please tell me what looks wrong.
+
+Earlier versions:
+2.6 - four ready efforts per step (Easy, Steady, Hard, All-out) in Tailored intervals, and nine look fixes (Workouts, At the gym, Busy pill, History, Settings).
+2.5 - Pace, Power, Weight and Level boxes for each step of a Tailored intervals workout; the app's name under the icon is Workouts.
+2.4 - speed or power text and Effort / Easy per step; exercises in an Exercise list can be dragged into order.
+2.3 - Tailored intervals: your own steps, each with its own name and length; lock screen for each step.
+2.2 - Stretch now and Save as template at the top of Session done; the rest voice in every rest.
+2.1 - warm-up moves that fit today's plan.
+2.0 - warm-up, one stretch library with hand-drawn pictures, one Well done, instruction view, rest voice.

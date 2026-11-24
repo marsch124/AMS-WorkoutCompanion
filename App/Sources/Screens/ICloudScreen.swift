@@ -99,6 +99,7 @@ struct ICloudScreen: View {
                 }
             }
         }
+        .readableWidth()
         .scrollContentBackground(.hidden)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("iCloud")

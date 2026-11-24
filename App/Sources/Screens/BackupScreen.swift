@@ -111,12 +111,12 @@ struct BackupScreen: View {
                 Button("Keep a copy now") {
                     library.weeklyBackup(force: true)
                     copies = library.weeklyCopies()
-                    message = "Copy kept on this iPhone."
+                    message = "Copy kept on this device."
                 }
                 .foregroundStyle(Theme.accent)
                 .accessibilityIdentifier("backup-keep-copy")
             } header: {
-                Text("On this iPhone").foregroundStyle(Self.colour.fillColor)
+                Text("On this device").foregroundStyle(Self.colour.fillColor)
             } footer: {
                 Text("Once a week the app keeps a copy here by itself; the newest 4 stay. They go if the app is deleted — so also keep one in Files.")
             }
@@ -152,7 +152,7 @@ struct BackupScreen: View {
             Button("Restore", role: .destructive) { restore() }
                 .accessibilityIdentifier("backup-restore-confirm")
         } message: {
-            Text((pending?.contents.text ?? "") + ".\n\nIt replaces what is on this iPhone now. Today's data is kept aside first.")
+            Text((pending?.contents.text ?? "") + ".\n\nIt replaces what is on this device now — and, through iCloud, on your other devices. Today's data is kept aside first.")
         }
     }
 
@@ -184,7 +184,7 @@ struct BackupScreen: View {
             try library.restore(p.backup)
             message = "Restored: \(p.contents.text)."
         } catch {
-            message = "The backup could not be restored. What was on this iPhone is kept aside."
+            message = "The backup could not be restored. What was on this device is kept aside."
         }
     }
 }
