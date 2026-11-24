@@ -58,19 +58,20 @@ struct WorkoutPlanScreen: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// Sets & reps and Interval timer: label on the left, number on the right.
+    /// Sets & reps, Interval timer and Tailored intervals: the figure right beside its name, on the left
+    /// (since 2.4, his rule; before, at the far right edge).
     private var lines: some View {
         VStack(spacing: 0) {
             ForEach(Array(workout.plan.enumerated()), id: \.offset) { n, line in
                 if n > 0 { Divider().overlay(Theme.line) }
-                HStack {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text(line.label)
                         .font(.body)
                         .foregroundStyle(Theme.ink)
-                    Spacer(minLength: 8)
                     Text(line.value)
                         .font(.system(.title3, design: .rounded).weight(.bold).monospacedDigit())
                         .foregroundStyle(Theme.ink)
+                    Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)

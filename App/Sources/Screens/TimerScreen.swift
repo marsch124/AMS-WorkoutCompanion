@@ -113,17 +113,29 @@ struct TimerScreen: View {
     private func countdown(_ phase: Phase) -> some View {
         let left = session.remaining(at: now) ?? 0
         let (label, sub) = words(for: phase)
-        let colour = phase.isRest ? Theme.muted : workout.fill
+        // An Easy step of a Tailored workout is grey like a rest (since 2.4).
+        let step = workout.step(of: phase)
+        let calm = phase.isRest || step?.easy == true
+        let colour = calm ? Theme.muted : workout.fill
         return ZStack {
             Ring(fractionLeft: session.fractionLeft(at: now), colour: colour, width: 24)
             VStack(spacing: 6) {
                 Text(label)
                     .font(.system(size: 20, weight: .heavy, design: .rounded))
                     .tracking(3)
-                    .foregroundStyle(phase.isRest ? Theme.muted : Theme.ink)
+                    .foregroundStyle(calm ? Theme.muted : Theme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .accessibilityIdentifier("run-phase")
+                // The speed or power to hold in this step (since 2.4).
+                if let target = step?.shownTarget {
+                    Text(target)
+                        .font(.system(.title3, design: .rounded, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .accessibilityIdentifier("run-target")
+                }
                 Text(Clock.text(Int(left.rounded(.up))))
                     .font(.system(size: 88, weight: .bold, design: .rounded))
                     .monospacedDigit()
@@ -224,8 +236,8 @@ struct TimerScreen: View {
     private func words(for phase: Phase) -> (String, String) {
         switch phase {
         case .getReady:
-            if case .step(let s, let name, _, _)? = session.phases.dropFirst(session.index + 1).first {
-                return ("GET READY", "First: \(name) \(Clock.text(s))")
+            if let first = following {
+                return ("GET READY", "First: \(first)")
             }
             return ("GET READY", "Round 1 of \(workout.rounds)")
         case .step(_, let name, let n, let of): return (name.uppercased(), "Step \(n) of \(of)")
@@ -237,11 +249,13 @@ struct TimerScreen: View {
     }
 
     /// What follows the step on the screen: "Next: Walk 2:00", or "Last step".
-    private var comingUp: String {
-        if case .step(let s, let name, _, _)? = session.phases.dropFirst(session.index + 1).first {
-            return "Next: \(name) \(Clock.text(s))"
-        }
-        return "Last step"
+    private var comingUp: String { following.map { "Next: \($0)" } ?? "Last step" }
+
+    /// The step after this phase in words — "Walk 2:00", or "Walk 2:00 · 5 km/h" with a speed or power.
+    private var following: String? {
+        let next = session.phases.dropFirst(session.index + 1).first
+        guard case .step(let s, let name, _, _)? = next else { return nil }
+        return "\(name) \(Clock.text(s))\(workout.step(of: next)?.shownTarget.map { " · \($0)" } ?? "")"
     }
 
     /// A Tailored intervals workout (since 2.3): a notification for every coming change of step, and
@@ -253,14 +267,13 @@ struct TimerScreen: View {
             RestLive.show(nil)
             return
         }
-        StepAlarms.set(Plan.notices(phases: session.phases, index: session.index, left: left, name: workout.name))
-        let heading: String
-        if case .step(_, let name, _, _) = phase { heading = name } else { heading = "Get ready" }
-        var next = "Finish"
-        if case .step(let s, let name, _, _)? = session.phases.dropFirst(session.index + 1).first {
-            next = "\(name) \(Clock.text(s))"
+        StepAlarms.set(Plan.notices(phases: session.phases, index: session.index, left: left,
+                                    name: workout.name, steps: workout.steps))
+        var heading = "Get ready"
+        if case .step(_, let name, _, _) = phase {
+            heading = name + (workout.step(of: phase)?.shownTarget.map { " \($0)" } ?? "")
         }
-        RestLive.show(RestCard(kind: .workout, title: workout.name, next: next,
+        RestLive.show(RestCard(kind: .workout, title: workout.name, next: following ?? "Finish",
                                start: t, end: t.addingTimeInterval(left), heading: heading))
     }
 
@@ -313,7 +326,8 @@ struct TimerScreen: View {
         case .work(_, let r, let of)?:
             cues.go(r == of ? "Last round. Go!" : "Round \(r). Go!")
         case .step(let s, let name, let n, let of)?:
-            cues.go(TailoredCue.start(name: name, seconds: s, isLast: n == of))
+            cues.go(TailoredCue.start(name: name, seconds: s, isLast: n == of,
+                                      target: workout.step(of: session.current)?.shownTarget))
         }
     }
 

@@ -83,7 +83,7 @@ Version 2.0. iPhone only, portrait, iOS 17+, light and dark. The name under the 
 - Editor: Name, Colour (the fifteen AMS-Icons colours, two rows of eight), Type (Sets / List / Intervals). Since 2.3 the Type switch has a fourth entry, Tailored (Sets / List / Intervals / Tailored). Cancel and Save; Save is a full-colour pill and without a name it says "Give it a name first." instead of being greyed out. Nothing is kept before Save.
 - Sets & reps: Sets 1–50, Reps per set 1–500, Rest 0–10:00 in 15 s steps (0 = None).
 - Interval timer: Rounds 1–99, Work 0:05–15:00 and Rest 0:00–15:00 in 5 s steps; the total is shown.
-- Exercise list: per exercise Name, Amount (free text), Note, Photo (from Photos, stored scaled to 1600 px). ••• moves it up, down, or removes it. Add exercise adds one.
+- Exercise list: per exercise Name, Amount (free text), Note, Photo (from Photos, stored scaled to 1600 px). Add exercise adds one. Since 2.4 there is no ••• menu: a block "Order" (two or more exercises) lists the exercises with a ≡ grip to drag them into order, and the red word "Remove" on each heading removes one after asking (see Version 2.4). Before 2.4: ••• moved it up, down, or removed it.
 - Changing the type keeps every other type's numbers. An existing workout can be deleted (asks first).
 
 ## Running a Sets & reps workout
@@ -577,3 +577,51 @@ Version 2.3. A fourth workout type, "Tailored intervals": intervals where every 
 - Core `Core/Tests/WorkoutCoreTests/Version23Tests.swift`: data tests for the rules above.
 - UI `UITests/Version23UITests.swift`: one screen test: make a Tailored workout, save it, start it, see the first step.
 - **Not proven on a real phone:** the voice outdoors, and the notifications with the phone locked.
+
+## Version 2.4 — speed or power, Effort or Easy, and exercises dragged into order (24 Nov 2026)
+
+Version 2.4 has four changes: (A) speed or power for each step of a Tailored intervals workout, (B) Effort or Easy for each step, (C) the plan page with each figure right beside its name, and (D) exercises dragged into order. The notes on D follow after A to C. The owner's rule (23 Nov 2026): every list he puts in order is drag and drop, never up/down arrows or "move up / move down" commands. The Exercise list editor was the last place in this app that still broke it. He said yes to fixing it on 24 Nov 2026.
+
+### A. Speed or power for each step (ask of 24 Nov 2026, with a screenshot of the Steps list)
+- **Before 2.4:** a step of a Tailored intervals workout had only a name and a length.
+- **Editor.** Every step has a second, smaller line. At its left: a field "Speed or power", free words (for example "8 km/h", "150 W", "5:30 /km"). It may be empty; then nothing is shown anywhere. Identifier `step-target-N`.
+- **Where it shows:** the run screen, right under the step's name and above the countdown (`run-target`); after the length in "First: Jog 1:00 · 8 km/h" and "Next: Walk 2:00 · 5 km/h"; the plan page, after the step's length ("1 · Jog 1:00 · 8 km/h"); the notification that marks a change of step with the phone locked ("Jog · 2:00 · 8 km/h"); the lock-screen card ("Jog 8 km/h · <workout name>").
+- **Voice:** says it after the length: "Jog. 2 minutes. 8 km/h."
+- **Add step** copies the speed or power of the step two lines up, together with its name (the seconds still come from the last step).
+- **Data:** `IntervalStep` gains `target: String` (empty by default). A file written before 2.4 without it reads as empty. `Workout.nextStep()` copies name, target and easy from two lines up and the seconds from the last step. `TailoredCue.start(name:seconds:isLast:target:)`. `Plan.notices(phases:index:left:name:steps:)` adds the target to the title. `Workout.step(of:)` gives the step behind a running phase. `Workout.plan` puts the target after the length.
+
+### B. Effort or Easy for each step
+- **Before 2.4:** every step ran in the workout's colour.
+- **Editor.** On the same second line, at the right: a small button with the word "Effort" (workout's colour) or "Easy" (grey). A tap switches between the two. Identifier `step-effort-N`. The foot text under the list now also says: "Effort or Easy: tap the word to switch. An Easy step runs on a grey ring."
+- **Running.** An Effort step: ring and step name as before (workout's colour). An Easy step: grey ring and the name in grey, the same grey as a rest in the other workout types. Nothing else differs: the voice, the countdown words and the Skip button are the same for both.
+- **Defaults.** The ready-made example (jog and walk 1, 2, 3, 2, 1 minutes) has Jog as Effort and Walk as Easy (`IntervalStep.example` has the Walk steps easy). Steps saved with 2.3 are all Effort until changed. Add step copies Effort/Easy from the step two lines up.
+- **Data:** `IntervalStep` gains `easy: Bool` (false by default = Effort). A file without it reads as Effort.
+
+### C. Plan page: the figure right beside its name
+- The plan page opens when the owner taps a workout's tile on Workouts. His rule: a figure stands right beside its name, on the left, never at the far right edge.
+- **Before 2.4:** each line had its name at the left and its figure at the far right edge.
+- **Now:** the figure follows the name: "Sets 5", "Rest between sets 1:30", "1 · Jog 1:00", "Total time 18:00". This holds for Sets & reps, Interval timer and Tailored intervals. Exercise lists look as before.
+
+### D. Exercises dragged into order (notes below)
+
+### Where
+- Workouts, the pen on an Exercise list workout (or the round + then Exercise list), then the editor.
+
+### Before 2.4
+- Every exercise's heading ("Exercise 1", "Exercise 2" ...) had a ••• button with a menu: Move up, Move down, Remove. Remove in the menu removed at once, without asking.
+
+### Now
+- **Order block.** A new block "Order" sits above the exercises, as soon as the list has two or more exercises. One short line per exercise: its name (or "Exercise 3" while it has no name yet) and the ≡ grip at the right. Hold the grip and drag the line to its place; the exercises below follow at once. Under the block: "Hold ≡ and drag to put the exercises in order."
+- **Remove.** The ••• button and its menu are gone. Each exercise's heading has the red word "Remove" instead. A tap asks first: "Remove Bridge?" with a red Remove button (id `exercise-remove-confirm`); a tap beside the question closes it and keeps the exercise.
+- **Saving.** As before, nothing is stored until Save; Cancel leaves the workout as it was.
+- **Unchanged.** Name, amount, note and photo of an exercise, Add exercise, ticking off a list. No data changed.
+
+### Identifiers
+- Order lines `exercise-order-N`, the Remove word `exercise-remove-N`, the confirm button `exercise-remove-confirm`.
+
+### Tests (lean)
+- Core `Core/Tests/WorkoutCoreTests/Version24Tests.swift`: data rules for A and B (target and easy defaults, older files, `nextStep()`, example, cue, notices, plan).
+- UI `UITests/Version24UITests.swift`: `testAStepCarriesSpeedOrPowerAndEffortOrEasy` (A and B), and `testExercisesAreDraggedIntoOrderAndRemovedByWord`. The drag part is skipped on GitHub's simulator, like the plan-drag test, and runs on the Mac.
+- Version lists: `AppTextTests` (2.4 first) and `testSettingsShowsTheVersionAndWhatsNew` (2.4, `whatsnew-2.4`).
+- Checked in the simulator, day and night. **Not yet tried by hand on a real phone:** the drag, and speed or power and Effort or Easy on a run.
+- **Texts.** What's new (2.4) and How it works (Making a workout, Workouts, Tailored intervals, Signs in this app) updated.

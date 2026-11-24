@@ -7,11 +7,23 @@ public struct IntervalStep: Codable, Identifiable, Hashable, Sendable {
     /// His word for the step; empty = "Step 3".
     public var name: String
     public var seconds: Int
+    /// The speed or power to hold in this step, in his own words — "8 km/h", "150 W" (since 2.4). Empty = none.
+    public var target: String
+    /// An easy step — a walk between jogs — runs on a grey ring, like a rest (since 2.4). False = an effort step.
+    public var easy: Bool
 
-    public init(id: UUID = UUID(), name: String = "", seconds: Int = 60) {
+    public init(id: UUID = UUID(), name: String = "", seconds: Int = 60, target: String = "", easy: Bool = false) {
         self.id = id
         self.name = name
         self.seconds = seconds
+        self.target = target
+        self.easy = easy
+    }
+
+    /// The speed or power, trimmed; nil when he gave none.
+    public var shownTarget: String? {
+        let t = target.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? nil : t
     }
 
     public init(from decoder: Decoder) throws {
@@ -19,6 +31,8 @@ public struct IntervalStep: Codable, Identifiable, Hashable, Sendable {
         id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
         seconds = try c.decodeIfPresent(Int.self, forKey: .seconds) ?? 60
+        target = try c.decodeIfPresent(String.self, forKey: .target) ?? ""
+        easy = try c.decodeIfPresent(Bool.self, forKey: .easy) ?? false
     }
 
     /// The shortest and the longest a step can be, and the most steps one workout holds
@@ -47,7 +61,7 @@ public struct IntervalStep: Codable, Identifiable, Hashable, Sendable {
     /// jog and walk 1, 2, 3, 2, 1 minutes, 18 minutes in all.
     public static var example: [IntervalStep] {
         [1, 2, 3, 2, 1].flatMap { minutes in
-            [IntervalStep(name: "Jog", seconds: minutes * 60), IntervalStep(name: "Walk", seconds: minutes * 60)]
+            [IntervalStep(name: "Jog", seconds: minutes * 60), IntervalStep(name: "Walk", seconds: minutes * 60, easy: true)]
         }
     }
 }
@@ -63,11 +77,18 @@ extension Workout {
         return name.isEmpty ? "Step \(index + 1)" : name
     }
 
-    /// The step "Add step" appends: the name of the step two lines up, so Jog, Walk, Jog, Walk
-    /// carries on by itself, and the length of the last step.
+    /// The step "Add step" appends: the name of the step two lines up — and, since 2.4, its speed or
+    /// power and Effort / Easy — so Jog, Walk, Jog, Walk carries on by itself, and the length of the last step.
     public func nextStep() -> IntervalStep {
-        IntervalStep(name: steps.count >= 2 ? steps[steps.count - 2].name : "",
-                     seconds: steps.last?.seconds ?? 60)
+        let like = steps.count >= 2 ? steps[steps.count - 2] : nil
+        return IntervalStep(name: like?.name ?? "", seconds: steps.last?.seconds ?? 60,
+                            target: like?.target ?? "", easy: like?.easy ?? false)
+    }
+
+    /// The step behind a running phase; nil for a get ready.
+    public func step(of phase: Phase?) -> IntervalStep? {
+        guard case .step(_, _, let number, _)? = phase, steps.indices.contains(number - 1) else { return nil }
+        return steps[number - 1]
     }
 
     /// A new workout of a kind. A Tailored one starts with the example, ready to change.
@@ -90,8 +111,8 @@ public enum SpokenLength {
 
 /// What the voice says when a step starts (his pick: his word plus the length).
 public enum TailoredCue {
-    public static func start(name: String, seconds: Int, isLast: Bool) -> String {
-        "\(isLast ? "Last step. " : "")\(name). \(SpokenLength.words(seconds))."
+    public static func start(name: String, seconds: Int, isLast: Bool, target: String? = nil) -> String {
+        "\(isLast ? "Last step. " : "")\(name). \(SpokenLength.words(seconds)).\(target.map { " \($0)." } ?? "")"
     }
 }
 
@@ -113,13 +134,16 @@ public struct StepNotice: Equatable, Sendable {
 extension Plan {
     /// The notifications still to come while phase `index` has `left` seconds to go: one for every
     /// later step, at the moment it starts, and one when the last phase ends.
-    public static func notices(phases: [Phase], index: Int, left: TimeInterval, name: String) -> [StepNotice] {
+    /// With `steps`, a step's speed or power follows its length: "Jog · 2:00 · 8 km/h" (since 2.4).
+    public static func notices(phases: [Phase], index: Int, left: TimeInterval, name: String,
+                               steps: [IntervalStep] = []) -> [StepNotice] {
         guard phases.indices.contains(index) else { return [] }
         var out: [StepNotice] = []
         var after = max(0, left)
         for phase in phases.dropFirst(index + 1) {
             if case .step(let seconds, let step, let number, let of) = phase {
-                out.append(StepNotice(after: after, title: "\(step) · \(Clock.text(seconds))",
+                let target = steps.indices.contains(number - 1) ? steps[number - 1].shownTarget : nil
+                out.append(StepNotice(after: after, title: "\(step) · \(Clock.text(seconds))\(target.map { " · \($0)" } ?? "")",
                                       body: "Step \(number) of \(of) · \(name)"))
             }
             after += TimeInterval(phase.seconds ?? 0)

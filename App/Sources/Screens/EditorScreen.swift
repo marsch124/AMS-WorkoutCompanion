@@ -12,6 +12,7 @@ struct EditorScreen: View {
     @State private var askDelete = false
     @State private var needsName = false
     @State private var needsSteps = false
+    @State private var removing: Exercise?
     @State private var mine = IntervalPreset.mine()
     @State private var askPresetName = false
     @State private var presetName = ""
@@ -82,15 +83,28 @@ struct EditorScreen: View {
             case .tailored:
                 stepsSection
             case .checklist:
+                // The order is dragged (since 2.4, his rule: drag and drop, never arrows or Move up / Move down).
+                if draft.exercises.count >= 2 {
+                    Section {
+                        ForEach(orderLines) { line in
+                            Text(line.name)
+                                .foregroundStyle(Theme.ink)
+                                .lineLimit(1)
+                                .accessibilityIdentifier("exercise-order-\(line.number)")
+                        }
+                        .onMove { draft.exercises.move(fromOffsets: $0, toOffset: $1) }
+                    } header: {
+                        Text("Order")
+                    } footer: {
+                        Text("Hold ≡ and drag to put the exercises in order.")
+                    }
+                }
                 ForEach($draft.exercises) { $exercise in
                     let n = (draft.exercises.firstIndex { $0.id == exercise.id } ?? 0) + 1
                     Section {
                         ExerciseFields(exercise: $exercise, number: n)
                     } header: {
-                        ExerciseHeader(number: n, count: draft.exercises.count,
-                                       up: { move(exercise.id, by: -1) },
-                                       down: { move(exercise.id, by: 1) },
-                                       remove: { draft.exercises.removeAll { $0.id == exercise.id } })
+                        ExerciseHeader(number: n, remove: { removing = exercise })
                     }
                 }
                 Section {
@@ -100,6 +114,7 @@ struct EditorScreen: View {
                         MarkLabel(title: "Add exercise", mark: .addCircle, colour: Theme.accent)
                             .font(.body.weight(.semibold))
                     }
+                    .buttonStyle(.borderless)
                     .accessibilityIdentifier("editor-add-exercise")
                 }
             }
@@ -112,7 +127,16 @@ struct EditorScreen: View {
             }
         }
         // The steps of a Tailored workout show their ≡ grip and red minus all the time: drag and drop, no arrows.
-        .environment(\.editMode, .constant(draft.kind == .tailored ? .active : .inactive))
+        .environment(\.editMode, .constant(draft.kind == .tailored || draft.kind == .checklist ? .active : .inactive))
+        .confirmationDialog("Remove \(removing.map { orderName($0, number: 0) } ?? "")?", isPresented: Binding(
+            get: { removing != nil }, set: { if !$0 { removing = nil } }
+        ), titleVisibility: .visible) {
+            Button("Remove", role: .destructive) {
+                if let r = removing { withAnimation { draft.exercises.removeAll { $0.id == r.id } } }
+                removing = nil
+            }
+            .accessibilityIdentifier("exercise-remove-confirm")
+        }
         .scrollContentBackground(.hidden)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle(isNew ? draft.kind.title : "Edit workout")
@@ -137,7 +161,8 @@ struct EditorScreen: View {
     @ViewBuilder private var stepsSection: some View {
         Section {
             ForEach($draft.steps) { $step in
-                StepRow(step: $step, number: (draft.steps.firstIndex { $0.id == step.id } ?? 0) + 1)
+                StepRow(step: $step, number: (draft.steps.firstIndex { $0.id == step.id } ?? 0) + 1,
+                        fill: draft.swatch.fillColor, ink: draft.swatch.inkColor)
             }
             .onMove { draft.steps.move(fromOffsets: $0, toOffset: $1) }
             .onDelete { draft.steps.remove(atOffsets: $0) }
@@ -165,6 +190,7 @@ struct EditorScreen: View {
                 Text("Total \(Clock.text(draft.tailoredTotal)), after a 5-second get ready.")
                     .accessibilityIdentifier("editor-steps-total")
                 Text("Tap a time to choose a length; − and + change it in small steps. Hold ≡ and drag to put the steps in order. The red minus removes a step.")
+                Text("Effort or Easy: tap the word to switch. An Easy step runs on a grey ring.")
             }
         }
     }
@@ -240,11 +266,20 @@ struct EditorScreen: View {
         }
     }
 
-    private func move(_ id: UUID, by offset: Int) {
-        guard let i = draft.exercises.firstIndex(where: { $0.id == id }) else { return }
-        let j = i + offset
-        guard draft.exercises.indices.contains(j) else { return }
-        withAnimation { draft.exercises.swapAt(i, j) }
+    /// The lines of the Order block. Each has an identity of its own: the exercises' own identities
+    /// already name the sections below, and two rows with one identity in the same list cannot be dragged.
+    private var orderLines: [OrderLine] {
+        draft.exercises.enumerated().map {
+            OrderLine(id: "order-\($1.id.uuidString)", name: orderName($1, number: $0 + 1), number: $0 + 1)
+        }
+    }
+
+    /// An exercise's line in the Order block and in "Remove …?": its name, or "Exercise 3" while it has none.
+    private func orderName(_ exercise: Exercise, number: Int) -> String {
+        let name = exercise.name.trimmingCharacters(in: .whitespaces)
+        if !name.isEmpty { return name }
+        let n = number > 0 ? number : (draft.exercises.firstIndex { $0.id == exercise.id } ?? 0) + 1
+        return "Exercise \(n)"
     }
 }
 
@@ -301,12 +336,42 @@ private struct NumberRow: View {
     }
 }
 
-/// One step of a Tailored intervals workout: his word for it, its length (a tap offers ready lengths), − and +.
+/// One step of a Tailored intervals workout: his word for it, its length (a tap offers ready lengths), − and +;
+/// under them, since 2.4, the speed or power to hold and Effort / Easy.
 private struct StepRow: View {
     @Binding var step: IntervalStep
     let number: Int
+    let fill: Color
+    let ink: Color
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            top
+            HStack(spacing: 8) {
+                TextField("Speed or power", text: $step.target)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.ink)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .accessibilityIdentifier("step-target-\(number)")
+                Button {
+                    step.easy.toggle()
+                } label: {
+                    Text(step.easy ? "Easy" : "Effort")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(step.easy ? Theme.muted : ink)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .frame(minWidth: 62)
+                        .background(step.easy ? Theme.line : fill, in: Capsule())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("step-effort-\(number)")
+            }
+        }
+    }
+
+    private var top: some View {
         HStack(spacing: 8) {
             TextField("Step \(number)", text: $step.name)
                 .font(.body.weight(.semibold))
@@ -336,25 +401,28 @@ private struct StepRow: View {
     }
 }
 
+private struct OrderLine: Identifiable {
+    let id: String
+    let name: String
+    let number: Int
+}
+
+/// An exercise's heading: its number and the red word Remove (since 2.4; before, a ••• menu with
+/// Move up, Move down and Remove — the order is dragged in the Order block now).
 private struct ExerciseHeader: View {
     let number: Int
-    let count: Int
-    let up: () -> Void
-    let down: () -> Void
     let remove: () -> Void
 
     var body: some View {
         HStack {
             Text("Exercise \(number)")
             Spacer()
-            Menu {
-                Button("Move up", action: up).disabled(number == 1)
-                Button("Move down", action: down).disabled(number == count)
-                Button("Remove", role: .destructive, action: remove)
-            } label: {
-                ControlMarkView(.more, size: 22, colour: Theme.accent).frame(width: 32, height: 24)
-            }
-            .accessibilityLabel("Exercise \(number) options")
+            Button("Remove", action: remove)
+                .font(.footnote.weight(.semibold))
+                .textCase(nil)
+                .foregroundStyle(Theme.problem)
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("exercise-remove-\(number)")
         }
     }
 }
