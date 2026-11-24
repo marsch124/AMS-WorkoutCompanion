@@ -12,6 +12,8 @@ final class Library {
     /// Every Sets & reps, Interval and Exercise-list workout done (gym visits live in the gym log).
     private(set) var history: [SessionRecord] = []
     let folder: URL
+    /// How this device stands with iCloud (since 3.0); the side list's dot and Settings → iCloud show it.
+    private(set) var syncStatus: SyncStatus = .off
 
     private var file: URL { folder.appendingPathComponent("workouts.json") }
     private var gymFile: URL { folder.appendingPathComponent("gym.json") }

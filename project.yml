@@ -1,5 +1,5 @@
 # XcodeGen spec — run `xcodegen generate`, then open AMSWorkoutCompanion.xcodeproj.
-# iPhone only, portrait.
+# iPhone (portrait), iPad and — as the iPad app — the Mac (since 3.0).
 name: AMSWorkoutCompanion
 options:
   bundleIdPrefix: com.schabbauer
@@ -11,7 +11,7 @@ settings:
     DEVELOPMENT_TEAM: D24ENP83QQ
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "2.6"
+    MARKETING_VERSION: "3.0"
     # Build number, short since 1.19 (his ask): 1 for each new version, then 2, 3 … for another build of it.
     CURRENT_PROJECT_VERSION: "1"
 packages:
@@ -39,7 +39,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.schabbauer.AMSWorkoutCompanion
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_FILE: App/Config/Info.plist
@@ -49,6 +49,10 @@ targets:
       properties:
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
+        # 3.0: the app's own iCloud folder, where iPhone, iPad and Mac meet.
+        com.apple.developer.icloud-container-identifiers: [iCloud.com.schabbauer.AMSWorkoutCompanion]
+        com.apple.developer.icloud-services: [CloudDocuments]
+        com.apple.developer.ubiquity-container-identifiers: [iCloud.com.schabbauer.AMSWorkoutCompanion]
     info:
       path: App/Config/Info.plist
       properties:
@@ -69,6 +73,8 @@ targets:
         UILaunchScreen:
           UIColorName: ""
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # The iPad turns every way (Apple refuses an iPad app that does not: error 90474).
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         # The rest on the lock screen and in the Dynamic Island (since 1.15).
         NSSupportsLiveActivities: true
   # Draws the rest on the lock screen and in the Dynamic Island (since 1.15).
@@ -84,7 +90,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.schabbauer.AMSWorkoutCompanion.RestWidget
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_FILE: Widget/Config/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES
