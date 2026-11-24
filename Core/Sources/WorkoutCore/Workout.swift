@@ -213,12 +213,14 @@ public enum WorkoutFile {
     struct Envelope: Codable {
         var version: Int
         var workouts: [Workout]
+        /// When each workout last changed, and which were deleted (since 3.0); older files have none.
+        var sync: SyncMarks?
     }
 
     public static func encode(_ workouts: [Workout]) throws -> Data {
         let e = JSONEncoder()
         e.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try e.encode(Envelope(version: 1, workouts: workouts))
+        return try e.encode(Envelope(version: 1, workouts: workouts, sync: nil))
     }
 
     public static func decode(_ data: Data) throws -> [Workout] {

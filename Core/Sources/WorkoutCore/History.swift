@@ -180,13 +180,14 @@ public enum HistoryFile {
     struct Envelope: Codable {
         var version: Int
         var sessions: [SessionRecord]
+        var sync: SyncMarks?
     }
 
     public static func encode(_ records: [SessionRecord]) throws -> Data {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         enc.dateEncodingStrategy = .iso8601
-        return try enc.encode(Envelope(version: 1, sessions: records))
+        return try enc.encode(Envelope(version: 1, sessions: records, sync: nil))
     }
 
     public static func decode(_ data: Data) throws -> [SessionRecord] {

@@ -1129,9 +1129,11 @@ public enum GymFile {
         var nudgeDays: Int?
         var stretch: UUID?
         var book: StretchBook?
+        /// When each record last changed, and which were deleted (since 3.0); older files have none.
+        var sync: SyncMarks?
     }
 
-    public static func encode(_ log: GymLog) throws -> Data {
+    public static func encode(_ log: GymLog, marks: SyncMarks? = nil) throws -> Data {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         enc.dateEncodingStrategy = .iso8601
@@ -1141,7 +1143,7 @@ public enum GymFile {
                                         muscles: log.muscles, templates: log.templates, rests: log.rests,
                                         arrived: log.arrived,
                                         carried: log.carried.isEmpty ? nil : log.carried,
-                                        nudgeDays: log.nudgeDays, stretch: log.stretchID, book: log.stretchBook))
+                                        nudgeDays: log.nudgeDays, stretch: log.stretchID, book: log.stretchBook, sync: marks))
     }
 
     public static func decode(_ data: Data) throws -> GymLog {
