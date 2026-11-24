@@ -7,7 +7,9 @@ import Foundation
 public struct Backup: Codable, Equatable, Sendable {
     public static let appName = "AMS WorkoutCompanion"
     /// The data files a backup holds, in the app's Documents folder.
-    public static let fileNames = ["workouts.json", "gym.json", "history.json"]
+    public static let fileNames = ["workouts.json", "gym.json", "history.json", "settings.json"]
+    /// In backups since 3.0; a backup without it leaves the sounds and presets as they are.
+    static let optionalNames: Set<String> = ["settings.json"]
 
     public var app: String
     public var version: Int
@@ -128,7 +130,7 @@ extension Backup {
             throw error
         }
         // Everything is written: put it in place.
-        for name in Backup.fileNames {
+        for name in Backup.fileNames where files[name] != nil || !Backup.optionalNames.contains(name) {
             let url = folder.appendingPathComponent(name)
             try? fm.removeItem(at: url)
             let ready = waiting.appendingPathComponent(name)

@@ -15,14 +15,36 @@ final class Library {
     /// How this device stands with iCloud (since 3.0); the side list's dot and Settings → iCloud show it.
     private(set) var syncStatus: SyncStatus = .off
 
+    /// The sound choices and his own interval presets (since 3.0 in settings.json, so they travel too).
+    private(set) var settings = SharedSettings()
+    /// Each data file taken apart, with its change marks, as last written (since 3.0). Nil for a file
+    /// that cannot be joined safely (unreadable, or two records with one id): that file stays on this device.
+    private var docs: [SyncFile: SyncDoc] = [:]
+    /// Which device this is when data from before 3.0 meets: Mac 1, iPad 2, iPhone 3 — the iPhone's stays.
+    let rank: Int
+    /// The meeting point with iCloud; nil in UI tests.
+    var cloud: CloudSync?
+    /// Goes up when a photo arrived from another device, so pictures on screen are drawn again.
+    private(set) var photoTick = 0
+    /// The library the sound settings read from (they are asked for from places without a library at hand).
+    static weak var current: Library?
+
     private var file: URL { folder.appendingPathComponent("workouts.json") }
     private var gymFile: URL { folder.appendingPathComponent("gym.json") }
     private var historyFile: URL { folder.appendingPathComponent("history.json") }
+    private var settingsFile: URL { folder.appendingPathComponent(SettingsFile.name) }
     var photoFolder: URL { folder.appendingPathComponent("Photos", isDirectory: true) }
 
-    init(folder: URL) {
+    init(folder: URL, rank: Int? = nil) {
         self.folder = folder
+        self.rank = rank ?? Library.deviceRank
         load()
+        Library.current = self
+    }
+
+    static var deviceRank: Int {
+        if ProcessInfo.processInfo.isiOSAppOnMac { return 1 }
+        return UIDevice.current.userInterfaceIdiom == .pad ? 2 : 3
     }
 
     /// Reads the three files; at launch and again after a restore.
@@ -35,9 +57,11 @@ final class Library {
         workoutsUnreadable = false
         gymUnreadable = false
         historyUnreadable = false
+        docs = [:]
         if let data = try? Data(contentsOf: file) {
             if let list = try? WorkoutFile.decode(data) {
                 workouts = list
+                docs[.workouts] = (try? SyncFile.workouts.doc(from: data))?.doc.baselined(rank: rank)
             } else {
                 // Never overwrite a file we cannot read: keep it aside first, and save nothing over it (1.21).
                 workoutsUnreadable = true
@@ -53,6 +77,7 @@ final class Library {
         if let data = try? Data(contentsOf: gymFile) {
             if let log = try? GymFile.decode(data) {
                 gym = log
+                docs[.gym] = (try? SyncFile.gym.doc(from: data))?.doc.baselined(rank: rank)
             } else {
                 gymUnreadable = true
                 let aside = folder.appendingPathComponent("gym-unreadable-\(Int(Date().timeIntervalSince1970)).json")
@@ -62,16 +87,61 @@ final class Library {
         if let data = try? Data(contentsOf: historyFile) {
             if let list = try? HistoryFile.decode(data) {
                 history = list
+                docs[.history] = (try? SyncFile.history.doc(from: data))?.doc.baselined(rank: rank)
             } else {
                 historyUnreadable = true
                 let aside = folder.appendingPathComponent("history-unreadable-\(Int(Date().timeIntervalSince1970)).json")
                 try? fm.copyItem(at: historyFile, to: aside)
             }
         }
+        // A file that is not there yet starts as an empty doc from before sync: whatever is saved into
+        // it first (the starter workouts, a first gym) counts as "from before 3.0", not as a change made now.
+        if !fm.fileExists(atPath: gymFile.path) { docs[.gym] = SyncDoc() }
+        if !fm.fileExists(atPath: historyFile.path) { docs[.history] = HistoryFile.doc([])?.baselined(rank: rank) }
+        loadSettings()
         if needsFirstSave {
             needsFirstSave = false
+            docs[.workouts] = WorkoutFile.doc(workouts)?.baselined(rank: rank)
             persist()
         }
+    }
+
+    /// settings.json; the first time, the sounds and presets move over from the phone's small settings store.
+    private func loadSettings() {
+        settingsUnreadable = false
+        if let data = try? Data(contentsOf: settingsFile) {
+            if let read = try? SettingsFile.read(data) {
+                settings = read.settings
+                docs[.settings] = (try? SyncFile.settings.doc(from: data))?.doc.baselined(rank: rank)
+            } else {
+                settingsUnreadable = true
+                let aside = folder.appendingPathComponent("settings-unreadable-\(Int(Date().timeIntervalSince1970)).json")
+                try? FileManager.default.copyItem(at: settingsFile, to: aside)
+            }
+            return
+        }
+        var moved = SharedSettings()
+        let old = UserDefaults.standard
+        if !ProcessInfo.processInfo.arguments.contains("-uitest") {
+            if let data = old.data(forKey: "sounds"), let c = try? JSONDecoder().decode(SoundChoice.self, from: data) { moved.sounds = c }
+            if let data = old.data(forKey: "intervalPresets"),
+               let list = try? JSONDecoder().decode([IntervalPreset].self, from: data) { moved.presets = list }
+        }
+        settings = moved
+        docs[.settings] = SettingsFile.doc(moved)?.baselined(rank: rank)
+        if let data = try? SettingsFile.encode(moved, marks: docs[.settings]?.marks) { try? data.write(to: settingsFile, options: .atomic) }
+    }
+
+    private var settingsUnreadable = false
+
+    func setSounds(_ sounds: SoundChoice) {
+        settings.sounds = sounds
+        persistSettings()
+    }
+
+    func setPresets(_ presets: [IntervalPreset]) {
+        settings.presets = presets
+        persistSettings()
     }
 
     /// The starter workouts still have to be written (a first launch, or a backup without workouts).
@@ -144,6 +214,8 @@ final class Library {
         let library = Library(folder: docs)
         library.weeklyBackup()
         library.autoBackupIfDue()
+        // 3.0: the meeting point with iCloud; it starts when the first window is up.
+        library.cloud = CloudSync(library: library)
         return library
     }
 
@@ -266,6 +338,7 @@ final class Library {
     // MARK: Photos
 
     func image(_ name: String?) -> UIImage? {
+        _ = photoTick   // a photo that arrives from another device redraws whoever asked for it
         guard let name else { return nil }
         return UIImage(contentsOfFile: photoFolder.appendingPathComponent(name).path)
     }
@@ -519,27 +592,146 @@ final class Library {
             try fm.copyItem(at: photoFolder, to: aside.appendingPathComponent("Photos", isDirectory: true))
         }
         // Then the backup's files and photos — all or nothing (1.21): a failure leaves today's data in place.
+        let before = docs
         try backup.install(in: folder)
         load()
+        // With sync (3.0): a restore is a change made now, on this device. The marks carry on from just
+        // before it, so everything the backup puts back or takes away counts as changed or deleted now
+        // and reaches the other devices — instead of being undone by them at the next meeting.
+        for f in SyncFile.allCases { if let old = before[f] { docs[f] = old } }
+        persist()
+        persistGym()
+        persistHistory()
+        persistSettings()
     }
 
     // MARK: Saving
 
+    /// Brings the file's doc and marks up to date with the data as it is now (3.0): what changed is
+    /// marked changed now, what is gone is marked deleted. Returns the marks to write into the file.
+    private func mark(_ f: SyncFile, _ fresh: SyncDoc?) -> SyncMarks? {
+        guard let fresh, let old = docs[f] else {
+            docs[f] = nil
+            return nil
+        }
+        // A file's very first contents on this device count as "from before sync", not as changes made now.
+        let blank = old.records.isEmpty && old.marks.changed.isEmpty && old.marks.gone.isEmpty
+        let doc = blank ? fresh.baselined(rank: rank) : fresh.stamped(after: old)
+        docs[f] = doc
+        return doc.marks
+    }
+
     private func persist() {
-        guard !workoutsUnreadable, let data = try? WorkoutFile.encode(workouts) else { return }
+        guard !workoutsUnreadable else { return }
+        let marks = mark(.workouts, WorkoutFile.doc(workouts))
+        guard let data = try? WorkoutFile.encode(workouts, marks: marks) else { return }
         try? data.write(to: file, options: .atomic)
         removeUnusedPhotos()
+        cloud?.localChanged()
     }
 
     private func persistGym() {
-        guard !gymUnreadable, let data = try? GymFile.encode(gym) else { return }
+        guard !gymUnreadable else { return }
+        let marks = mark(.gym, GymFile.doc(gym))
+        guard let data = try? GymFile.encode(gym, marks: marks) else { return }
         try? data.write(to: gymFile, options: .atomic)
         removeUnusedPhotos()
+        cloud?.localChanged()
     }
 
     private func persistHistory() {
-        guard !historyUnreadable, let data = try? HistoryFile.encode(history) else { return }
+        guard !historyUnreadable else { return }
+        let marks = mark(.history, HistoryFile.doc(history))
+        guard let data = try? HistoryFile.encode(history, marks: marks) else { return }
         try? data.write(to: historyFile, options: .atomic)
+        cloud?.localChanged()
+    }
+
+    private func persistSettings() {
+        guard !settingsUnreadable else { return }
+        let marks = mark(.settings, SettingsFile.doc(settings))
+        guard let data = try? SettingsFile.encode(settings, marks: marks) else { return }
+        try? data.write(to: settingsFile, options: .atomic)
+        cloud?.localChanged()
+    }
+
+    // MARK: iCloud (since 3.0)
+
+    func setSync(_ status: SyncStatus) {
+        if syncStatus != status { syncStatus = status }
+    }
+
+    /// This device's data for one file, ready to be joined; nil when it must stay out of the meeting.
+    func doc(_ f: SyncFile) -> SyncDoc? { docs[f] }
+
+    /// Puts joined data in place of this device's — only when every record in it reads back.
+    @discardableResult
+    func apply(_ f: SyncFile, _ doc: SyncDoc) -> Bool {
+        guard docs[f] != nil, f.holds(doc), let data = try? f.data(from: doc) else { return false }
+        let url: URL
+        switch f {
+        case .workouts:
+            workouts = WorkoutFile.workouts(from: doc)
+            url = file
+        case .gym:
+            let finished: (GymLog) -> [GymVisit] = { $0.visits.filter { $0.finished != nil } }
+            let log = GymFile.log(from: doc)
+            let boardChanged = finished(log) != finished(gym)
+            gym = log
+            url = gymFile
+            if boardChanged { writeBoardFile() }
+            SessionLive.sync(gym)
+            GymNudge.sync(gym)
+        case .history:
+            history = HistoryFile.records(from: doc)
+            url = historyFile
+        case .settings:
+            settings = SettingsFile.settings(from: doc)
+            url = settingsFile
+            Cues.shared.reload()
+        }
+        docs[f] = doc
+        try? data.write(to: url, options: .atomic)
+        if f == .gym {
+            // A gym log always has a gym and a chosen gym that exists.
+            var whole = gym
+            whole.ensureGym()
+            if whole != gym {
+                gym = whole
+                persistGym()
+            }
+        }
+        if f == .workouts || f == .gym { removeUnusedPhotos() }
+        return true
+    }
+
+    /// Every photo the data names; nil while a file is unreadable (then nobody may tidy photos).
+    var photosInUse: Set<String>? {
+        guard !gymUnreadable, !workoutsUnreadable else { return nil }
+        return WorkoutFile.photosInUse(workouts).union(gym.photosInUse)
+    }
+
+    func photosArrived() { photoTick += 1 }
+
+    /// The copy made once, just before this device first meets iCloud: Documents/Before iCloud.
+    var beforeICloudFolder: URL { folder.appendingPathComponent("Before iCloud", isDirectory: true) }
+
+    /// Keeps everything as it is on this device right now in one backup file, before the first join.
+    /// True when the copy is there (or there was nothing to keep).
+    func keepBeforeICloud(now: Date = Date()) -> Bool {
+        let fm = FileManager.default
+        guard !workouts.isEmpty || !gym.machines.isEmpty || !gym.visits.isEmpty || !history.isEmpty else { return true }
+        try? fm.createDirectory(at: beforeICloudFolder, withIntermediateDirectories: true)
+        guard let data = try? Backup.encode(makeBackup(at: now)) else { return false }
+        return (try? data.write(to: beforeICloudFolder.appendingPathComponent(Backup.fileName(now)), options: .atomic)) != nil
+    }
+
+    /// The copies from before iCloud on this device, newest first.
+    func beforeICloudCopies() -> [(url: URL, made: Date)] {
+        let urls = (try? FileManager.default.contentsOfDirectory(at: beforeICloudFolder, includingPropertiesForKeys: [.creationDateKey])) ?? []
+        return urls.filter { $0.pathExtension == "json" }.map { url in
+            (url, (try? url.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast)
+        }.sorted { $0.made > $1.made }
     }
 
     /// Photos no workout or machine uses any more (replaced, removed, deleted) go.

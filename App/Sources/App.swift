@@ -17,6 +17,9 @@ struct AMSWorkoutCompanionApp: App {
                     // The gym session on the lock screen and the gym reminder, as things stand now (since 1.23).
                     SessionLive.sync(library.gym)
                     GymNudge.sync(library.gym)
+                    Cues.shared.reload()
+                    // 3.0: meet iCloud.
+                    library.cloud?.start()
                 }
         }
         // Leaving the app: the day's automatic backup, if one is due (since 1.7).
@@ -25,6 +28,8 @@ struct AMSWorkoutCompanionApp: App {
                 library.autoBackupIfDue()
                 library.writeBoardFile()
             }
+            // Back in front: what the other devices did meanwhile comes in (3.0).
+            if now == .active { library.cloud?.start() }
         }
     }
 }

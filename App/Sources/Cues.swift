@@ -320,32 +320,22 @@ enum RestLive {
 }
 
 extension SoundChoice {
-    private static let key = "sounds"
+    /// His saved choices (since 3.0 in settings.json, the same on every device); the old sounds when nothing is saved.
+    @MainActor
+    static func load() -> SoundChoice { Library.current?.settings.sounds ?? SoundChoice() }
 
-    /// His saved choices; the old sounds when nothing is saved.
-    static func load() -> SoundChoice {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let c = try? JSONDecoder().decode(SoundChoice.self, from: data) else { return SoundChoice() }
-        return c
-    }
-
+    @MainActor
     func save() {
-        if let data = try? JSONEncoder().encode(self) { UserDefaults.standard.set(data, forKey: Self.key) }
-        Task { @MainActor in Cues.shared.reload() }
+        Library.current?.setSounds(self)
+        Cues.shared.reload()
     }
 }
 
 extension IntervalPreset {
-    private static let key = "intervalPresets"
-
     /// His own saved presets.
-    static func mine() -> [IntervalPreset] {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let list = try? JSONDecoder().decode([IntervalPreset].self, from: data) else { return [] }
-        return list
-    }
+    @MainActor
+    static func mine() -> [IntervalPreset] { Library.current?.settings.presets ?? [] }
 
-    static func saveMine(_ list: [IntervalPreset]) {
-        if let data = try? JSONEncoder().encode(list) { UserDefaults.standard.set(data, forKey: key) }
-    }
+    @MainActor
+    static func saveMine(_ list: [IntervalPreset]) { Library.current?.setPresets(list) }
 }
