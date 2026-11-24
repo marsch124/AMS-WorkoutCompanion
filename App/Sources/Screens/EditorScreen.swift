@@ -194,7 +194,7 @@ struct EditorScreen: View {
         Section {
             ForEach($draft.steps) { $step in
                 StepRow(step: $step, number: (draft.steps.firstIndex { $0.id == step.id } ?? 0) + 1,
-                        measures: draft.shownMeasures)
+                        measures: draft.shownMeasures, fill: draft.swatch.fillColor, ink: draft.swatch.inkColor)
             }
             .onMove { draft.steps.move(fromOffsets: $0, toOffset: $1) }
             .onDelete { draft.steps.remove(atOffsets: $0) }
@@ -222,6 +222,7 @@ struct EditorScreen: View {
                 Text("Total \(Clock.text(draft.tailoredTotal)), after a 5-second get ready.")
                     .accessibilityIdentifier("editor-steps-total")
                 Text("Tap a time to choose a length; − and + change it in small steps. Hold ≡ and drag to put the steps in order. The red minus removes a step.")
+                Text("Effort: tap the word to choose Easy, Steady, Hard or All-out. An Easy step runs on a grey ring.")
             }
         }
     }
@@ -373,17 +374,19 @@ private struct StepRow: View {
     @Binding var step: IntervalStep
     let number: Int
     let measures: [StepMeasure]
+    let fill: Color
+    let ink: Color
     /// A "Speed or power" text typed in 2.4 stays on its step, to change or empty; new steps have no such line.
     @State private var hadTarget = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             top
-            if !measures.isEmpty {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 6)], alignment: .leading, spacing: 6) {
-                    ForEach(measures, id: \.self) { measure in
-                        MeasureBox(measure: measure, step: $step, number: number)
-                    }
+            // The effort word first (since 2.6), then a box for each number the workout uses.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 6)], alignment: .leading, spacing: 6) {
+                effortMenu
+                ForEach(measures, id: \.self) { measure in
+                    MeasureBox(measure: measure, step: $step, number: number)
                 }
             }
             if hadTarget {
@@ -396,6 +399,36 @@ private struct StepRow: View {
             }
         }
         .onAppear { hadTarget = step.shownTarget != nil }
+    }
+
+    /// The step's effort (since 2.6, his pick "Four ready efforts"): its word — Easy grey, the others in the
+    /// workout's colour — or a grey "Effort" in an outline when it has none. A tap offers the four.
+    private var effortMenu: some View {
+        Menu {
+            ForEach(StepEffort.allCases, id: \.self) { effort in
+                Button(effort.title) { step.effort = effort }
+            }
+            Divider()
+            Button("No effort") { step.effort = nil }
+        } label: {
+            Text(step.effort?.title ?? "Effort")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(step.effort == nil || step.isCalm ? Theme.muted : ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background {
+                    if step.effort == nil {
+                        Capsule().stroke(Theme.muted.opacity(0.55), lineWidth: 1.5)
+                    } else {
+                        Capsule().fill(step.isCalm ? Theme.line : fill)
+                    }
+                }
+                .contentShape(Capsule())
+        }
+        .accessibilityLabel("Effort of step \(number): \(step.effort?.title ?? "none")")
+        .accessibilityIdentifier("step-effort-\(number)")
     }
 
     private var top: some View {
@@ -438,7 +471,7 @@ private struct MeasureBox: View {
 
     var body: some View {
         HStack(spacing: 3) {
-            TextField("", text: $text)
+            TextField(measure.title, text: $text)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.ink)
                 .keyboardType(.numbersAndPunctuation)
@@ -453,7 +486,7 @@ private struct MeasureBox: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Theme.line, lineWidth: 1.5))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Theme.muted.opacity(0.55), lineWidth: 1.5))
         .onAppear { text = step.value(measure).map(measure.text) ?? "" }
         .onChange(of: text) { _, typed in
             let value = measure.parse(typed)

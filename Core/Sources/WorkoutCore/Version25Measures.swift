@@ -111,7 +111,9 @@ extension Workout {
     public func detail(at index: Int) -> String? {
         guard steps.indices.contains(index) else { return nil }
         let step = steps[index]
-        let parts = shownMeasures.compactMap { m in step.value(m).map { m.shown($0) } } + [step.shownTarget].compactMap { $0 }
+        // Since 2.6 the effort word stands first: "Steady · 5:30 /km".
+        let parts = [step.effort?.title].compactMap { $0 }
+            + shownMeasures.compactMap { m in step.value(m).map { m.shown($0) } } + [step.shownTarget].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " \u{B7} ")
     }
 
@@ -119,7 +121,8 @@ extension Workout {
     public func spokenDetail(at index: Int) -> String? {
         guard steps.indices.contains(index) else { return nil }
         let step = steps[index]
-        let parts = shownMeasures.compactMap { m in step.value(m).map { m.spoken($0) } } + [step.shownTarget].compactMap { $0 }
+        let parts = [step.effort?.title].compactMap { $0 }
+            + shownMeasures.compactMap { m in step.value(m).map { m.spoken($0) } } + [step.shownTarget].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: ". ")
     }
 

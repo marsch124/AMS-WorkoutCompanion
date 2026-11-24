@@ -140,7 +140,9 @@ struct HomeScreen: View {
                 .accessibilityLabel("New workout")
                 .accessibilityIdentifier("add-workout")
             }
-            .navigationTitle("Workout Companion")
+            // The small title "Workouts" (since 2.6; before, the app's name as a large heading).
+            .navigationTitle("Workouts")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: $showGym) { GymScreen() }
             // The screen stays on (and sounds can play) while at the gym.
             .onChange(of: showGym) { _, on in on ? Cues.shared.begin() : Cues.shared.end() }
@@ -207,8 +209,8 @@ private struct WorkoutCard: View {
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                     Text(workout.summary)
-                        .font(.caption)
-                        .foregroundStyle(workout.inkOnFill.opacity(0.85))
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(workout.inkOnFill)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }

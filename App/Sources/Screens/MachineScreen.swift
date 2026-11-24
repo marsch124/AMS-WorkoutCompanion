@@ -170,7 +170,14 @@ struct MachineScreen: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
-            .background(Theme.bg.opacity(0.96).ignoresSafeArea(edges: .bottom))
+            .background(Theme.bg.ignoresSafeArea(edges: .bottom))
+            // The page fades out above the button (since 2.6); before, words were cut through at its edge.
+            .overlay(alignment: .top) {
+                LinearGradient(colors: [Theme.bg.opacity(0), Theme.bg], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 20)
+                    .offset(y: -20)
+                    .allowsHitTesting(false)
+            }
             .accessibilityLabel(leaving)
             .accessibilityValue(next.map { "Next: \($0.name)" } ?? "")
             .accessibilityIdentifier("machine-done-pill")

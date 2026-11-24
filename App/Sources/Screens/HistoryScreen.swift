@@ -105,21 +105,22 @@ struct HistoryScreen: View {
         let o = Stats.overview(all, gym: library.gym, in: period)
         let key = statsMonth ? "month" : "week"
         return VStack(alignment: .leading, spacing: 6) {
-            Text(statsMonth ? "This month" : "This week")
-                .font(.headline)
-                .foregroundStyle(Past.tint)
+            // The switch itself says the period (since 2.6; before, a heading above it said it twice).
             Picker("Period", selection: $statsMonth) {
                 Text("This week").tag(false)
                 Text("This month").tag(true)
             }
             .pickerStyle(.segmented)
             .accessibilityIdentifier("stats-period")
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                tile("Sessions", "\(o.sessions)", "plum", id: "history-\(key)-sessions")
-                tile("Minutes", "\(o.minutes)", "green", id: "history-\(key)-minutes")
-                tile("Exercises", "\(o.exercises)", "orange", id: "history-\(key)-exercises")
-                tile("Sets", "\(o.sets)", "blue", id: "history-\(key)-sets")
-                if o.kg > 0 { tile("Lifted", "\(GymSet.number(o.kg)) kg", "indigo", id: "history-\(key)-kg") }
+            // Four numbers in one row (since 2.6; before, three and Sets alone below); Lifted is one wide line.
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    tile("Sessions", "\(o.sessions)", "plum", id: "history-\(key)-sessions")
+                    tile("Minutes", "\(o.minutes)", "green", id: "history-\(key)-minutes")
+                    tile("Exercises", "\(o.exercises)", "orange", id: "history-\(key)-exercises")
+                    tile("Sets", "\(o.sets)", "blue", id: "history-\(key)-sets")
+                }
+                if o.kg > 0 { tile("Lifted", "\(GymSet.number(o.kg)) kg", "indigo", id: "history-\(key)-kg", wide: true) }
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(statsMonth ? "stats-month" : "stats-week")
@@ -146,6 +147,9 @@ struct HistoryScreen: View {
     private func bar(_ label: String, _ value: String, fraction: Double, colour: IconColour) -> some View {
         HStack(spacing: 8) {
             Text(label).font(.subheadline).foregroundStyle(Theme.ink).frame(width: 92, alignment: .leading).lineLimit(1)
+            // The figure right beside its name (since 2.6; before, at the far right edge), then the bar.
+            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(colour.fillColor)
+                .lineLimit(1).frame(width: 64, alignment: .leading)
             GeometryReader { geo in
                 Capsule().fill(colour.fillColor.opacity(0.15))
                     .overlay(alignment: .leading) {
@@ -153,8 +157,6 @@ struct HistoryScreen: View {
                     }
             }
             .frame(height: 10)
-            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(colour.fillColor)
-                .frame(minWidth: 48, alignment: .trailing)
         }
         .accessibilityElement(children: .combine)
     }
@@ -192,6 +194,9 @@ struct HistoryScreen: View {
                         Text("Not trained").font(.subheadline.weight(.semibold)).foregroundStyle(Gym.busyTint)
                         Spacer(minLength: 0)
                     } else {
+                        // The figure right beside its name (since 2.6; before, at the far right edge).
+                        Text("\(r.total) set\(r.total == 1 ? "" : "s")").font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(c.fillColor)
+                            .lineLimit(1).frame(width: 64, alignment: .leading)
                         HStack(alignment: .bottom, spacing: 4) {
                             ForEach(Array(r.weeks.enumerated()), id: \.offset) { _, n in
                                 RoundedRectangle(cornerRadius: 2)
@@ -201,7 +206,6 @@ struct HistoryScreen: View {
                         }
                         .frame(height: 22, alignment: .bottom)
                         Spacer(minLength: 0)
-                        Text("\(r.total) set\(r.total == 1 ? "" : "s")").font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(c.fillColor)
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -306,18 +310,23 @@ struct HistoryScreen: View {
         .accessibilityIdentifier("stats-badge-\(b.id)")
     }
 
-    private func tile(_ title: String, _ value: String, _ colour: String, id: String) -> some View {
+    private func tile(_ title: String, _ value: String, _ colour: String, id: String, wide: Bool = false) -> some View {
         let c = IconColour.of(key: colour) ?? Past.swatch
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.caption.weight(.semibold)).foregroundStyle(c.inkColor.opacity(0.85))
+        // A wide tile has its figure right beside its name, on one line.
+        let layout = wide ? AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+        return layout {
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(c.inkColor).lineLimit(1).minimumScaleFactor(0.75)
             Text(value)
-                .font(.title2.weight(.bold))
+                .font(wide ? .headline.weight(.bold) : .title2.weight(.bold))
                 .monospacedDigit()
                 .foregroundStyle(c.inkColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .accessibilityIdentifier(id)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
+        .padding(.horizontal, 8)
+        .padding(.vertical, wide ? 7 : 8)
         .background(c.fillColor, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 

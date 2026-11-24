@@ -14,9 +14,12 @@ public struct IntervalStep: Codable, Identifiable, Hashable, Sendable {
     public var easy: Bool
     /// The step's numbers (since 2.5): pace, power, weight, level — keyed by `StepMeasure`'s raw name.
     public var values: [String: Double]
+    /// How hard the step is (since 2.6): Easy, Steady, Hard, All-out — or none.
+    public var effort: StepEffort?
 
     public init(id: UUID = UUID(), name: String = "", seconds: Int = 60, target: String = "", easy: Bool = false,
-                values: [String: Double] = [:]) {
+                values: [String: Double] = [:], effort: StepEffort? = nil) {
+        self.effort = effort
         self.id = id
         self.name = name
         self.seconds = seconds
@@ -39,6 +42,10 @@ public struct IntervalStep: Codable, Identifiable, Hashable, Sendable {
         target = try c.decodeIfPresent(String.self, forKey: .target) ?? ""
         easy = try c.decodeIfPresent(Bool.self, forKey: .easy) ?? false
         values = try c.decodeIfPresent([String: Double].self, forKey: .values) ?? [:]
+        // A step saved as Easy in 2.4 comes back as Easy; a word this version does not know is no effort.
+        effort = ((try? c.decodeIfPresent(StepEffort.self, forKey: .effort)) ?? nil) ?? (easy ? .easy : nil)
+        // The old mark is used up: or a step he later sets to "No effort" would come back as Easy.
+        easy = false
     }
 
     /// The shortest and the longest a step can be, and the most steps one workout holds
@@ -64,10 +71,11 @@ public struct IntervalStep: Codable, Identifiable, Hashable, Sendable {
     }
 
     /// What a new Tailored intervals workout starts with: his own example of 23 November 2026 —
-    /// jog and walk 1, 2, 3, 2, 1 minutes, 18 minutes in all.
+    /// jog and walk 1, 2, 3, 2, 1 minutes, 18 minutes in all. Since 2.6 the efforts are preset: Jog Steady, Walk Easy.
     public static var example: [IntervalStep] {
         [1, 2, 3, 2, 1].flatMap { minutes in
-            [IntervalStep(name: "Jog", seconds: minutes * 60), IntervalStep(name: "Walk", seconds: minutes * 60)]
+            [IntervalStep(name: "Jog", seconds: minutes * 60, effort: .steady),
+             IntervalStep(name: "Walk", seconds: minutes * 60, effort: .easy)]
         }
     }
 }
@@ -88,7 +96,7 @@ extension Workout {
     public func nextStep() -> IntervalStep {
         let like = steps.count >= 2 ? steps[steps.count - 2] : nil
         return IntervalStep(name: like?.name ?? "", seconds: steps.last?.seconds ?? 60,
-                            target: like?.target ?? "", values: like?.values ?? [:])
+                            target: like?.target ?? "", values: like?.values ?? [:], effort: like?.effort)
     }
 
     /// The step behind a running phase; nil for a get ready.

@@ -662,3 +662,43 @@ Version 2.5 has two changes to Tailored intervals: (A) Pace, Power, Weight and L
 - Version lists: `AppTextTests` (2.5 first) and `testSettingsShowsTheVersionAndWhatsNew` (2.5, `whatsnew-2.5`).
 - Checked in the simulator, day and night. **Not yet tried on a real phone.**
 - **Texts.** What's new (2.5) and How it works (Tailored intervals, Signs in this app) updated.
+
+## Version 2.6 — four ready efforts per step, and nine look fixes (24 Nov 2026)
+
+Version 2.6 has two parts: (A) efforts are back on the steps of a Tailored intervals workout, as four ready words, and (B) nine look fixes from a look-over. The owner picked all of this on 24 Nov 2026: for A, "Four ready efforts: Easy, Steady, Hard, All-out"; for B, the numbered findings on the picture he saw (number 6 was not picked and is not done).
+
+### A. Four ready efforts: Easy, Steady, Hard, All-out
+- **Before:** 2.4 had a button Effort / Easy on each step; 2.5 removed it, so a step had no effort word.
+- **Effort button.** Every step has a small effort button at the start of its second line in the editor (id `step-effort-N`). It shows the step's word (Easy, Steady, Hard or All-out), or the grey word "Effort" in an outline when the step has none. A tap opens a short list: Easy, Steady, Hard, All-out, No effort. Easy is grey; Steady, Hard and All-out are filled in the workout's colour. The Pace, Power, Weight and Level boxes of 2.5 stay as they are.
+- **Example.** The ready-made example of a new Tailored workout (jog and walk 1, 2, 3, 2, 1 minutes) starts with Jog = Steady and Walk = Easy.
+- **Add step** copies the effort of the step two lines up, together with its name and numbers, as before.
+- **Older files.** Steps saved as "Easy" in 2.4 (`"easy": true`) are read as effort Easy. All other older steps have no effort until the owner picks one.
+- **Where the effort shows.** First in the line under the step's name on the run screen ("Steady · 5:30 /km · 150 W"); after the length in "First: Jog 1:00 · Steady · 5:30 /km" and "Next: Walk 2:00 · Easy"; on the plan page ("1 · Jog 1:00 · Steady · 5:30 /km"); in the notification title; on the lock screen.
+- **Voice.** After the length: "Jog. 2 minutes. Steady. 5:30 per kilometre."
+- **Run colours.** An Easy step runs on a grey ring with a grey name (as in 2.4). Steady, Hard and All-out run in the workout's colour. Grey on the run screen therefore means: a rest, Get ready, or an Easy step ("take it easy").
+- **Foot text of the editor** gains: "Effort: tap the word to choose Easy, Steady, Hard or All-out. An Easy step runs on a grey ring."
+- **Empty boxes (look fix 10).** Before, an empty number box showed only its faint unit ("/km", "W"). Now an empty box shows its word in grey (Pace, Power, Weight, Level) and the box outline is stronger, also at night.
+
+### B. Nine look fixes (numbers are those of the picture)
+1. **Workouts page.** The big heading "Workout Companion" is gone; the page has the small centred title "Workouts", like History and Settings. Everything below starts about 50 points higher.
+2. **Workout tiles.** The line under a workout's name ("5 × 20 · rest 1:30") was caption size at 85 % strength; now footnote size, medium weight, full strength.
+3. **At the gym.** The grey hint line under the gym button ("Tap the machine you'll use next — or plan today's order.", "Tap the machine you'll use next.", "Follow the plan, or tap any machine that is free.") is gone once the gym has machines; the first-time hint of an empty gym ("At each machine: take a photo, give it a name, then log your sets.") stays. The big heading "At the gym" becomes a small centred title. Together the machines start about 100 points higher.
+4. **Busy pill.** Before, an unmarked machine showed the word Busy in orange with an orange outline, so every machine looked busy. Now an unmarked pill is grey (word and outline) and turns full orange only when tapped. Orange means only "marked busy". Its place (bottom right of the photo) is unchanged.
+5. **Machine page.** Before, words of the page (for example the heading "History") showed cut through above the bottom button "Back to gym" / "Exercise done". Now the button's strip is the full page colour (before 96 %) and the page fades out over the 20 points above it (a soft fade from clear to the page colour), so no half words stand at its edge.
+6. Not picked, not done.
+7. **History.** The heading "This week" / "This month" above the switch is gone. The four tiles (Sessions, Minutes, Exercises, Sets) stand in one row of four (before: three, and Sets alone on a second row). "Lifted" (only when kilograms were lifted) is one wide line under them, its figure right beside the word (`tile(…, wide: true)`; before, a fifth tile). About 70 points less height.
+8. **History, Muscle balance.** The number of sets ("12 sets") stands right beside the muscle's name ("Chest 12 sets"), not at the far right edge; the bars follow. The shared `bar` row of Muscle groups and Warm-up and cardio has the same order: name (92 pt), figure (64 pt), bar.
+9. **Settings.** Before: two unnamed blocks (2 and 8 rows), rows about 52 points tall, words only. Now three named blocks: "Help" (How it works, What's new), "Training" (Muscle groups, Plan templates, Rest times, Sounds, Reminder and stretch), "Your data" (Backups, Check my data, Garmin Board). Each row has a small hand-drawn mark in its block's colour and is 44 points tall. The version stays at the bottom.
+9a. Settings marks (hand-drawn, from the icon library, on a 28 pt tile; row = 28 + 8 above + 8 below = 44 pt, `defaultMinListRowHeight` 44): Help orange — book, gift; Training blue — strength, notebook, stopwatch, headphones, yoga; Your data green — box, pulse, watch. Row identifiers are unchanged.
+10. **Tailored steps editor.** Empty boxes show their word in grey; stronger outline (see A).
+
+### Data
+- `StepEffort` (easy, steady, hard, allOut) and `IntervalStep.effort` in `Core/Sources/WorkoutCore/Version26Effort.swift`. `IntervalStep.easy` (2.4) is read: `"easy": true` becomes effort Easy.
+- No other data change; Backups carry the efforts with the steps.
+
+### Texts
+- What's new (2.6) added. How it works updated: Tailored intervals, Signs in this app, Workouts, At the gym, Busy machines, Next machine, History, Statistics, Muscle balance and Records. The sentences saying there is no Effort or Easy button and that every step runs in the workout's colour are corrected.
+- Not yet tried on a real phone.
+
+- Old Easy mark: when a step is read, an old `"easy": true` (2.4) gives effort Easy and the old mark is then cleared, so a step later set to "No effort" stays without effort. Test: Version24Tests.
+- Checked on the simulator by hand, by day: Workouts, At the gym (Busy off and on), a machine, History, Settings, the Tailored editor (effort list, boxes), the run screen (Hard, Easy grey, Steady). Data tests: 222 green. The screen test Version26UITests was written but not run locally (the Mac was overloaded); GitHub runs it.

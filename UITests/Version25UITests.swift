@@ -43,10 +43,10 @@ final class Version25UITests: XCTestCase {
         app.buttons["new-tailored"].tap()
         type("Hill", into: "editor-name")
 
-        // Nothing chosen: no boxes, and no Effort / Easy button any more.
+        // Nothing chosen: no number boxes. Since 2.6 each step has its effort button again.
         let pace = app.buttons["measure-pace"]
         app.reveal(pace)
-        XCTAssertFalse(app.buttons["step-effort-1"].exists)
+        XCTAssertTrue(app.buttons["step-effort-1"].exists)
         XCTAssertFalse(app.textFields["step-pace-1"].exists)
         XCTAssertFalse(app.textFields["step-target-1"].exists)
 

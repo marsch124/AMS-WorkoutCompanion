@@ -101,6 +101,7 @@ final class Version25Tests: XCTestCase {
         let w = try XCTUnwrap(WorkoutFile.decode(Data(old.utf8)).first)
         XCTAssertEqual(w.measures, [])
         XCTAssertEqual(w.steps[0].values, [:])
-        XCTAssertEqual(w.detail(at: 0), "8 km/h")
+        // The old step was Easy in 2.4: since 2.6 its effort word stands first.
+        XCTAssertEqual(w.detail(at: 0), "Easy \u{B7} 8 km/h")
     }
 }

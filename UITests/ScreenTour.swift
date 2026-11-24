@@ -231,7 +231,7 @@ final class ScreenTour: XCTestCase {
         XCTAssertTrue(app.buttons["open-gym"].waitForExistence(timeout: 10))
         snap("28 Train")
         app.buttons["open-gym"].tap()
-        XCTAssertTrue(app.staticTexts["gym-intro"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["machine-Lat pulldown"].waitForExistence(timeout: 5)) // the intro hint shows only without machines since 2.6
         snap("29 Gym")
         app.buttons["machine-Lat pulldown"].tap()
         XCTAssertTrue(app.buttons["machine-done-pill"].waitForExistence(timeout: 5))

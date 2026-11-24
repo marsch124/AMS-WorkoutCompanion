@@ -34,7 +34,7 @@ final class Version23Tests: XCTestCase {
     func testPlanLines() {
         let plan = pyramid().plan
         XCTAssertEqual(plan.count, 11)
-        XCTAssertEqual(plan.first, PlanLine("1 · Jog", "1:00"))
+        XCTAssertEqual(plan.first, PlanLine("1 · Jog", "1:00 · Steady"))
         XCTAssertEqual(plan.last, PlanLine("Total time", "18:00"))
     }
 

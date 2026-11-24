@@ -177,14 +177,13 @@ struct GymScreen: View {
                     .background(Gym.busy.fillColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .accessibilityIdentifier("gym-earlier-day")
                 }
-                Text(machines.isEmpty
-                     ? "At each machine: take a photo, give it a name, then log your sets."
-                     : plan != nil ? "Follow the plan, or tap any machine that is free."
-                     : sessionStart != nil || (visit?.setCount ?? 0) > 0 ? "Tap the machine you'll use next."
-                     : "Tap the machine you'll use next — or plan today's order.")
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.muted)
-                    .accessibilityIdentifier("gym-intro")
+                // The hint shows only while the gym has no machines (since 2.6): the machines start higher.
+                if machines.isEmpty {
+                    Text("At each machine: take a photo, give it a name, then log your sets.")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.muted)
+                        .accessibilityIdentifier("gym-intro")
+                }
                 actionRow
                 }
                 .padding(10)
@@ -333,7 +332,7 @@ struct GymScreen: View {
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("At the gym")
         .noSwipeBack()
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if library.gym.gyms.isEmpty { library.changeGym { $0.ensureGym() } }
         }
@@ -1187,22 +1186,23 @@ private struct BandHeight: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
-/// "Busy" on a machine's photo: full orange when marked, a light outline when not.
+/// "Busy" on a machine's photo: full orange when marked; grey word and grey outline when not (since 2.6 —
+/// before, an unmarked pill was orange too, so every machine looked busy). Orange means only "marked busy".
 private struct BusyPill: View {
     static let height: CGFloat = 20
     let on: Bool
 
     var body: some View {
         HStack(spacing: 2) {
-            IconMark(.hand("stopwatch"), size: 11, colour: on ? Gym.busy.inkColor : Gym.busyTint)
+            IconMark(.hand("stopwatch"), size: 11, colour: on ? Gym.busy.inkColor : Theme.muted)
             Text("Busy")
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(on ? Gym.busy.inkColor : Gym.busyTint)
+                .foregroundStyle(on ? Gym.busy.inkColor : Theme.muted)
         }
         .padding(.horizontal, 5)
         .frame(height: Self.height)
         .background(on ? AnyShapeStyle(Gym.busy.fillColor) : AnyShapeStyle(Theme.card.opacity(0.92)), in: Capsule())
-        .overlay(Capsule().stroke(Gym.busy.fillColor, lineWidth: on ? 0 : 1))
+        .overlay(Capsule().stroke(Theme.muted.opacity(0.55), lineWidth: on ? 0 : 1))
         .contentShape(Capsule())
     }
 }

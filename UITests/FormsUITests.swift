@@ -32,11 +32,17 @@ final class FormsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["machine-Chest press"].waitForExistence(timeout: 5))
     }
 
-    func testTheGymIntroSaysWhichMachineNext() {
+    /// Since 2.6 the hint shows only while the gym has no machines.
+    func testTheGymIntroShowsOnlyWhileThereAreNoMachines() {
         launchGymDemo()
+        XCTAssertFalse(app.staticTexts["gym-intro"].exists)
+        app.terminate()
+        app.launchArguments = ["-uitest"]
+        app.launch()
+        app.buttons["open-gym"].tap()
         let intro = app.staticTexts["gym-intro"]
         XCTAssertTrue(intro.waitForExistence(timeout: 5))
-        XCTAssertTrue(intro.label.contains("Tap the machine you'll use next"), intro.label)
+        XCTAssertTrue(intro.label.contains("At each machine: take a photo, give it a name, then log your sets."), intro.label)
     }
 
     func testExerciseDonePillGoesBackToTheGymAndThereIsNoBackButton() {

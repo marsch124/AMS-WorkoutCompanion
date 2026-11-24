@@ -113,9 +113,9 @@ struct TimerScreen: View {
     private func countdown(_ phase: Phase) -> some View {
         let left = session.remaining(at: now) ?? 0
         let (label, sub) = words(for: phase)
-        // Grey is for a rest and the get ready only; every Tailored step runs in the workout's colour
-        // (2.4 had grey "Easy" steps; gone in 2.5, his pick).
-        let calm = phase.isRest
+        // Grey is for a rest, the get ready and — since 2.6, as in 2.4 — an Easy step of a Tailored workout;
+        // Steady, Hard and All-out steps run in the workout's colour.
+        let calm = phase.isRest || workout.step(of: phase)?.isCalm == true
         let detail = workout.stepIndex(of: phase).flatMap { workout.detail(at: $0) }
         let colour = calm ? Theme.muted : workout.fill
         return ZStack {

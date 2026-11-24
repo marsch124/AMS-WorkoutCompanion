@@ -108,9 +108,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("2.5 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("2.6 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-2.5"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-2.6"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {
@@ -491,7 +491,7 @@ final class WorkoutCompanionUITests: XCTestCase {
     // MARK: 1.5
 
     func testTheHomeHasTabsTheHeadingAndTwoColumns() {
-        XCTAssertTrue(app.navigationBars["Workout Companion"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Workouts"].waitForExistence(timeout: 5))
         let push = app.buttons["workout-Push-ups"], intervals = app.buttons["workout-Intervals"]
         XCTAssertTrue(push.exists && intervals.exists)
         // Two columns: Push-ups and Intervals side by side.
