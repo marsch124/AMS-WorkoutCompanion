@@ -302,7 +302,7 @@ enum RestLive {
             end()
             return
         }
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        guard UIDevice.current.userInterfaceIdiom == .phone, ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         let content = ActivityContent(state: RestActivityAttributes.ContentState(card: card), staleDate: card.end)
         if let current {
             Task { await current.update(content) }

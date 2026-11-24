@@ -103,6 +103,7 @@ struct SettingsScreen: View {
         .environment(\.defaultMinListRowHeight, 44)
         .listSectionSpacing(.compact)
         .scrollContentBackground(.hidden)
+        .readableWidth(680)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
@@ -128,6 +129,7 @@ private struct HowItWorksScreen: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .readableWidth(680)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("How it works")
         .navigationBarTitleDisplayMode(.inline)
@@ -149,6 +151,7 @@ private struct WhatsNewScreen: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .readableWidth(680)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("What's new")
         .navigationBarTitleDisplayMode(.inline)

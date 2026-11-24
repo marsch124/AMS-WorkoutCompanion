@@ -51,6 +51,7 @@ struct HealthCheckScreen: View {
                 Text("This only looks. Nothing is changed or deleted.")
             }
         }
+        .readableWidth(680)
         .navigationTitle("Check my data")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { if report == nil { check() } }

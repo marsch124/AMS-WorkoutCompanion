@@ -122,6 +122,7 @@ struct BackupScreen: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .readableWidth(680)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("Backups")
         .navigationBarTitleDisplayMode(.inline)

@@ -84,6 +84,7 @@ struct ChecklistScreen: View {
                 }
             }
         }
+        .readableWidth(560)
         .background(Theme.bg.ignoresSafeArea())
         .onAppear { Cues.shared.begin() }
         .onDisappear { Cues.shared.end() }

@@ -158,6 +158,7 @@ struct StretchTimerScreen: View {
                 controls
             }
         }
+        .readableWidth(560)
         .background(Theme.bg.ignoresSafeArea())
         .onAppear(perform: prepare)
         .sheet(isPresented: $rechoosing) {

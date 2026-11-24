@@ -34,6 +34,7 @@ struct TimerScreen: View {
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 12)
+        .readableWidth(560)
         .background(Theme.bg.ignoresSafeArea())
         .onAppear {
             Cues.shared.begin()

@@ -59,6 +59,7 @@ struct MuscleGroupsScreen: View {
         }
         .environment(\.editMode, .constant(.active))
         .scrollContentBackground(.hidden)
+        .readableWidth(680)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("Muscle groups")
         .navigationBarTitleDisplayMode(.inline)

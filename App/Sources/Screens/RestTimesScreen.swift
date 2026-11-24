@@ -20,6 +20,7 @@ struct RestTimesScreen: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .readableWidth(680)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("Rest times")
         .navigationBarTitleDisplayMode(.inline)

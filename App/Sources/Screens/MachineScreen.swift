@@ -142,6 +142,7 @@ struct MachineScreen: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
+            .readableWidth(720)
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Theme.bg.ignoresSafeArea())

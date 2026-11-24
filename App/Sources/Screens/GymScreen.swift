@@ -143,7 +143,13 @@ struct GymScreen: View {
     private var machines: [Machine] { library.gym.machines(in: gymID) }
     private var plan: DayPlan? { library.gym.plan(on: day, gym: gymID) }
     private var isToday: Bool { Calendar.current.isDateInToday(day) }
-    private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    /// Wide window (since 3.0): about four tiles in a row on an iPad on its side.
+    private var columns: [GridItem] {
+        sizeClass == .regular
+            ? [GridItem(.adaptive(minimum: 180, maximum: 260), spacing: 8, alignment: .top)]
+            : [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -320,6 +326,7 @@ struct GymScreen: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
+            .readableWidth(1100)
         }
         // Opening Earlier visits brings the list up into view (since 1.32, his ask: "you don't see anything").
         .onChange(of: showingEarlier) { _, open in

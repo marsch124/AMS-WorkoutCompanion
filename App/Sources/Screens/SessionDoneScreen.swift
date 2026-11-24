@@ -198,6 +198,7 @@ struct SummaryScreen: View {
                 }
             }
         }
+        .readableWidth(560)
         .navigationTitle("Session done")
         .navigationBarTitleDisplayMode(.inline)
         // Since 1.32 (his ask) Stretch now starts the guided timer with voice cues; since 2.0 his chosen

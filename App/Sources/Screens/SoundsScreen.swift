@@ -35,6 +35,7 @@ struct SoundsScreen: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .readableWidth(680)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("Sounds")
         .navigationBarTitleDisplayMode(.inline)

@@ -55,6 +55,7 @@ struct HistoryScreen: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
+            .readableWidth(820)
         }
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("History")
@@ -484,6 +485,7 @@ struct RecordScreen: View {
                 }
             }
         }
+        .readableWidth(680)
         .navigationTitle(r?.started.formatted(date: .abbreviated, time: .omitted) ?? "Workout")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
