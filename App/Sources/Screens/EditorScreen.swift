@@ -81,6 +81,7 @@ struct EditorScreen: View {
                     Text("Total \(Clock.text(draft.intervalTotal)), after a 5-second get ready.")
                 }
             case .tailored:
+                measuresSection
                 stepsSection
             case .checklist:
                 // The order is dragged (since 2.4, his rule: drag and drop, never arrows or Move up / Move down).
@@ -156,13 +157,44 @@ struct EditorScreen: View {
         }
     }
 
+    /// What each step of a Tailored workout carries (since 2.5, his pick "pick per workout"): four words
+    /// to tap — Pace, Power, Weight, Level. A chosen word is filled in the workout's colour.
+    @ViewBuilder private var measuresSection: some View {
+        Section {
+            HStack(spacing: 6) {
+                ForEach(StepMeasure.allCases, id: \.self) { measure in
+                    let on = draft.measures.contains(measure)
+                    Button {
+                        draft.toggle(measure)
+                    } label: {
+                        Text(measure.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(on ? draft.swatch.inkColor : Theme.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .padding(.vertical, 7)
+                            .frame(maxWidth: .infinity)
+                            .background(on ? draft.swatch.fillColor : Theme.line, in: Capsule())
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                    .accessibilityIdentifier("measure-\(measure.rawValue)")
+                }
+            }
+        } header: {
+            Text("Each step has")
+        } footer: {
+            Text("Tap what this workout needs. Every step then gets a box for it.")
+        }
+    }
+
     /// The steps of a Tailored intervals workout (since 2.3): his word, the length, − and +; the ≡ grip
     /// drags a line, the red minus removes it.
     @ViewBuilder private var stepsSection: some View {
         Section {
             ForEach($draft.steps) { $step in
                 StepRow(step: $step, number: (draft.steps.firstIndex { $0.id == step.id } ?? 0) + 1,
-                        fill: draft.swatch.fillColor, ink: draft.swatch.inkColor)
+                        measures: draft.shownMeasures)
             }
             .onMove { draft.steps.move(fromOffsets: $0, toOffset: $1) }
             .onDelete { draft.steps.remove(atOffsets: $0) }
@@ -190,7 +222,6 @@ struct EditorScreen: View {
                 Text("Total \(Clock.text(draft.tailoredTotal)), after a 5-second get ready.")
                     .accessibilityIdentifier("editor-steps-total")
                 Text("Tap a time to choose a length; − and + change it in small steps. Hold ≡ and drag to put the steps in order. The red minus removes a step.")
-                Text("Effort or Easy: tap the word to switch. An Easy step runs on a grey ring.")
             }
         }
     }
@@ -337,38 +368,34 @@ private struct NumberRow: View {
 }
 
 /// One step of a Tailored intervals workout: his word for it, its length (a tap offers ready lengths), − and +;
-/// under them, since 2.4, the speed or power to hold and Effort / Easy.
+/// under them, since 2.5, one box for each number the workout uses (pace, power, weight, level).
 private struct StepRow: View {
     @Binding var step: IntervalStep
     let number: Int
-    let fill: Color
-    let ink: Color
+    let measures: [StepMeasure]
+    /// A "Speed or power" text typed in 2.4 stays on its step, to change or empty; new steps have no such line.
+    @State private var hadTarget = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             top
-            HStack(spacing: 8) {
+            if !measures.isEmpty {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 6)], alignment: .leading, spacing: 6) {
+                    ForEach(measures, id: \.self) { measure in
+                        MeasureBox(measure: measure, step: $step, number: number)
+                    }
+                }
+            }
+            if hadTarget {
                 TextField("Speed or power", text: $step.target)
                     .font(.subheadline)
                     .foregroundStyle(Theme.ink)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .accessibilityIdentifier("step-target-\(number)")
-                Button {
-                    step.easy.toggle()
-                } label: {
-                    Text(step.easy ? "Easy" : "Effort")
-                        .font(.footnote.weight(.bold))
-                        .foregroundStyle(step.easy ? Theme.muted : ink)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .frame(minWidth: 62)
-                        .background(step.easy ? Theme.line : fill, in: Capsule())
-                }
-                .buttonStyle(.borderless)
-                .accessibilityIdentifier("step-effort-\(number)")
             }
         }
+        .onAppear { hadTarget = step.shownTarget != nil }
     }
 
     private var top: some View {
@@ -397,6 +424,43 @@ private struct StepRow: View {
             }
             .labelsHidden()
             .accessibilityIdentifier("step-stepper-\(number)")
+        }
+    }
+}
+
+/// One number of a step in its box: typed freely, read when it makes sense, tidied when he leaves the box.
+private struct MeasureBox: View {
+    let measure: StepMeasure
+    @Binding var step: IntervalStep
+    let number: Int
+    @State private var text = ""
+    @FocusState private var typing: Bool
+
+    var body: some View {
+        HStack(spacing: 3) {
+            TextField("", text: $text)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+                .keyboardType(.numbersAndPunctuation)
+                .autocorrectionDisabled()
+                .multilineTextAlignment(.trailing)
+                .focused($typing)
+                .accessibilityLabel("\(measure.title) of step \(number)")
+                .accessibilityIdentifier("step-\(measure.rawValue)-\(number)")
+            Text(measure.unit)
+                .font(.footnote)
+                .foregroundStyle(Theme.muted)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Theme.line, lineWidth: 1.5))
+        .onAppear { text = step.value(measure).map(measure.text) ?? "" }
+        .onChange(of: text) { _, typed in
+            let value = measure.parse(typed)
+            if value != step.value(measure) { step.set(measure, value) }
+        }
+        .onChange(of: typing) { _, now in
+            if !now { text = step.value(measure).map(measure.text) ?? "" }
         }
     }
 }

@@ -100,12 +100,14 @@ public struct Workout: Codable, Identifiable, Hashable, Sendable {
     public var exercises: [Exercise]
     // Tailored intervals (since 2.3)
     public var steps: [IntervalStep]
+    /// What each step carries (since 2.5): pace, power, weight, level — chosen per workout.
+    public var measures: [StepMeasure]
 
     public init(
         id: UUID = UUID(), name: String = "", kind: WorkoutKind, colour: String? = nil,
         sets: Int = 5, reps: Int = 10, restSeconds: Int = 90,
         rounds: Int = 8, workSeconds: Int = 40, offSeconds: Int = 20,
-        exercises: [Exercise] = [], steps: [IntervalStep] = [], icon: String? = nil
+        exercises: [Exercise] = [], steps: [IntervalStep] = [], measures: [StepMeasure] = [], icon: String? = nil
     ) {
         self.icon = icon
         self.id = id
@@ -120,6 +122,7 @@ public struct Workout: Codable, Identifiable, Hashable, Sendable {
         self.offSeconds = offSeconds
         self.exercises = exercises
         self.steps = steps
+        self.measures = measures
     }
 
     public init(from decoder: Decoder) throws {
@@ -138,6 +141,7 @@ public struct Workout: Codable, Identifiable, Hashable, Sendable {
             offSeconds: try c.decodeIfPresent(Int.self, forKey: .offSeconds) ?? 20,
             exercises: try c.decodeIfPresent([Exercise].self, forKey: .exercises) ?? [],
             steps: try c.decodeIfPresent([IntervalStep].self, forKey: .steps) ?? [],
+            measures: (try? c.decodeIfPresent([StepMeasure].self, forKey: .measures)) ?? [],
             icon: try c.decodeIfPresent(String.self, forKey: .icon)
         )
     }

@@ -1,7 +1,7 @@
 import XCTest
 
-/// 2.4: exercises are dragged into order and Remove is a word that asks first; a Tailored step
-/// carries a speed or power and is Effort or Easy; the plan page has each figure beside its name.
+/// 2.4: exercises are dragged into order and Remove is a word that asks first.
+/// (Its test of a step's "Speed or power" line and Effort / Easy was retired in 2.5, which replaced both.)
 final class Version24UITests: XCTestCase {
     var app: XCUIApplication!
 
@@ -93,59 +93,5 @@ final class Version24UITests: XCTestCase {
         let card = app.buttons["workout-Knee"]
         XCTAssertTrue(card.waitForExistence(timeout: 5))
         XCTAssertTrue(card.label.contains("1 exercise"), card.label)
-    }
-
-    func testAStepCarriesSpeedOrPowerAndEffortOrEasy() {
-        XCTAssertTrue(app.buttons["add-workout"].waitForExistence(timeout: 10))
-        app.buttons["add-workout"].tap()
-        app.buttons["new-tailored"].tap()
-        type("Hill", into: "editor-name")
-
-        // The example: Jog is Effort, Walk is Easy; a tap switches.
-        let effort = app.buttons["step-effort-1"]
-        app.reveal(effort)
-        XCTAssertEqual(effort.label, "Effort")
-        XCTAssertEqual(app.buttons["step-effort-2"].label, "Easy")
-        effort.tap()
-        waitFor(effort, label: "Easy")
-        effort.tap()
-        waitFor(effort, label: "Effort")
-        type("8 km/h", into: "step-target-1")
-        picture("2.4 steps")
-
-        // Add step carries on: an eleventh step, Jog again, with the ninth step's Effort.
-        let add = app.buttons["editor-add-step"]
-        app.reveal(add)
-        add.tap()
-        let eleventh = app.textFields["step-name-11"]
-        XCTAssertTrue(eleventh.waitForExistence(timeout: 5))
-        XCTAssertEqual(eleventh.value as? String, "Jog")
-        picture("2.4 steps bottom")
-        app.buttons["editor-save"].tap()
-
-        // The plan page: the figure right beside its name, with the speed.
-        let card = app.buttons["workout-Hill"]
-        XCTAssertTrue(card.waitForExistence(timeout: 5))
-        XCTAssertTrue(card.label.contains("11 steps"), card.label)
-        card.tap()
-        let line = any("plan-line-1")
-        XCTAssertTrue(line.waitForExistence(timeout: 5))
-        XCTAssertTrue(line.label.contains("8 km/h"), line.label)
-        picture("2.4 plan")
-        app.buttons["plan-done"].tap()
-
-        // Running: the speed under the step's name; the walk after it is an Easy step.
-        app.buttons["start-Hill"].tap()
-        let phase = app.staticTexts["run-phase"]
-        waitFor(phase, label: "JOG", timeout: 14)
-        waitFor(any("run-target"), label: "8 km/h")
-        picture("2.4 run effort")
-        app.buttons["run-skip"].tap()
-        waitFor(phase, label: "WALK")
-        XCTAssertFalse(any("run-target").exists)
-        picture("2.4 run easy")
-        app.buttons["run-close"].tap()
-        app.buttons["run-end-confirm"].firstMatch.tap()
-        XCTAssertTrue(card.waitForExistence(timeout: 5))
     }
 }

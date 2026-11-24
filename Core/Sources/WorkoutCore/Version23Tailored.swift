@@ -9,15 +9,20 @@ public struct IntervalStep: Codable, Identifiable, Hashable, Sendable {
     public var seconds: Int
     /// The speed or power to hold in this step, in his own words — "8 km/h", "150 W" (since 2.4). Empty = none.
     public var target: String
-    /// An easy step — a walk between jogs — runs on a grey ring, like a rest (since 2.4). False = an effort step.
+    /// Effort or Easy of 2.4. Since 2.5 (his pick) there is no such button and every step runs in the
+    /// workout's colour; the field is still read so an older file keeps what it holds.
     public var easy: Bool
+    /// The step's numbers (since 2.5): pace, power, weight, level — keyed by `StepMeasure`'s raw name.
+    public var values: [String: Double]
 
-    public init(id: UUID = UUID(), name: String = "", seconds: Int = 60, target: String = "", easy: Bool = false) {
+    public init(id: UUID = UUID(), name: String = "", seconds: Int = 60, target: String = "", easy: Bool = false,
+                values: [String: Double] = [:]) {
         self.id = id
         self.name = name
         self.seconds = seconds
         self.target = target
         self.easy = easy
+        self.values = values
     }
 
     /// The speed or power, trimmed; nil when he gave none.
@@ -33,6 +38,7 @@ public struct IntervalStep: Codable, Identifiable, Hashable, Sendable {
         seconds = try c.decodeIfPresent(Int.self, forKey: .seconds) ?? 60
         target = try c.decodeIfPresent(String.self, forKey: .target) ?? ""
         easy = try c.decodeIfPresent(Bool.self, forKey: .easy) ?? false
+        values = try c.decodeIfPresent([String: Double].self, forKey: .values) ?? [:]
     }
 
     /// The shortest and the longest a step can be, and the most steps one workout holds
@@ -61,7 +67,7 @@ public struct IntervalStep: Codable, Identifiable, Hashable, Sendable {
     /// jog and walk 1, 2, 3, 2, 1 minutes, 18 minutes in all.
     public static var example: [IntervalStep] {
         [1, 2, 3, 2, 1].flatMap { minutes in
-            [IntervalStep(name: "Jog", seconds: minutes * 60), IntervalStep(name: "Walk", seconds: minutes * 60, easy: true)]
+            [IntervalStep(name: "Jog", seconds: minutes * 60), IntervalStep(name: "Walk", seconds: minutes * 60)]
         }
     }
 }
@@ -82,7 +88,7 @@ extension Workout {
     public func nextStep() -> IntervalStep {
         let like = steps.count >= 2 ? steps[steps.count - 2] : nil
         return IntervalStep(name: like?.name ?? "", seconds: steps.last?.seconds ?? 60,
-                            target: like?.target ?? "", easy: like?.easy ?? false)
+                            target: like?.target ?? "", values: like?.values ?? [:])
     }
 
     /// The step behind a running phase; nil for a get ready.
@@ -134,15 +140,16 @@ public struct StepNotice: Equatable, Sendable {
 extension Plan {
     /// The notifications still to come while phase `index` has `left` seconds to go: one for every
     /// later step, at the moment it starts, and one when the last phase ends.
-    /// With `steps`, a step's speed or power follows its length: "Jog · 2:00 · 8 km/h" (since 2.4).
+    /// With `details` (one per step, see `Workout.detail(at:)`), a step's numbers follow its length:
+    /// "Jog · 2:00 · 5:30 /km" (since 2.5; 2.4 passed the steps themselves).
     public static func notices(phases: [Phase], index: Int, left: TimeInterval, name: String,
-                               steps: [IntervalStep] = []) -> [StepNotice] {
+                               details: [String?] = []) -> [StepNotice] {
         guard phases.indices.contains(index) else { return [] }
         var out: [StepNotice] = []
         var after = max(0, left)
         for phase in phases.dropFirst(index + 1) {
             if case .step(let seconds, let step, let number, let of) = phase {
-                let target = steps.indices.contains(number - 1) ? steps[number - 1].shownTarget : nil
+                let target = details.indices.contains(number - 1) ? details[number - 1] : nil
                 out.append(StepNotice(after: after, title: "\(step) · \(Clock.text(seconds))\(target.map { " · \($0)" } ?? "")",
                                       body: "Step \(number) of \(of) · \(name)"))
             }

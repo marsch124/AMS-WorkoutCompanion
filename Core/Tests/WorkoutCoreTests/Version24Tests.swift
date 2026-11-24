@@ -3,9 +3,9 @@ import XCTest
 
 /// 2.4: a step of a Tailored intervals workout carries a speed or power, and is Effort or Easy.
 final class Version24Tests: XCTestCase {
-    func testTheExampleJogsWithEffortAndWalksEasy() {
-        XCTAssertEqual(IntervalStep.example.map(\.easy), [false, true, false, true, false, true, false, true, false, true])
-        XCTAssertTrue(IntervalStep.example.allSatisfy { $0.shownTarget == nil })
+    /// 2.4 had Jog as Effort and Walk as Easy; 2.5 removed Effort / Easy (his pick).
+    func testTheExampleHasNoEasyStepsSince25() {
+        XCTAssertTrue(IntervalStep.example.allSatisfy { !$0.easy && $0.shownTarget == nil && $0.values.isEmpty })
     }
 
     func testAddStepCopiesSpeedOrPowerAndEasyFromTwoLinesUp() {
@@ -20,7 +20,6 @@ final class Version24Tests: XCTestCase {
         XCTAssertEqual(next.seconds, 120)
         var longer = w
         longer.steps.append(next)
-        XCTAssertTrue(longer.nextStep().easy)
         XCTAssertEqual(longer.nextStep().target, "5 km/h")
     }
 
@@ -35,7 +34,7 @@ final class Version24Tests: XCTestCase {
             IntervalStep(name: "Walk", seconds: 60, easy: true),
         ])
         XCTAssertEqual(w.plan, [PlanLine("1 · Jog", "1:00 · 150 W"), PlanLine("2 · Walk", "1:00"), PlanLine("Total time", "2:00")])
-        let notices = Plan.notices(phases: Plan.phases(for: w), index: 0, left: 5, name: "Hill", steps: w.steps)
+        let notices = Plan.notices(phases: Plan.phases(for: w), index: 0, left: 5, name: "Hill", details: w.steps.indices.map { w.detail(at: $0) })
         XCTAssertEqual(notices.map(\.title), ["Jog · 1:00 · 150 W", "Walk · 1:00", "Workout complete"])
     }
 
@@ -44,7 +43,7 @@ final class Version24Tests: XCTestCase {
         let phases = Plan.phases(for: w)
         XCTAssertNil(w.step(of: phases[0]))
         XCTAssertEqual(w.step(of: phases[2])?.name, "Walk")
-        XCTAssertEqual(w.step(of: phases[2])?.easy, true)
+        XCTAssertEqual(w.stepIndex(of: phases[2]), 1)
     }
 
     func testAStepSavedWith23HasNoSpeedAndIsEffort() throws {

@@ -33,7 +33,7 @@ extension Workout {
         case .tailored:
             return steps.indices.map {
                 PlanLine("\($0 + 1) · \(stepName(at: $0))",
-                         Clock.text(steps[$0].seconds) + (steps[$0].shownTarget.map { " · \($0)" } ?? ""))
+                         Clock.text(steps[$0].seconds) + (detail(at: $0).map { " · \($0)" } ?? ""))
             }
                 + [PlanLine("Total time", Clock.text(tailoredTotal))]
         case .checklist:

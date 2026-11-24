@@ -580,6 +580,8 @@ Version 2.3. A fourth workout type, "Tailored intervals": intervals where every 
 
 ## Version 2.4 — speed or power, Effort or Easy, and exercises dragged into order (24 Nov 2026)
 
+Changed in 2.5: the free 'Speed or power' line and the Effort / Easy button were replaced — see Version 2.5.
+
 Version 2.4 has four changes: (A) speed or power for each step of a Tailored intervals workout, (B) Effort or Easy for each step, (C) the plan page with each figure right beside its name, and (D) exercises dragged into order. The notes on D follow after A to C. The owner's rule (23 Nov 2026): every list he puts in order is drag and drop, never up/down arrows or "move up / move down" commands. The Exercise list editor was the last place in this app that still broke it. He said yes to fixing it on 24 Nov 2026.
 
 ### A. Speed or power for each step (ask of 24 Nov 2026, with a screenshot of the Steps list)
@@ -625,3 +627,38 @@ Version 2.4 has four changes: (A) speed or power for each step of a Tailored int
 - Version lists: `AppTextTests` (2.4 first) and `testSettingsShowsTheVersionAndWhatsNew` (2.4, `whatsnew-2.4`).
 - Checked in the simulator, day and night. **Not yet tried by hand on a real phone:** the drag, and speed or power and Effort or Easy on a run.
 - **Texts.** What's new (2.4) and How it works (Making a workout, Workouts, Tailored intervals, Signs in this app) updated.
+
+## Version 2.5 — Pace, Power, Weight and Level per step; Effort / Easy removed (24 Nov 2026)
+
+Version 2.5 has two changes to Tailored intervals: (A) Pace, Power, Weight and Level for each step, and (B) the Effort / Easy button is gone. Right after 2.4 the owner wrote: "I'm not sure about your effort solutions. I need to be able to enter [speed] and/or power and/or weights for each step." He was shown one picture with three numbered ways and picked, in a question round: way 1 "Pick per workout", also add Level, remove the Effort / Easy button, and speed entered as pace in minutes per kilometre.
+
+### A. Pace, Power, Weight and Level for each step
+- **Before 2.5 (2.4):** a step had one free-text line "Speed or power".
+- **Block "Each step has".** In the editor of a Tailored intervals workout, above the Steps list, four words to tap: Pace, Power, Weight, Level (ids `measure-pace`, `measure-power`, `measure-weight`, `measure-level`). A chosen word is filled in the workout's colour; the others are grey. Under them: "Tap what this workout needs. Every step then gets a box for it."
+- **Boxes.** Every step then shows a second line with one small box per chosen word, each with its unit: Pace in minutes per kilometre ("5:30 /km"), Power in watts ("150 W"), Weight in kilos ("20 kg"; halves allowed, "22.5 kg"; comma or point), Level as a whole number ("8 lvl" in the box, shown elsewhere as "Level 8"). Ids `step-pace-N`, `step-power-N`, `step-weight-N`, `step-level-N`. A box may stay empty.
+- **Pace input.** 5:30, 5.30 and 530 all mean 5 minutes 30 seconds per kilometre; a plain 5 means 5:00.
+- **Nothing chosen.** Steps have one line only, as in 2.3. A new workout starts with nothing chosen.
+- **Turning a word off** hides its boxes and its numbers everywhere but keeps what was typed; turning it on again brings the numbers back.
+- **Where the numbers show** (only the chosen ones, in the order Pace, Power, Weight, Level, joined with " · "): the run screen under the step's name ("5:30 /km · 150 W", id `run-target`); "First: Jog 1:00 · 5:30 /km" and "Next: Walk 2:00 · 7:00 /km"; the plan page after the length; the title of the lock-screen notification; the lock-screen card.
+- **Voice.** After the length: "Jog. 2 minutes. 5:30 per kilometre. 150 watts." Weight is said as "20 kilos", Level as "Level 8".
+- **Add step** copies the numbers of the step two lines up together with its name, and the length of the last step, as before.
+- **The 2.4 text line.** The free line "Speed or power" is no longer offered. A step where the owner already typed something into it keeps that text: the line still shows on that step (so he can change or empty it), and the text is still shown and spoken after the numbers. Nothing he typed is lost.
+
+### B. Effort / Easy removed (his pick)
+- **Before (2.4):** each step had a button Effort (workout's colour) or Easy (grey); an Easy step ran on a grey ring with a grey name.
+- **Now:** no button. Every step runs with the ring in the workout's colour again, as in 2.3. A grey ring and a grey word on the run screen mean a rest (in Sets & reps and the Interval timer) and Get ready, nothing else. The numbers entered say how hard a step is.
+- The ready-made example (jog and walk 1, 2, 3, 2, 1 minutes) has no Easy steps any more.
+
+### Data
+- `StepMeasure` (pace, power, weight, level): `title`, `unit`, `parse`, `text`, `shown`, `spoken`.
+- `Workout.measures: [StepMeasure]`: what the workout uses; empty in older files.
+- `IntervalStep.values: [String: Double]`: keyed by the measure's raw name; pace in seconds per kilometre.
+- `IntervalStep.target` (the 2.4 free text) is kept and still read. `IntervalStep.easy` is still read from older files but no longer used.
+- `Workout.detail(at:)` gives what is shown for a step; `Workout.spokenDetail(at:)` what is spoken. `Plan.notices(phases:index:left:name:details:)` takes the details for the notification titles.
+
+### Tests (lean)
+- Core `Core/Tests/WorkoutCoreTests/Version25Tests.swift`: data rules. The 2.4 data tests are adjusted.
+- UI `UITests/Version25UITests.swift`: `testAStepCarriesPacePowerWeightAndLevel`. The 2.4 screen test for speed-or-power and Effort / Easy is retired.
+- Version lists: `AppTextTests` (2.5 first) and `testSettingsShowsTheVersionAndWhatsNew` (2.5, `whatsnew-2.5`).
+- Checked in the simulator, day and night. **Not yet tried on a real phone.**
+- **Texts.** What's new (2.5) and How it works (Tailored intervals, Signs in this app) updated.

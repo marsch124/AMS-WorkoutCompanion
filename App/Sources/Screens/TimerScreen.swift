@@ -113,9 +113,10 @@ struct TimerScreen: View {
     private func countdown(_ phase: Phase) -> some View {
         let left = session.remaining(at: now) ?? 0
         let (label, sub) = words(for: phase)
-        // An Easy step of a Tailored workout is grey like a rest (since 2.4).
-        let step = workout.step(of: phase)
-        let calm = phase.isRest || step?.easy == true
+        // Grey is for a rest and the get ready only; every Tailored step runs in the workout's colour
+        // (2.4 had grey "Easy" steps; gone in 2.5, his pick).
+        let calm = phase.isRest
+        let detail = workout.stepIndex(of: phase).flatMap { workout.detail(at: $0) }
         let colour = calm ? Theme.muted : workout.fill
         return ZStack {
             Ring(fractionLeft: session.fractionLeft(at: now), colour: colour, width: 24)
@@ -127,9 +128,9 @@ struct TimerScreen: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .accessibilityIdentifier("run-phase")
-                // The speed or power to hold in this step (since 2.4).
-                if let target = step?.shownTarget {
-                    Text(target)
+                // The step's numbers — pace, power, weight, level (since 2.5; 2.4 had one free line).
+                if let detail {
+                    Text(detail)
                         .font(.system(.title3, design: .rounded, weight: .bold))
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
@@ -255,7 +256,8 @@ struct TimerScreen: View {
     private var following: String? {
         let next = session.phases.dropFirst(session.index + 1).first
         guard case .step(let s, let name, _, _)? = next else { return nil }
-        return "\(name) \(Clock.text(s))\(workout.step(of: next)?.shownTarget.map { " · \($0)" } ?? "")"
+        let detail = workout.stepIndex(of: next).flatMap { workout.detail(at: $0) }
+        return "\(name) \(Clock.text(s))\(detail.map { " · \($0)" } ?? "")"
     }
 
     /// A Tailored intervals workout (since 2.3): a notification for every coming change of step, and
@@ -268,10 +270,11 @@ struct TimerScreen: View {
             return
         }
         StepAlarms.set(Plan.notices(phases: session.phases, index: session.index, left: left,
-                                    name: workout.name, steps: workout.steps))
+                                    name: workout.name,
+                                    details: workout.steps.indices.map { workout.detail(at: $0) }))
         var heading = "Get ready"
         if case .step(_, let name, _, _) = phase {
-            heading = name + (workout.step(of: phase)?.shownTarget.map { " \($0)" } ?? "")
+            heading = name + (workout.stepIndex(of: phase).flatMap { workout.detail(at: $0) }.map { " \($0)" } ?? "")
         }
         RestLive.show(RestCard(kind: .workout, title: workout.name, next: following ?? "Finish",
                                start: t, end: t.addingTimeInterval(left), heading: heading))
@@ -327,7 +330,7 @@ struct TimerScreen: View {
             cues.go(r == of ? "Last round. Go!" : "Round \(r). Go!")
         case .step(let s, let name, let n, let of)?:
             cues.go(TailoredCue.start(name: name, seconds: s, isLast: n == of,
-                                      target: workout.step(of: session.current)?.shownTarget))
+                                      target: workout.stepIndex(of: session.current).flatMap { workout.spokenDetail(at: $0) }))
         }
     }
 
