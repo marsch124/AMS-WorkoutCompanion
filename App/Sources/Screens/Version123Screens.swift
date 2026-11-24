@@ -273,7 +273,8 @@ enum SessionLive {
             }
             return
         }
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        // 3.0: lock-screen sessions are the phone's; nothing on the iPad or the Mac.
+        guard UIDevice.current.userInterfaceIdiom == .phone, ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         let content = ActivityContent(state: SessionActivityAttributes.ContentState(card: card), staleDate: card.pauseAt)
         if let current = Activity<SessionActivityAttributes>.activities.first {
             Task { await current.update(content) }
@@ -291,6 +292,8 @@ enum GymNudge {
     private static let id = "gym-nudge"
 
     static func sync(_ gym: GymLog) {
+        // 3.0: the reminder is the phone's; the iPad and the Mac stay quiet (and never ask the notification service).
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
         let centre = UNUserNotificationCenter.current()
         centre.removePendingNotificationRequests(withIdentifiers: [id])
         guard !Cues.shared.quiet, let at = gym.nudgeDate(now: Date()) else { return }

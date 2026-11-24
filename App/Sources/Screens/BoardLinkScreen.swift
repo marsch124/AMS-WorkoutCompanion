@@ -61,6 +61,7 @@ struct BoardLinkScreen: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .readableWidth(680)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("Garmin Board")
         .navigationBarTitleDisplayMode(.inline)

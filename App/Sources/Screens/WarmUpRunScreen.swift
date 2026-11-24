@@ -83,6 +83,7 @@ struct WarmUpRunScreen: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+        .readableWidth(560)
         .background(Theme.bg.ignoresSafeArea())
         .onAppear(perform: setup)
         .onReceive(tick) { date in

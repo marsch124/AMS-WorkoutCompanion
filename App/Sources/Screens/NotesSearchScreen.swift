@@ -39,6 +39,7 @@ struct NotesSearchScreen: View {
                 .background(hits.isEmpty ? Color.clear : Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .padding(.horizontal, 16).padding(.vertical, 8)
+            .readableWidth(680)
         }
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("Search my notes")

@@ -7,10 +7,56 @@ struct RootView: View {
     @Environment(Library.self) private var library
     enum Tab { case train, history, settings }
     @State private var tab = Tab.train
+    /// Wide window (iPad, the Mac): the side list replaces the tab bar (since 3.0).
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var side = SideRow.workouts
+    /// The gym page is made the first time its row is chosen, then keeps its place (not at launch).
+    @State private var gymVisited = false
 
     @State private var typing = false
 
     var body: some View {
+        if sizeClass == .regular { wideBody } else { phoneBody }
+    }
+
+    /// The wide look: a side list down the left, the chosen page filling the rest.
+    private var wideBody: some View {
+        HStack(spacing: 0) {
+            SideList(selection: $side)
+            ZStack {
+                HomeScreen(openGym: { side = .gym })
+                    .opacity(side == .workouts ? 1 : 0)
+                    .allowsHitTesting(side == .workouts)
+                    .accessibilityHidden(side != .workouts)
+                if gymVisited {
+                    NavigationStack { GymScreen() }
+                        .opacity(side == .gym ? 1 : 0)
+                        .allowsHitTesting(side == .gym)
+                        .accessibilityHidden(side != .gym)
+                }
+                if side == .history { NavigationStack { HistoryScreen().noSwipeBack() } }
+                if side == .settings { NavigationStack { SettingsScreen().noSwipeBack() } }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(Theme.bg.ignoresSafeArea())
+        .onChange(of: side) { old, new in
+            if new == .gym { gymVisited = true; Cues.shared.begin() }
+            if old == .gym { Cues.shared.end() }
+        }
+        .overlay(alignment: .bottom) {
+            if let point = library.undoPoint {
+                UndoBar(point: point)
+                    .frame(maxWidth: 520)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(duration: 0.3), value: library.undoPoint?.id)
+    }
+
+    private var phoneBody: some View {
         // The pages end above the tab bar (1.9.1): as a safe-area inset the bar covered the bottom of
         // pushed pages — "Exercise done" and the last History session sat underneath it on his iPhone.
         VStack(spacing: 0) {
@@ -83,13 +129,21 @@ struct RootView: View {
 /// Train: the gym as a wide tile, then the workouts in two columns. Tap one to start it; the pencil edits it.
 struct HomeScreen: View {
     @Environment(Library.self) private var library
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    /// Wide window only: chooses the At the gym row of the side list (the gym has its own row there).
+    var openGym: (() -> Void)? = nil
+    private var wide: Bool { sizeClass == .regular && openGym != nil }
     @State private var running: Workout?
     @State private var editing: Workout?
     @State private var showing: Workout?
     @State private var adding = false
     @State private var deleting: Workout?
     @State private var showGym = false
-    private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+    private let phoneColumns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+    /// Wide: as many columns as fit, each about as wide as a tile on the phone, not stretched.
+    private var columns: [GridItem] {
+        wide ? [GridItem(.adaptive(minimum: 170, maximum: 230), spacing: 10, alignment: .top)] : phoneColumns
+    }
 
     var body: some View {
         NavigationStack {
@@ -97,11 +151,11 @@ struct HomeScreen: View {
                 VStack(spacing: 10) {
                     if let words = library.unreadableNote { UnreadableNote(words: words) }
                     if library.backupReminderDue { BackupReminder() }
-                    GymCard { showGym = true }
+                    if !wide { GymCard { showGym = true } }
                     // A gym session is going today (since 1.18, his ask): the same green line as on the gym screen.
                     // Since 1.20 from the moment the gym screen opened today, before any set.
                     if let start = library.gym.sessionStart(on: Date(), gym: library.gym.currentGym?.id) {
-                        Button { showGym = true } label: {
+                        Button { if wide { openGym?() } else { showGym = true } } label: {
                             SessionGoingLine(start: start, visit: library.gym.openVisit(on: Date(), gym: library.gym.currentGym?.id),
                                              identifier: "home-session-going")
                         }
@@ -120,6 +174,7 @@ struct HomeScreen: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
+                .readableWidth(1000)
                 // Room under the last panel for the round + at the bottom right.
                 .padding(.bottom, 84)
             }
@@ -291,6 +346,7 @@ struct KindPicker: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel", action: done)
+                    .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("new-cancel")
             }
         }

@@ -96,6 +96,7 @@ struct VisitScreen: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
+                .readableWidth(680)
             }
         }
         .background(Theme.bg.ignoresSafeArea())
