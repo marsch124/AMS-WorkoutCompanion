@@ -4,6 +4,7 @@ import WorkoutCore
 
 /// Settings: How it works, What's new and the version.
 struct SettingsScreen: View {
+    @Environment(Library.self) private var library
     /// Nil in the Settings tab, which needs no Done.
     var onDone: (() -> Void)? = nil
 
@@ -63,6 +64,19 @@ struct SettingsScreen: View {
                     .accessibilityIdentifier("settings-gym-extras")
             } header: { heading("Training", "blue") }
             Section {
+                // 3.0: iCloud first, with the status dot at the end of its row.
+                NavigationLink { ICloudScreen() } label: {
+                    HStack(spacing: 10) {
+                        MarkTile(mark: .cloud, colour: IconColour.of(key: "green"))
+                        Text("iCloud").foregroundStyle(Theme.ink)
+                        Spacer()
+                        Text(library.syncStatus.words).font(.subheadline).foregroundStyle(Theme.muted).lineLimit(1)
+                        SyncDot(status: library.syncStatus)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                .listRowInsets(Self.rowInsets)
+                .accessibilityIdentifier("settings-icloud")
                 NavigationLink { BackupScreen() } label: { row("Backups", "box", "green") }
                     .listRowInsets(Self.rowInsets)
                     .accessibilityIdentifier("settings-backups")

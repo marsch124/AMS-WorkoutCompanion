@@ -73,6 +73,28 @@ struct BackupScreen: View {
                         .accessibilityIdentifier("backup-message")
                 }
             }
+            // 3.0: the copy made just before this device first met iCloud. It stays; nothing tidies it away.
+            let before = library.beforeICloudCopies()
+            if !before.isEmpty {
+                Section {
+                    ForEach(Array(before.enumerated()), id: \.offset) { i, copy in
+                        Button { open(copy.url) } label: {
+                            HStack {
+                                IconMark(.hand("box"), size: 20, colour: Self.colour.fillColor)
+                                Text(copy.made.formatted(.dateTime.weekday(.wide).day().month(.wide).hour().minute()))
+                                    .foregroundStyle(Theme.ink)
+                                Spacer()
+                                Text("Restore").font(.subheadline).foregroundStyle(Theme.accent)
+                            }
+                        }
+                        .accessibilityIdentifier("backup-before-icloud-\(i)")
+                    }
+                } header: {
+                    Text("From before iCloud").foregroundStyle(Self.colour.fillColor)
+                } footer: {
+                    Text("Everything as it was on this device just before it first met iCloud. Restoring it puts that back on all your devices.")
+                }
+            }
             Section {
                 ForEach(Array(copies.enumerated()), id: \.offset) { i, copy in
                     Button { open(copy.url) } label: {

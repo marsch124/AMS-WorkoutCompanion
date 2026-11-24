@@ -35,6 +35,8 @@ enum AppMark: String {
     case clock = "M4 12a8 8 0 1 0 16 0a8 8 0 1 0 -16 0 M12 7.5V12l3 2"
     /// A calendar, for logging an earlier day (since 1.29).
     case calendar = "M6.5 6h11a1.5 1.5 0 0 1 1.5 1.5v10.5a1.5 1.5 0 0 1 -1.5 1.5h-11a1.5 1.5 0 0 1 -1.5 -1.5V7.5a1.5 1.5 0 0 1 1.5 -1.5Z M5 10.5h14 M8.5 4v3.5 M15.5 4v3.5"
+    /// A cloud, for iCloud (since 3.0).
+    case cloud = "M7.6 18.5a3.9 3.9 0 0 1 -.5 -7.77a5.2 5.2 0 0 1 10.1 1.1a3.4 3.4 0 0 1 -.4 6.67Z"
     /// A small flame, for a warm-up set.
     case warmup = "M12 4c2.4 3.2 5 5.2 5 9a5 5 0 0 1 -10 0c0 -2.2 1.2 -3.5 2.3 -4.5c.3 1.6 1 2.4 1.9 2.7C11.5 8.6 11.4 6.6 12 4Z"
 }
