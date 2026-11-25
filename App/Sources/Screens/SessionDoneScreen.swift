@@ -45,7 +45,10 @@ struct SummaryScreen: View {
                 Section {
                     Button { TrainingLink.openTraining() } label: {
                         HStack(spacing: 8) {
-                            Text("Open Triathlon").fontWeight(.semibold).foregroundStyle(Gym.tint)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Open Triathlon").fontWeight(.semibold).foregroundStyle(Gym.tint)
+                                Text("Log this session in your training plan").font(.caption).foregroundStyle(.secondary)
+                            }
                             Spacer()
                             ControlMarkView(.chevron, size: 14, colour: Gym.tint)
                         }
