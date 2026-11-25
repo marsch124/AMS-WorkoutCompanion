@@ -132,7 +132,8 @@ public enum TrainingNotes {
         return o
     }
 
-    /// Kept: a note of the last 14 days (by its `day`, else its `at`), or one with no readable date.
+    /// Kept: a note of the last 14 days, today included (by its `day`, else its `at`), or one with no
+    /// readable date. The same 14 days as the training app's own pruning (today and the 13 before it).
     private static func isRecent(_ item: JSON, now: Date, calendar: Calendar) -> Bool {
         guard case .object(let o) = item else { return true }
         let date: Date?
@@ -141,7 +142,7 @@ public enum TrainingNotes {
         else { date = nil }
         guard let date else { return true }
         let today = calendar.startOfDay(for: now)
-        guard let oldest = calendar.date(byAdding: .day, value: -keepDays, to: today) else { return true }
+        guard let oldest = calendar.date(byAdding: .day, value: -(keepDays - 1), to: today) else { return true }
         return calendar.startOfDay(for: date) >= oldest
     }
 

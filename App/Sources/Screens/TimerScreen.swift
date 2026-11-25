@@ -209,9 +209,19 @@ struct TimerScreen: View {
                 .accessibilityIdentifier("run-skip")
             }
         case nil:
-            Button("Close", action: onClose)
-                .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill))
-                .accessibilityIdentifier("run-finish-close")
+            VStack(spacing: 10) {
+                // 3.1: a finished Sets & reps workout leaves a note for AMS Triathlon Training; the small
+                // link to it shows only when that app is on this device.
+                if session.isFinished, workout.kind == .reps, TrainingLink.trainingInstalled {
+                    Button { TrainingLink.openTraining() } label: {
+                        Text("Open Triathlon").font(.subheadline.weight(.semibold))
+                    }
+                    .accessibilityIdentifier("run-open-triathlon")
+                }
+                Button("Close", action: onClose)
+                    .buttonStyle(BigButtonStyle(fill: workout.fill, ink: workout.inkOnFill))
+                    .accessibilityIdentifier("run-finish-close")
+            }
         }
     }
 

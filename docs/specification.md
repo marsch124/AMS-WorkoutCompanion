@@ -750,8 +750,8 @@ One small release (version 3.1, build 1). The owner's apps AMS Triathlon Trainin
 ### Rules of the model
 - Read, change, write; never a blind overwrite. Fields this version does not know (and the other apps' notes and `feel`) are kept as they are.
 - A `format` higher than 1: nothing is read, nothing is written. Bytes that are not a JSON object: nothing is written. No item yet: a new one with `format` 1.
-- Only `done` notes of the last 14 days stay (by `day`; a note with no readable date stays). The same `id` is never added twice.
-- Every Keychain failure is silent: the app behaves as if there were no notes.
+- Only `done` notes of the last 14 days stay, today and the 13 days before, as in the training app (by `day`; a note with no readable date stays). The same `id` is never added twice.
+- Every Keychain failure is silent: the app behaves as if there were no notes. A read that fails (anything but "no item yet") means nothing is written, so notes that are there but unreadable right now are never replaced.
 - A note: `id` (UUID of the finished session or record), `day` (local `yyyy-MM-dd`), `kind` "strength", `title`, `minutes` (whole minutes), `at` (UTC, ISO 8601), `from` "workouts". `effort` is never written: the app has no 1 to 10 effort (the session feel Great to Rough is not mapped).
 
 ### When a note is written
@@ -761,12 +761,12 @@ One small release (version 3.1, build 1). The owner's apps AMS Triathlon Trainin
 
 ### Links
 - URL scheme `amsworkouts://` (Info.plist `CFBundleURLTypes`): `amsworkouts://open` brings the app to the front; any other address is ignored. `LSApplicationQueriesSchemes`: `amsworkoutsync`.
-- Well done page (`SummaryScreen`): a small button "Open Triathlon" (id `gym-open-triathlon`, text and chevron in the gym colour) in its own row under the title, shown only when `canOpenURL(amsworkoutsync://today)` is true; it opens `amsworkoutsync://today`. Debug builds: launch argument `-triathloninstalled` pretends the app is installed.
+- Well done page (`SummaryScreen`): a small button "Open Triathlon" (id `gym-open-triathlon`, text and chevron in the gym colour) in its own row under the title, shown only when `canOpenURL(amsworkoutsync://today)` is true; it opens `amsworkoutsync://today`. The same small button (id `run-open-triathlon`, plain text in the app tint) stands above Close at the end of a complete Sets & reps workout (`TimerScreen`), with the same rule. Debug builds: launch argument `-triathloninstalled` pretends the app is installed.
 
 ### Texts
 - What's new (3.1) added. How it works: new chapter "AMS Triathlon Training"; "Where things are kept" mentions the notes. No new mark, so "Signs in this app" is unchanged (the button is words and the existing chevron).
 
 ### Tests (lean)
-- `Version31NotesTests`: 9 data tests (first note, effort only when given, other apps' notes and unknown fields kept, newer format, bytes that are not notes, never twice, 14 days, removing, which workouts make a note).
+- `Version31NotesTests`: 10 data tests (first note, the 14-day edge, effort only when given, other apps' notes and unknown fields kept, newer format, bytes that are not notes, never twice, 14 days, removing, which workouts make a note).
 - `Version31UITests`: 1 screen test (the button after Finish with the training app pretended installed). Written and compiled; not run for this release.
 - The version tests expect 3.1 first.

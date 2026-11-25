@@ -72,6 +72,16 @@ final class Version31NotesTests: XCTestCase {
         XCTAssertTrue(ids.contains("NEW"))
     }
 
+    func testFourteenDaysMeansTodayAndThe13Before() {
+        let today = TrainingNotes.dayString(now, calendar: cal)
+        let back13 = TrainingNotes.dayString(cal.date(byAdding: .day, value: -13, to: now)!, calendar: cal)
+        let back14 = TrainingNotes.dayString(cal.date(byAdding: .day, value: -14, to: now)!, calendar: cal)
+        let old = "{\"format\":1,\"done\":[{\"id\":\"K\",\"day\":\"\(back13)\"},{\"id\":\"G\",\"day\":\"\(back14)\"}]}"
+        let ids = TrainingNotes.doneIDs(in: TrainingNotes.adding(note("T"), to: Data(old.utf8), now: now, calendar: cal))
+        XCTAssertEqual(ids, ["K", "T"])
+        XCTAssertEqual(today.count, 10)
+    }
+
     func testRemovingAnUndoneNote() {
         let two = TrainingNotes.adding(note("B"), to: TrainingNotes.adding(note("A"), to: nil, now: now, calendar: cal), now: now, calendar: cal)
         let one = TrainingNotes.removing(id: "A", from: two)

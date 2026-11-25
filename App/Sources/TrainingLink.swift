@@ -21,13 +21,18 @@ enum TrainingLink {
 
     private static var skipping: Bool { ProcessInfo.processInfo.arguments.contains("-uitest") }
 
-    static func read() -> Data? {
+    /// What the item holds. `ok` is false when it could not be read (anything but "no item yet"): then nothing
+    /// is written, so notes that are there but unreadable right now are never replaced by a fresh set.
+    static func read() -> (data: Data?, ok: Bool) {
         var q = match
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         var out: CFTypeRef?
-        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess else { return nil }
-        return out as? Data
+        switch SecItemCopyMatching(q as CFDictionary, &out) {
+        case errSecSuccess: return (out as? Data, out is Data)
+        case errSecItemNotFound: return (nil, true)
+        default: return (nil, false)
+        }
     }
 
     @discardableResult
@@ -43,14 +48,17 @@ enum TrainingLink {
 
     /// A finished strength workout goes into the notes (read, change, write). Never in the app's own tests.
     static func add(_ note: TrainingNotes.Note?) {
-        guard let note, !skipping,
-              let data = TrainingNotes.adding(note, to: read()) else { return }
+        guard let note, !skipping else { return }
+        let now = read()
+        guard now.ok, let data = TrainingNotes.adding(note, to: now.data) else { return }
         write(data)
     }
 
     /// Undo Finish or Discard session: the note goes again.
     static func remove(id: String) {
-        guard !skipping, let data = TrainingNotes.removing(id: id, from: read()) else { return }
+        guard !skipping else { return }
+        let now = read()
+        guard now.ok, let data = TrainingNotes.removing(id: id, from: now.data) else { return }
         write(data)
     }
 
