@@ -315,7 +315,19 @@ final class Library {
     func record(_ r: SessionRecord) {
         history.append(r)
         persistHistory()
+        // 3.1: a finished Sets & reps workout is noted for AMS Triathlon Training (this device only).
+        TrainingLink.add(TrainingNotes.note(for: r))
     }
+
+    /// 3.1: a finished gym session is noted for AMS Triathlon Training. Called where Finish is tapped on
+    /// this device, never for a session that arrives from another device.
+    func noteFinished(visit id: UUID) {
+        guard let v = gym.visits.first(where: { $0.id == id }), v.setCount > 0 else { return }
+        TrainingLink.add(TrainingNotes.note(for: v))
+    }
+
+    /// 3.1: Undo Finish or Discard session takes the note back.
+    func forgetNote(visit id: UUID) { TrainingLink.remove(id: id.uuidString) }
 
     func describe(record id: UUID, title: String, notes: String) {
         guard let i = history.firstIndex(where: { $0.id == id }) else { return }

@@ -108,9 +108,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         app.buttons["open-settings"].tap()
         let version = app.staticTexts["settings-version"]
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(version.label.hasPrefix("3.0 ("), version.label)
+        XCTAssertTrue(version.label.hasPrefix("3.1 ("), version.label)
         app.buttons["settings-new"].tap()
-        XCTAssertTrue(app.staticTexts["whatsnew-3.0"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["whatsnew-3.1"].waitForExistence(timeout: 5))
     }
 
     func testANewWorkoutCanBeCancelled() {

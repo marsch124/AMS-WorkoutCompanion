@@ -425,11 +425,13 @@ struct GymScreen: View {
             NavigationStack {
                 SummaryScreen(visitID: v.id, undo: {
                     if let before = beforeFinish { library.changeGym { $0.undoFinish(visit: v.id, before: before) } }
+                    library.forgetNote(visit: v.id)   // 3.1
                     beforeFinish = nil
                     summary = nil
                 }, discard: {
                     // Since 1.30 (his ask): throw the just-finished session away.
                     library.changeGym { $0.discard(visit: v.id) }
+                    library.forgetNote(visit: v.id)   // 3.1
                     GymNudge.sync(library.gym)
                     beforeFinish = nil
                     summary = nil
@@ -920,6 +922,7 @@ struct GymScreen: View {
         let now = Date()
         beforeFinish = library.gym
         library.changeGym { $0.finish(visit: visit.id, at: now) }
+        library.noteFinished(visit: visit.id)   // 3.1
         GymNudge.sync(library.gym)
         if stretch {
             // Stretch now (since 2.0): the stretching opens full screen; Well done follows it.

@@ -11,6 +11,8 @@ struct AMSWorkoutCompanionApp: App {
             RootView()
                 .environment(library)
                 .tint(Theme.accent)
+                // 3.1: amsworkouts://open brings the app to the front; any other address is ignored.
+                .onOpenURL { TrainingLink.handle($0) }
                 // A rest left on the lock screen from before the app was closed (since 1.15).
                 .task {
                     RestLive.end()

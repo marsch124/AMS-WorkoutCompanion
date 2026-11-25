@@ -11,7 +11,7 @@ settings:
     DEVELOPMENT_TEAM: D24ENP83QQ
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "3.0"
+    MARKETING_VERSION: "3.1"
     # Build number, short since 1.19 (his ask): 1 for each new version, then 2, 3 … for another build of it.
     CURRENT_PROJECT_VERSION: "1"
 packages:
@@ -53,6 +53,10 @@ targets:
         com.apple.developer.icloud-container-identifiers: [iCloud.com.schabbauer.AMSWorkoutCompanion]
         com.apple.developer.icloud-services: [CloudDocuments]
         com.apple.developer.ubiquity-container-identifiers: [iCloud.com.schabbauer.AMSWorkoutCompanion]
+        # 3.1: the notes shared with AMS Triathlon Training — the app's own group first, then the training app's.
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.schabbauer.AMSWorkoutCompanion
+          - $(AppIdentifierPrefix)com.schabbauer.AMSWorkoutSync
     info:
       path: App/Config/Info.plist
       properties:
@@ -77,6 +81,11 @@ targets:
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         # The rest on the lock screen and in the Dynamic Island (since 1.15).
         NSSupportsLiveActivities: true
+        # 3.1: amsworkouts://open brings the app to the front; amsworkoutsync is the training app, asked about for "Open Triathlon".
+        CFBundleURLTypes:
+          - CFBundleURLName: com.schabbauer.AMSWorkoutCompanion
+            CFBundleURLSchemes: [amsworkouts]
+        LSApplicationQueriesSchemes: [amsworkoutsync]
   # Draws the rest on the lock screen and in the Dynamic Island (since 1.15).
   RestWidget:
     type: app-extension

@@ -737,3 +737,36 @@ Version 3.0 has two parts: (A) the data is the same on the owner's iPhone, iPad 
 - `Version30SyncTests`: 21 data tests (joining, newest change per item, deletes, missing or unreadable files, format number, before-3.0 marks by device, starters not doubled, restore as a change, Undo hold).
 - `Version30LayoutUITests`: 1 screen test, iPad only (side list rows and the iCloud row in Settings, found by identifier).
 - The version tests (`testSettingsShowsTheVersionAndWhatsNew`, the release list) expect 3.0 first.
+
+## Version 3.1 — a link to AMS Triathlon Training (25 Nov 2026)
+
+One small release (version 3.1, build 1). The owner's apps AMS Triathlon Training, AMS Workouts and AMS Magic Morning pass short notes through one shared Keychain item on the same iPhone; this app writes "strength" notes and can open the training app. No server, no network, no App Group.
+
+### The shared item
+- Generic password, service `ams.training.notes`, account `v1`, access group `D24ENP83QQ.com.schabbauer.AMSWorkoutSync` (the training app's own group), `kSecAttrAccessibleAfterFirstUnlock`, not synchronised. Value: UTF-8 JSON, `format` 1, a `feel` block (never touched by this app) and a list `done`.
+- Entitlement `keychain-access-groups`: `$(AppIdentifierPrefix)com.schabbauer.AMSWorkoutCompanion` first, `$(AppIdentifierPrefix)com.schabbauer.AMSWorkoutSync` second (in `project.yml`). Every existing entitlement (HealthKit, iCloud) is unchanged. Before 3.1 the app stored nothing in the Keychain.
+- Code: model `Core/Sources/WorkoutCore/TrainingNotes.swift` (bytes in, bytes out); Keychain and links `App/Sources/TrainingLink.swift`.
+
+### Rules of the model
+- Read, change, write; never a blind overwrite. Fields this version does not know (and the other apps' notes and `feel`) are kept as they are.
+- A `format` higher than 1: nothing is read, nothing is written. Bytes that are not a JSON object: nothing is written. No item yet: a new one with `format` 1.
+- Only `done` notes of the last 14 days stay (by `day`; a note with no readable date stays). The same `id` is never added twice.
+- Every Keychain failure is silent: the app behaves as if there were no notes.
+- A note: `id` (UUID of the finished session or record), `day` (local `yyyy-MM-dd`), `kind` "strength", `title`, `minutes` (whole minutes), `at` (UTC, ISO 8601), `from` "workouts". `effort` is never written: the app has no 1 to 10 effort (the session feel Great to Rough is not mapped).
+
+### When a note is written
+- Gym session: in `GymScreen.finish(_:stretch:)` right after `GymLog.finish`, through `Library.noteFinished(visit:)`: only when the session has at least one set and its time is known. Title "At the gym"; minutes = `GymVisit.minutes`. This runs also when Stretch now follows. Undo finish and Discard session call `Library.forgetNote(visit:)`, which takes the note out again.
+- Sets & reps workout: in `Library.record(_:)`, only for kind Sets & reps and only when it was done to the last set. Title = the workout's name; minutes = `SessionRecord.minutes`. Interval timer, Tailored intervals, Exercise lists and stretches write nothing.
+- Only where the workout is done on this device: the notes are never written from data that arrives through iCloud, or from History. UI tests (`-uitest`) never touch the Keychain.
+
+### Links
+- URL scheme `amsworkouts://` (Info.plist `CFBundleURLTypes`): `amsworkouts://open` brings the app to the front; any other address is ignored. `LSApplicationQueriesSchemes`: `amsworkoutsync`.
+- Well done page (`SummaryScreen`): a small button "Open Triathlon" (id `gym-open-triathlon`, text and chevron in the gym colour) in its own row under the title, shown only when `canOpenURL(amsworkoutsync://today)` is true; it opens `amsworkoutsync://today`. Debug builds: launch argument `-triathloninstalled` pretends the app is installed.
+
+### Texts
+- What's new (3.1) added. How it works: new chapter "AMS Triathlon Training"; "Where things are kept" mentions the notes. No new mark, so "Signs in this app" is unchanged (the button is words and the existing chevron).
+
+### Tests (lean)
+- `Version31NotesTests`: 9 data tests (first note, effort only when given, other apps' notes and unknown fields kept, newer format, bytes that are not notes, never twice, 14 days, removing, which workouts make a note).
+- `Version31UITests`: 1 screen test (the button after Finish with the training app pretended installed). Written and compiled; not run for this release.
+- The version tests expect 3.1 first.

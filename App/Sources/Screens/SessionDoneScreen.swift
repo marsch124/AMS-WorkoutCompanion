@@ -40,6 +40,19 @@ struct SummaryScreen: View {
                 .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                 .listRowBackground(Color.clear)
             }
+            // 3.1: only when AMS Triathlon Training is on this device. A small text button, no more.
+            if TrainingLink.trainingInstalled {
+                Section {
+                    Button { TrainingLink.openTraining() } label: {
+                        HStack(spacing: 8) {
+                            Text("Open Triathlon").fontWeight(.semibold).foregroundStyle(Gym.tint)
+                            Spacer()
+                            ControlMarkView(.chevron, size: 14, colour: Gym.tint)
+                        }
+                    }
+                    .accessibilityIdentifier("gym-open-triathlon")
+                }
+            }
             if let visit {
                 // Since 2.2 (his ask, a marked screenshot): Stretch now, then Save as template, right under
                 // Well done. Before, both were near the bottom, under the numbers and Against last visit.
