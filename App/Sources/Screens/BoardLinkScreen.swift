@@ -56,7 +56,7 @@ struct BoardLinkScreen: View {
                 Text("Gym sessions on the Garmin Board")
             } footer: {
                 Text(library.boardFolderName == nil
-                     ? "Choose the folder \"AMS Garmin\" in iCloud Drive, once. After every finished session the app writes one small file there, and the Board on the Mac shows your gym sessions."
+                     ? "Choose the folder \"AMS Workout Companion app to Garmin\", once — it is in iCloud Drive › Documents › 03 Home › 02 IT › 01 SW › AMS Triathlon Training. After every finished session the app writes one small file there, and the Garmin Board on the Mac and the AMS Triathlon Training app show your gym sessions."
                      : "The file \"\(BoardFile.name)\" holds your last \(BoardFile.most) finished sessions: when, how long, the machines and sets, the kilograms, how it felt and your notes. No photos. It is written after every finished session and when you leave the app. Stop sharing forgets the folder; the file already there stays until you delete it.")
             }
         }
