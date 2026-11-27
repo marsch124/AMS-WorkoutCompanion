@@ -60,6 +60,7 @@ struct MachineScreen: View {
     private var partner: Machine? { library.gym.partner(of: machineID) }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 if let machine {
@@ -144,6 +145,17 @@ struct MachineScreen: View {
             .readableWidth(720)
         }
         .scrollDismissesKeyboard(.interactively)
+        // The number being typed during a rest sits well above the keyboard (since 3.3): it was
+        // half under the Next / Done strip.
+        .onChange(of: typing) { _, box in
+            guard box == .restKg || box == .restReps else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    proxy.scrollTo(box == .restKg ? "rest-weight" : "rest-reps", anchor: UnitPoint(x: 0.5, y: 0.7))
+                }
+            }
+        }
+        }
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle(machine?.name ?? "Machine")
         .navigationBarTitleDisplayMode(.inline)
@@ -597,11 +609,13 @@ struct MachineScreen: View {
             if !isReps && !isTime {
                 restRow("Weight", unit: "kg", id: "gym-rest-weight", value: $kg, decimals: true, box: .restKg,
                         minus: { kg = max(0, kg - step) }, plus: { kg += step })
+                    .id("rest-weight")
             }
             // The reps of the next set, typed or −/+ (since 1.33, his ask).
             if !isTime {
                 restRow("Reps", unit: "reps", id: "gym-rest-reps", value: whole($reps), decimals: false, box: .restReps,
                         minus: { reps = max(1, reps - 1) }, plus: { reps += 1 })
+                    .id("rest-reps")
             }
             if RestLive.isShowing {
                 // The same countdown is on the lock screen and in the Dynamic Island (since 1.15).

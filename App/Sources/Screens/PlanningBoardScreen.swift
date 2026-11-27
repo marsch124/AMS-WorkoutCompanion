@@ -295,10 +295,12 @@ struct PlanningBoardScreen: View {
     private func pill(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(Gym.ink)
+            .foregroundStyle(Gym.tint)
             .padding(.horizontal, 12)
             .frame(minHeight: 34)
-            .background(Gym.fill, in: RoundedRectangle(cornerRadius: 10))
+            // Pale blue with blue words, like the gym screen's second buttons: Save stays the one full-colour button.
+            .background(Gym.soft, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Gym.fill.opacity(0.35), lineWidth: 1))
     }
 
     private func boardButton(_ title: String, id: String, action: @escaping () -> Void) -> some View {

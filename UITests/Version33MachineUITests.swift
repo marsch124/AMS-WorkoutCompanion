@@ -27,6 +27,9 @@ final class Version33MachineUITests: XCTestCase {
         // The rest starts with the keyboard on Weight, the number picked: typing replaces it.
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the keyboard opens by itself")
         app.typeText("50")
+        // The Weight row stands above the keyboard's Next / Done strip.
+        sleep(1)
+        XCTAssertLessThan(app.textFields["gym-rest-weight"].frame.maxY, app.keyboards.firstMatch.frame.minY - 30)
         XCTAssertEqual(app.textFields["gym-rest-weight"].value as? String, "50")
         shot("33-rest-keyboard")
         app.buttons["keyboard-next"].tap()
@@ -50,6 +53,8 @@ final class Version33MachineUITests: XCTestCase {
         shot("33-rest-ring")
 
         app.buttons["gym-rest-skip"].tap()
+        app.swipeDown()
+        shot("33-sets")
         XCTAssertEqual(app.textFields["gym-weight"].value as? String, "50")
         XCTAssertEqual(app.textFields["gym-reps"].value as? String, "8")
 
