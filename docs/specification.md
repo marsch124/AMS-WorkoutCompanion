@@ -776,3 +776,33 @@ One small release (version 3.1, build 1). The owner's apps AMS Triathlon Trainin
 - **Words.** `BoardLinkScreen` footer before a folder is chosen: Choose the folder "AMS Workout Companion app to Garmin", once — it is in iCloud Drive › Documents › 03 Home › 02 IT › 01 SW › AMS Triathlon Training. After every finished session the app writes one small file there, and the Garmin Board on the Mac and the AMS Triathlon Training app show your gym sessions. How it works → Garmin Board says the same.
 - Readers of the file: the Garmin Board (setting `gymFile`, Board 1.12.3) and AMS Triathlon Training (Body › Gym sessions, since 2.9; the place in its words since 2.13).
 
+
+## Version 3.3 — one box for last time and today, rest on the ring, import and planning board (27 Nov 2026)
+- Build number 1 (3.3 (1)). The owner's asks from screenshots, and his picks from a picture of options. Part A (machine page) and B (gym screen) are built by the lead; part C (import) and D (planning board) by two other lanes. Words of C and D below follow the lane descriptions; **CONFIRM-C / CONFIRM-D: the lead corrects them with the final words and identifiers.**
+
+### A. Machine page
+- **One box "Last time beside today".** Replaces the grey line "Last time, 24 Nov: BW × 20, 2,5 × 20, 5 × 14, 7,5 × 7 kg" and the separate box of today's sets. Columns: the set (Warm-up, Set 2, Set 3 …), "Last time · 24 Nov" in grey, "Today" in green. Every set carries its own "kg" (before: one "kg" at the end of the line seemed to belong only to the last set); BW stays for body weight.
+- **Last time's warm-up** is marked: the word Warm-up and its set in the warm-up yellow with the flame mark (before: shown as an ordinary set).
+- **Today's sets.** Green words on a pale green fill (before: blue-grey box). A green ✓ after a set done; a gold ↑ when it beat the same set last time (rule as before: more weight, or the same weight with more reps; warm-ups never count); a small pencil: tap a today's set to change or remove it (as before). The next set to do shows "next" in grey. More sets today than last time: last time's cell shows "—". The existing `gym-last-set` line and its rule (warm-ups not counted; none on time machines or the first time) now live in the box.
+- **First time on a machine.** The heading says "First time on this machine"; only Today is filled. Last time's note and "Pain flagged last time — go easy." stay under the box.
+- **Rest buttons.** Before: three wide buttons in a row under the weight and reps, 48 points tall (`gym-rest-less` "−15 s", `gym-rest-more` "+15 s", `gym-rest-skip` "Skip rest"). Now: three smaller buttons ON the bottom of the countdown ring (`gym-rest-ring`), like a watch: −15 (pale yellow) left, Skip (pale green, larger, the skip mark with the word "Skip") middle, +15 (pale orange) right. Same actions as before (−15/+15 change the rest by 15 s, never below 5 s left; Skip ends the rest). Identifiers kept: `gym-rest-less`, `gym-rest-skip`, `gym-rest-more` (CONFIRM against the final code).
+- **Keyboard after Set done.** When a rest starts, the number keyboard opens on Weight with the number selected, so he just types the new weight. "Next" above the keyboard goes on to Reps; "Done" closes it. A reps-only exercise opens on Reps. A machine whose rest is set to none has no rest, so nothing opens. Before: nothing opened.
+- **"Last set felt".** Easy green, OK blue, Hard orange; the chosen one fills in its colour (before: all three blue). Identifiers as before: `gym-effort-easy`, `gym-effort-ok`, `gym-effort-hard`. Red stays only for Pain and End.
+
+### B. At the gym screen
+- **"Done this session"** (`gym-done-list`): green heading, green numbers, pale green box with a green frame (before: blue heading in a white box).
+- **"Find a machine"** (`gym-search`): 50 points tall (before 36), larger words, a blue edge.
+- **A machine used today:** "2 sets done" and "Done today" in green; its tick and frame green (before all blue). Green now means one thing in the gym part: done today (Set done, today's sets, Done this session, the tile). The green tiles Plan today / Repeat last visit / Warm up and the green Session going line are "go on" and the running clock; Signs in this app says so.
+
+### C. Import from a web page (all devices; most useful on iPad and Mac) — CONFIRM-C
+- Button "Import from a web page" on the gym screen. The owner pastes the link of a gym's or a maker's page that shows its machines; "Find machines" reads the page and shows the machines it finds as cards with name and picture. A tap ticks a card; a machine he already has shows "Already in this gym". "Add 3 machines" (the number ticked) adds them to the gym he is in, with their pictures. Rename and seat setting later with the machine's pencil. Nothing is added before he taps Add. Identifiers: to be filled in from the lane's final code.
+
+### D. Planning board (iPad and Mac, wide window) — CONFIRM-D
+- Button "Planning board" on the gym screen. Left: every machine of the gym with photo and last time, a search field; a tap or a drag adds a machine. Right: the plan for a day (Today, Tomorrow or a date); drag to put in order; "Repeat last visit"; templates; "Numbers" per machine sets what it starts with next time ("Starts with 40 kg × 10"); Remove. Save: it reaches the iPhone through iCloud and shows as Plan today on that day.
+- One plan per gym: saving a new day replaces the other ("Saving replaces your plan for Tue 1 Dec."). Identifiers: to be filled in from the lane's final code.
+
+### Texts and tests
+- What's new (3.3) added: every item above, plus a line that the app has run on iPad and Mac since 3.0 (24 Nov 2026) with data shared through iCloud. How it works: new chapters "Last time beside today", "Import from a web page", "Planning board"; updated: At the gym, Logging a set, Finding a machine, iPad and Mac, Signs in this app.
+- **Signs in this app (3.3).** Green tick, green frame and green "2 sets done" on a done machine (were blue); pencil on a today's set; warm-up yellow and flame also on last time's row; "next", "—", the grey and green columns; Easy green / OK blue / Hard orange; the three rest buttons (pale yellow, pale green, pale orange); blue edge of "Find a machine"; red only for Pain and End. Green means done today in the gym part; the green tiles and the Session going line are named as "go on" and the clock.
+- `project.yml` MARKETING_VERSION 3.3, build 1. The version tests expect 3.3 first (`AppTextTests`, `testSettingsShowsTheVersionAndWhatsNew`).
+- Tests of the other lanes: see their own files (`Version33*Tests`, `Version33*UITests`).
