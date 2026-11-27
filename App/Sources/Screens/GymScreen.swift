@@ -140,6 +140,9 @@ struct GymScreen: View {
     @State private var showingEarlier = false
     @State private var editingHours = false
     @State private var askingEnd = false
+    /// Import from a web page and the planning board (since 3.3, his asks).
+    @State private var importing = false
+    @State private var boardOpen = false
     @State private var askingDiscard = false
     @State private var choosingGym = false
     @State private var afterChooser: GymChooserAction?
@@ -294,6 +297,29 @@ struct GymScreen: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("gym-new-machine")
                 }
+                // Since 3.3 (his ask "plan on a large screen … import machines from a web page"):
+                // the planning board on the iPad and the Mac, and the import on every device.
+                HStack(spacing: 8) {
+                    if sizeClass == .regular {
+                        Button { boardOpen = true } label: {
+                            HStack(spacing: 6) {
+                                AppMarkView(.calendar, size: 18, colour: Gym.tint)
+                                Text("Planning board").font(.subheadline.weight(.semibold))
+                            }
+                        }
+                        .buttonStyle(SoftButtonStyle(height: 44, tint: (fill: Gym.soft, ink: Gym.tint)))
+                        .accessibilityIdentifier("gym-board")
+                    }
+                    Button { importing = true } label: {
+                        HStack(spacing: 6) {
+                            ControlMarkView(.add, size: 16, colour: Gym.tint)
+                            Text("Import from a web page").font(.subheadline.weight(.semibold))
+                        }
+                    }
+                    .buttonStyle(SoftButtonStyle(height: 44, tint: (fill: Gym.soft, ink: Gym.tint)))
+                    .accessibilityIdentifier("gym-import")
+                }
+                .padding(.top, 4)
 
                 if sessionStart != nil || (visit?.setCount ?? 0) > 0 {
                     // Since 1.18 (his ask) the button carries the session's minutes, seen when scrolled down.
@@ -466,6 +492,14 @@ struct GymScreen: View {
                 }
             }
             .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $importing) {
+            ImportMachinesScreen(gymID: gymID) { importing = false }
+                .environment(library)
+        }
+        .fullScreenCover(isPresented: $boardOpen) {
+            PlanningBoardScreen(gymID: gymID) { boardOpen = false }
+                .environment(library)
         }
         .sheet(isPresented: $planning) {
             NavigationStack {
