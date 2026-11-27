@@ -18,14 +18,23 @@ final class Version33ImportUITests: XCTestCase {
         app.buttons["import-find"].tap()
 
         XCTAssertTrue(app.buttons["import-item-0"].waitForExistence(timeout: 5))
-        app.buttons["import-item-0"].tap()
-        app.buttons["import-item-1"].tap()
+        // Two machines the demo gym does not have yet, found by their names.
+        func item(_ name: String) -> XCUIElement {
+            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'import-item-' AND label BEGINSWITH %@", name)).firstMatch
+        }
+        item("Rowing machine").tap()
+        XCTAssertTrue(item("Rowing machine").label.hasSuffix("ticked"), item("Rowing machine").label)
+        // The lower cards can sit under the bottom bar: bring them up first.
+        app.swipeUp()
+        item("Seated leg curl").tap()
+        XCTAssertTrue(item("Seated leg curl").label.hasSuffix("ticked"), item("Seated leg curl").label)
         XCTAssertEqual(app.buttons["import-add"].label, "Add 2 machines")
+        let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); a.name = "33-import"; a.lifetime = .keepAlways; add(a)
         app.buttons["import-add"].tap()
 
-        // The demo page's first machine is "Leg press"; the gym demo already has a tile of that name,
-        // so check the sheet closed and the gym screen shows the tile.
-        XCTAssertTrue(app.buttons["machine-Leg press"].waitForExistence(timeout: 8))
+        // Back on the gym screen with the two new machines.
+        XCTAssertTrue(app.buttons["machine-Rowing machine"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["machine-Seated leg curl"].exists)
         XCTAssertFalse(app.buttons["import-add"].exists)
     }
 }

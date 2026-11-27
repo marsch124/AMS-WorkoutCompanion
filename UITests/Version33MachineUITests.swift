@@ -32,7 +32,7 @@ final class Version33MachineUITests: XCTestCase {
         app.buttons["keyboard-next"].tap()
         app.typeText("8")
         XCTAssertEqual(app.textFields["gym-rest-reps"].value as? String, "8")
-        app.buttons["keyboard-done"].tap()
+        app.toolbars.buttons["Done"].firstMatch.tap()
 
         // −15, Skip and +15 sit on the bottom of the ring.
         let ring = any("gym-rest-ring").frame

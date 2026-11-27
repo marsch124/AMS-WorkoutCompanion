@@ -469,8 +469,9 @@ final class WorkoutCompanionUITests: XCTestCase {
         goBack()
 
         app.buttons["machine-Treadmill"].tap()
-        XCTAssertTrue(app.staticTexts["gym-last"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["gym-last"].label.contains("25 min · level 8 · incline 2 %"), app.staticTexts["gym-last"].label)
+        // Since 3.3 last time's set stands in its own column of the "Last time beside today" box.
+        XCTAssertTrue(app.staticTexts["gym-last-1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["gym-last-1"].label.contains("25 min · level 8 · incline 2 %"), app.staticTexts["gym-last-1"].label)
         XCTAssertTrue(app.buttons["gym-minutes-plus"].exists)
         XCTAssertTrue(app.buttons["gym-incline-plus"].exists)
         app.buttons["gym-minutes-plus"].tap()

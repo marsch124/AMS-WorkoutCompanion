@@ -149,38 +149,9 @@ struct MachineScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            // With no set yet it says "Back to gym" and logs nothing (since 1.19, his ask; his word since 1.20); Escape on the Mac.
-            // Since 1.22 the ONE way on (his ask): after a set "Exercise done" goes to the next planned machine
-            // ("Next: Hantel" under it), else back to the gym. The green Next beside Set done is gone.
-            let leaving = today.isEmpty ? "Back to gym" : "Exercise done"
-            let next = today.isEmpty ? nil : upNext
-            Button { moveOn(next?.id) } label: {
-                VStack(spacing: 0) {
-                    Text(leaving)
-                    if let next {
-                        Text("Next: \(next.name)").font(.caption.weight(.semibold)).lineLimit(1)
-                    }
-                }
-            }
-            // Pale blue with blue words since 1.33 (his ask: set it apart from the full-blue Set done).
-            .buttonStyle(BigButtonStyle(fill: Gym.soft, ink: Gym.tint, height: 50))
-            // A blue frame like a done machine tile (since 1.34, his ask).
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Gym.fill, lineWidth: 2))
-            .keyboardShortcut(today.isEmpty ? .cancelAction : nil)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
-            .background(Theme.bg.ignoresSafeArea(edges: .bottom))
-            // The page fades out above the button (since 2.6); before, words were cut through at its edge.
-            .overlay(alignment: .top) {
-                LinearGradient(colors: [Theme.bg.opacity(0), Theme.bg], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 20)
-                    .offset(y: -20)
-                    .allowsHitTesting(false)
-            }
-            .accessibilityLabel(leaving)
-            .accessibilityValue(next.map { "Next: \($0.name)" } ?? "")
-            .accessibilityIdentifier("machine-done-pill")
+            // Hidden while the keyboard is up (since 3.3): it rode up with the keyboard and covered
+            // the Weight row the keyboard was opened for.
+            if typing == nil { bottomBar }
         }
         .toolbar {
             // How long the session has been going, small at the top left (since 1.31, his ask).
@@ -213,7 +184,6 @@ struct MachineScreen: View {
                 }
                 Spacer()
                 Button("Done") { typing = nil }
-                    .accessibilityIdentifier("keyboard-done")
             }
         }
         .onAppear(perform: prefill)
@@ -307,6 +277,43 @@ struct MachineScreen: View {
     }
 
     // MARK: Parts
+
+    /// The one way on at the bottom: Back to gym / Exercise done.
+    @ViewBuilder private var bottomBar: some View {
+        // With no set yet it says "Back to gym" and logs nothing (since 1.19, his ask; his word since 1.20); Escape on the Mac.
+        // Since 1.22 the ONE way on (his ask): after a set "Exercise done" goes to the next planned machine
+        // ("Next: Hantel" under it), else back to the gym. The green Next beside Set done is gone.
+        let leaving = today.isEmpty ? "Back to gym" : "Exercise done"
+        let next = today.isEmpty ? nil : upNext
+        Button { moveOn(next?.id) } label: {
+            VStack(spacing: 0) {
+                Text(leaving)
+                if let next {
+                    Text("Next: \(next.name)").font(.caption.weight(.semibold)).lineLimit(1)
+                }
+            }
+        }
+        // Pale blue with blue words since 1.33 (his ask: set it apart from the full-blue Set done).
+        .buttonStyle(BigButtonStyle(fill: Gym.soft, ink: Gym.tint, height: 50))
+        // A blue frame like a done machine tile (since 1.34, his ask).
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Gym.fill, lineWidth: 2))
+        .keyboardShortcut(today.isEmpty ? .cancelAction : nil)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .background(Theme.bg.ignoresSafeArea(edges: .bottom))
+        // The page fades out above the button (since 2.6); before, words were cut through at its edge.
+        .overlay(alignment: .top) {
+            LinearGradient(colors: [Theme.bg.opacity(0), Theme.bg], startPoint: .top, endPoint: .bottom)
+                .frame(height: 20)
+                .offset(y: -20)
+                .allowsHitTesting(false)
+        }
+        .accessibilityLabel(leaving)
+        .accessibilityValue(next.map { "Next: \($0.name)" } ?? "")
+        .accessibilityIdentifier("machine-done-pill")
+    }
+
 
     /// Last time beside today (since 3.3, his pick 3 of a numbered picture): one row per set — last time's
     /// set in grey on the left, today's in green on the right, each with its own kg; a warm-up in the
