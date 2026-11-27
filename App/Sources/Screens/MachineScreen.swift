@@ -541,14 +541,8 @@ struct MachineScreen: View {
                     .accessibilityIdentifier("gym-new-best")
                 }
             }
-            // The same set last time, faintly (since 1.23): "Last time: 40 kg × 10 · hard".
-            if !warmup, let line = library.gym.lastSetLine(machineID, place: today.filter { !$0.isWarmup }.count, excluding: visit.id) {
-                Text(line)
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.muted.opacity(0.85))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityIdentifier("gym-last-set")
-            }
+            // The faint "Last time: 40 kg × 10 · hard" line (1.23–3.3) is gone since 3.4 (his yes): the
+            // Last time beside today box above already shows last time's set beside "next".
             if !isReps {
                 Stepper2(title: "kg", id: "gym-weight", value: $kg, box: .kg, typing: $typing,
                          minus: { kg = max(0, kg - step) }, plus: { kg += step })

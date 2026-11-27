@@ -58,7 +58,9 @@ final class Version123ScreensUITests: XCTestCase {
     func testMachineExtrasAndSessionDone() {
         openGym()
         app.buttons["machine-Leg press"].tap()
-        XCTAssertTrue(any("gym-last-set").waitForExistence(timeout: 5), "the same set last time, faintly")
+        // Since 3.4 last time's set stands only in the Last time beside today box (the faint line is gone).
+        XCTAssertTrue(any("gym-last-1").waitForExistence(timeout: 5), "the same set last time, in the box")
+        XCTAssertFalse(any("gym-last-set").exists)
         app.buttons["gym-set-done"].tap()
         XCTAssertTrue(app.buttons["gym-set-1"].waitForExistence(timeout: 10))
         app.buttons["gym-effort-hard"].tap()

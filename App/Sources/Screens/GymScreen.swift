@@ -297,19 +297,18 @@ struct GymScreen: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("gym-new-machine")
                 }
-                // Since 3.3 (his ask "plan on a large screen … import machines from a web page"):
-                // the planning board on the iPad and the Mac, and the import on every device.
-                HStack(spacing: 8) {
-                    if sizeClass == .regular {
-                        Button { boardOpen = true } label: {
-                            HStack(spacing: 6) {
-                                AppMarkView(.calendar, size: 18, colour: Gym.tint)
-                                Text("Planning board").font(.subheadline.weight(.semibold))
-                            }
+                // Since 3.3 (his ask "plan on a large screen … import machines from a web page"): the
+                // planning board and the import. Since 3.4 the board is on the iPhone too (his yes); there
+                // the two buttons stand one above the other.
+                let extras = Group {
+                    Button { boardOpen = true } label: {
+                        HStack(spacing: 6) {
+                            AppMarkView(.calendar, size: 18, colour: Gym.tint)
+                            Text("Planning board").font(.subheadline.weight(.semibold))
                         }
-                        .buttonStyle(SoftButtonStyle(height: 44, tint: (fill: Gym.soft, ink: Gym.tint)))
-                        .accessibilityIdentifier("gym-board")
                     }
+                    .buttonStyle(SoftButtonStyle(height: 44, tint: (fill: Gym.soft, ink: Gym.tint)))
+                    .accessibilityIdentifier("gym-board")
                     Button { importing = true } label: {
                         HStack(spacing: 6) {
                             ControlMarkView(.add, size: 16, colour: Gym.tint)
@@ -318,6 +317,13 @@ struct GymScreen: View {
                     }
                     .buttonStyle(SoftButtonStyle(height: 44, tint: (fill: Gym.soft, ink: Gym.tint)))
                     .accessibilityIdentifier("gym-import")
+                }
+                Group {
+                    if sizeClass == .regular {
+                        HStack(spacing: 8) { extras }
+                    } else {
+                        VStack(spacing: 8) { extras }
+                    }
                 }
                 .padding(.top, 4)
 

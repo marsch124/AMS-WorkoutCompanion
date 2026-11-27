@@ -21,6 +21,8 @@ struct PlanningBoardScreen: View {
     @State private var namingTemplate = false
     @State private var templateName = ""
     @State private var numbersFor: UUID?
+    /// The iPhone's board (since 3.4): the machines open in a sheet from "Add machines".
+    @State private var addingMachines = false
 
     private let cal = Calendar.current
 
@@ -50,14 +52,14 @@ struct PlanningBoardScreen: View {
                         planColumn
                     }
                 } else {
-                    VStack(spacing: 12) {
-                        machinesColumn
-                        planColumn
-                    }
+                    // The iPhone (since 3.4, his yes): only the plan; "Add machines" opens the machines.
+                    planColumn
                 }
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(Theme.bg.ignoresSafeArea())
             .navigationTitle("Planning board")
             .navigationBarTitleDisplayMode(.inline)
             .bottomActions(cancel: done, save: save, tint: Gym.fill, cancelID: "board-cancel", saveID: "board-save")
@@ -65,6 +67,24 @@ struct PlanningBoardScreen: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("board-screen")
         .onAppear(perform: load)
+        .sheet(isPresented: $addingMachines) {
+            NavigationStack {
+                machinesColumn
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .background(Theme.bg)
+                    .navigationTitle("Add machines")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { addingMachines = false }
+                                .keyboardShortcut(.cancelAction)
+                                .accessibilityIdentifier("board-machines-done")
+                        }
+                    }
+            }
+            .presentationDetents([.large])
+        }
         .alert("Save as template", isPresented: $namingTemplate) {
             TextField("For example: Leg day", text: $templateName)
             Button("Cancel", role: .cancel) {}
@@ -193,23 +213,25 @@ struct PlanningBoardScreen: View {
                         .accessibilityIdentifier("board-date")
                 }
             }
-            HStack(spacing: 8) {
-                boardButton("Repeat last visit", id: "board-repeat") {
-                    let o = library.gym.lastOrder(gym: gymID, before: day)
-                    if !o.isEmpty { order = o }
-                }
-                Menu {
-                    if templates.isEmpty { Text("No templates yet") }
-                    ForEach(templates) { t in
-                        Button(t.name) { order = library.gym.order(of: t) }
+            if sizeClass == .regular {
+                HStack(spacing: 8) { repeatButton; templateMenu; saveTemplateButton }
+            } else {
+                // Two rows on the iPhone (since 3.4): Add machines first.
+                Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                    GridRow {
+                        Button { addingMachines = true } label: {
+                            HStack(spacing: 5) {
+                                ControlMarkView(.add, size: 14, colour: Gym.tint)
+                                pillText("Add machines")
+                            }
+                            .pillFrame()
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("board-add-machines")
+                        repeatButton
                     }
-                } label: { pill("Use a template") }
-                .accessibilityIdentifier("board-template")
-                boardButton("Save as template…", id: "board-save-template") {
-                    templateName = ""
-                    namingTemplate = true
+                    GridRow { templateMenu; saveTemplateButton }
                 }
-                .disabled(order.isEmpty)
             }
             if let other = library.gym.planDayWarning(for: day, gym: gymID) {
                 Text("Saving replaces your plan for \(dayText(other)).")
@@ -218,7 +240,7 @@ struct PlanningBoardScreen: View {
                     .accessibilityIdentifier("board-warning")
             }
             if order.isEmpty {
-                Text("Nothing planned yet — tap machines on the left.")
+                Text(sizeClass == .regular ? "Nothing planned yet — tap machines on the left." : "Nothing planned yet — tap Add machines.")
                     .font(.subheadline).foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, minHeight: 80)
             } else {
@@ -230,6 +252,7 @@ struct PlanningBoardScreen: View {
                     .onMove { order.move(fromOffsets: $0, toOffset: $1) }
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
                 .environment(\.editMode, .constant(.active))
                 Text("Drag the handles to change the order.")
                     .font(.footnote).foregroundStyle(Theme.muted)
@@ -253,6 +276,7 @@ struct PlanningBoardScreen: View {
     private func planRow(_ i: Int, _ m: Machine) -> some View {
         let used = library.gym.last(m.id) != nil
         let start = library.gym.startingSet(m.id)
+        let wide = sizeClass == .regular
         return HStack(spacing: 10) {
             Text("\(i + 1)")
                 .font(.subheadline.weight(.bold))
@@ -260,47 +284,83 @@ struct PlanningBoardScreen: View {
                 .frame(width: 26, height: 26)
                 .background(Gym.fill, in: Circle())
             MachinePhoto(name: m.photo, height: 40, icon: m.icon, corner: 8)
-                .frame(width: 54)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(m.name).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
+                .frame(width: wide ? 54 : 44)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(m.name).font(.body.weight(.semibold)).foregroundStyle(Theme.ink).lineLimit(1)
                 Text(used ? "Starts with \(start.map { library.gym.text($0, machine: m.id) } ?? "")"
                           : "First time — numbers on the day")
-                    .font(.footnote).foregroundStyle(Theme.muted)
+                    .font(.footnote).foregroundStyle(Theme.muted).lineLimit(1)
+                // On the iPhone the two buttons sit under the name (since 3.4): beside it they broke
+                // into "Num bers" and "Re- move".
+                if !wide { HStack(spacing: 16) { rowButtons(i, m, used: used) }.padding(.top, 2) }
             }
             Spacer(minLength: 4)
-            if used {
-                Button { numbersFor = m.id } label: {
-                    HStack(spacing: 4) {
-                        PencilMark(size: 15, colour: Gym.tint)
-                        Text("Numbers")
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Gym.tint)
-                }
-                .buttonStyle(.borderless)
-                .accessibilityIdentifier("board-numbers-\(i + 1)")
-            }
-            Button { order.removeAll { $0 == m.id } } label: {
-                Text("Remove")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.muted)
-            }
-            .buttonStyle(.borderless)
-            .accessibilityIdentifier("board-remove-\(i + 1)")
+            if wide { rowButtons(i, m, used: used) }
         }
+        .listRowBackground(Theme.card)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("board-plan-\(i + 1)")
     }
 
+    @ViewBuilder private func rowButtons(_ i: Int, _ m: Machine, used: Bool) -> some View {
+        if used {
+            Button { numbersFor = m.id } label: {
+                HStack(spacing: 4) {
+                    PencilMark(size: 15, colour: Gym.tint)
+                    Text("Numbers")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Gym.tint)
+                .fixedSize()
+            }
+            .buttonStyle(.borderless)
+            .accessibilityIdentifier("board-numbers-\(i + 1)")
+        }
+        Button { order.removeAll { $0 == m.id } } label: {
+            Text("Remove")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.muted)
+                .fixedSize()
+        }
+        .buttonStyle(.borderless)
+        .accessibilityIdentifier("board-remove-\(i + 1)")
+    }
+
     private func pill(_ title: String) -> some View {
+        pillText(title).pillFrame()
+    }
+
+    private func pillText(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(Gym.tint)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 34)
-            // Pale blue with blue words, like the gym screen's second buttons: Save stays the one full-colour button.
-            .background(Gym.soft, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Gym.fill.opacity(0.35), lineWidth: 1))
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+    }
+
+    private var repeatButton: some View {
+        boardButton("Repeat last visit", id: "board-repeat") {
+            let o = library.gym.lastOrder(gym: gymID, before: day)
+            if !o.isEmpty { order = o }
+        }
+    }
+
+    private var templateMenu: some View {
+        Menu {
+            if templates.isEmpty { Text("No templates yet") }
+            ForEach(templates) { t in
+                Button(t.name) { order = library.gym.order(of: t) }
+            }
+        } label: { pill("Use a template") }
+        .accessibilityIdentifier("board-template")
+    }
+
+    private var saveTemplateButton: some View {
+        boardButton("Save as template…", id: "board-save-template") {
+            templateName = ""
+            namingTemplate = true
+        }
+        .disabled(order.isEmpty)
     }
 
     private func boardButton(_ title: String, id: String, action: @escaping () -> Void) -> some View {
@@ -311,6 +371,17 @@ struct PlanningBoardScreen: View {
 }
 
 private struct BoardID: Identifiable { let id: UUID }
+
+private extension View {
+    /// Pale blue with blue words, like the gym screen's second buttons: Save stays the one full-colour button.
+    func pillFrame() -> some View {
+        self.padding(.horizontal, 12)
+            .frame(minHeight: 34)
+            .frame(maxWidth: .infinity)
+            .background(Gym.soft, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Gym.fill.opacity(0.35), lineWidth: 1))
+    }
+}
 
 /// A small hand-drawn pencil, for the Numbers button (in the AMS-Icons style).
 private struct PencilMark: View {
