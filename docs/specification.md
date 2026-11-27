@@ -289,7 +289,7 @@ His two approved ideas after 1.17: see that a session is going from the Train pa
 
 ## Version 1.23 — 15 changes picked from 50 ideas: set-by-set memory, effort, holds, pain, move to next visit, pausing clock, lock screen, opening hours, session feel, comparison, stretch, reminder, sounds, spoken countdown, presets (18 Nov 2026)
 - Build number 2 (1.23 (2)); build 1 was 1.23 (1). Data stays on the phone; the gym file gains new optional fields and older backups still open.
-- **Last time, set by set.** In the box for the set about to be done, a faint line `gym-last-set` shows the same set from the last visit ("Last time: 40 kg × 10 · hard"). Rule `GymLog.lastSet` / `lastSetLine`: working sets only (warm-ups not counted); not on time machines or a first time. Before: one line for the whole machine at the top.
+- **Last time, set by set (gone since 3.4).** In the box for the set about to be done, a faint line `gym-last-set` shows the same set from the last visit ("Last time: 40 kg × 10 · hard"). Rule `GymLog.lastSet` / `lastSetLine`: working sets only (warm-ups not counted); not on time machines or a first time. Before: one line for the whole machine at the top.
 - **Effort per set.** Under today's sets a row "Last set felt" with pills `gym-effort-easy`, `gym-effort-ok`, `gym-effort-hard`; the word shows in that set's row; tapping the same pill again removes it; it appears next time in the "Last time" line. Stored as `GymSet.effort`.
 - **Holds.** `Machine.isHold`: a time machine with level and incline both off. Entered in seconds (± 5 s). `gym-hold-start` "Start countdown" counts down with a ring, ticks in the last three seconds, saves the set by itself at zero and starts the rest; `gym-hold-stop` "Stop" saves nothing; "Done" logs without a countdown. Times under one minute read "45 s" (before "0:45 min").
 - **Pain flag.** After the first set a "Pain here" pill `gym-pain` (red when on). Next visit a red line `gym-last-pain` "Pain flagged last time — go easy"; the app never suggests more weight or reps after a pain flag ("Pain last time — the same again, go easy"). Stored as `MachineEntry.pain`.
@@ -812,3 +812,25 @@ One small release (version 3.1, build 1). The owner's apps AMS Triathlon Trainin
 - **Signs in this app (3.3).** Green tick, green frame and green "2 sets done" on a done machine (were blue); pencil on a today's set; blue tick in a blue circle and blue outline on an import card = ticked to add; warm-up yellow and flame also on last time's row; "next", "—", the grey and green columns; Easy green / OK blue / Hard orange; the three rest buttons (pale yellow, pale green, pale orange); blue edge of "Find a machine"; red only for Pain and End. Green means done today in the gym part; the green tiles and the Session going line are named as "go on" and the clock.
 - `project.yml` MARKETING_VERSION 3.3, build 1. The version tests expect 3.3 first (`AppTextTests`, `testSettingsShowsTheVersionAndWhatsNew`).
 - Tests of the other lanes: see their own files (`Version33*Tests`, `Version33*UITests`).
+
+## Version 3.4 — the faint "Last time" line goes, the planning board on the iPhone (27 Nov 2026)
+- Build number 1 (3.4 (1)). The owner said yes to two ideas offered after 3.3.
+
+### A. Machine page (`MachineScreen`)
+- **Gone: the faint line `gym-last-set`** ("Last time: 55 kg × 12", rule `GymLog.lastSet` / `lastSetLine`; added in 1.23) in the Set box, above Weight and Reps before a set. Reason: the box "Last time beside today" (`gym-compare`, 3.3) already shows last time's set right beside "next". Nothing else in the Set box changes (Weight, Reps, − and +, Set done, "Last set felt", "Pain here"). The box is one line shorter, so Weight and Reps sit one line higher.
+
+### B. Planning board on every device (`GymScreen`, `PlanningBoardScreen`)
+- **Button:** "Planning board" (`gym-board`, calendar mark) stands under the machines on every device. Before (3.3): only on the iPad and the Mac in a wide window. On a wide window (iPad, Mac) "Planning board" and "Import from a web page" (`gym-import`) stand side by side as before; on the iPhone one above the other.
+- **Wide window (iPad, Mac):** unchanged from 3.3 (section D of Version 3.3): `board-screen`, columns Machines / Plan, drag onto the plan, "Nothing planned yet — tap machines on the left."
+- **iPhone, full screen (`board-screen`), only the Plan:**
+  - Day: Today / Tomorrow (`board-day`) / Pick a date (`board-date`, today or later).
+  - Buttons in two rows. Row 1: "Add machines" (new, `board-add-machines`, + mark) and "Repeat last visit" (`board-repeat`). Row 2: "Use a template" (menu, `board-template`) and "Save as template…" (`board-save-template`).
+  - Then the planned machines in order (`board-plan-<n>`), each with "Starts with 40 kg × 10" or "First time — numbers on the day", "Numbers" (`board-numbers-<n>` sheet as in 3.3) and "Remove" (`board-remove-<n>`). Drag the handles to change the order.
+  - One plan per gym; warning `board-warning` "Saving replaces your plan for <day>."; Cancel (`board-cancel`) and Save (`board-save`) at the bottom.
+  - Empty plan: "Nothing planned yet — tap Add machines."
+- **"Add machines" sheet (iPhone):** titled "Add machines", search field "Find a machine" (`board-search`), every machine of the gym (rows `board-machine-<name>`: photo, name, last time). A tap adds the machine to the end of the plan; it then shows "In the plan" and is dimmed (cannot be added twice). "Done" (`board-machines-done`) closes the sheet.
+- The saved plan shows as Plan today on its day on every device (iCloud), as in 3.3.
+
+### Texts and tests
+- What's new (3.4): five items (line removed; board on the iPhone; how it looks; Add machines; everything else as 3.3) plus the How it works note and "Nothing else changed". How it works updated: At the gym (button on every device), Logging a set (faint line gone since 3.4), Planning board (wide and iPhone parts), iPad and Mac. Signs in this app: "In the plan" (dimmed machine) also covers the iPhone's Add machines sheet; no other sign changes.
+- `project.yml` MARKETING_VERSION 3.4, build 1. The version tests expect 3.4 first (`AppTextTests`, `testSettingsShowsTheVersionAndWhatsNew`, `whatsnew-3.4`).
