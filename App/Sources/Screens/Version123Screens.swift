@@ -16,22 +16,25 @@ struct ChoicePills<Value: Hashable>: View {
     let fill: Color
     let ink: Color
     let tint: Color
+    /// Each option its own colours (since 3.3: Easy green, OK blue, Hard orange); nil = all alike.
+    var colours: ((Value) -> (fill: Color, ink: Color, tint: Color))? = nil
     let pick: (Value) -> Void
 
     var body: some View {
         HStack(spacing: 6) {
             ForEach(options, id: \.0) { value, title, key in
                 let on = value == chosen
+                let c = colours?(value) ?? (fill: fill, ink: ink, tint: tint)
                 Button { pick(value) } label: {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
-                        .foregroundStyle(on ? ink : tint)
+                        .foregroundStyle(on ? c.ink : c.tint)
                         .frame(maxWidth: .infinity)
                         .frame(height: 32)
-                        .background(on ? AnyShapeStyle(fill) : AnyShapeStyle(Color.clear), in: Capsule())
-                        .overlay(Capsule().stroke(fill, lineWidth: on ? 0 : 1))
+                        .background(on ? AnyShapeStyle(c.fill) : AnyShapeStyle(Color.clear), in: Capsule())
+                        .overlay(Capsule().stroke(c.fill, lineWidth: on ? 0 : 1.2))
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)

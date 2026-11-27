@@ -20,6 +20,19 @@ enum Gym {
     static let soft = Color.pair("#dbe6fb", "#1e2f52")
     /// Set done: a full green, the positive step (since 1.33 build 2, his ask).
     static let done = Color.pair("#16a34a", "#15803d")
+    /// Done today in words and marks (since 3.3, his ask "happy green"): today's sets, "2 sets done",
+    /// Done this session. Green means one thing in the gym part: done today.
+    static let doneTint = Color.pair("#15803d", "#86efac")
+    /// The pale green behind today's sets and the Done this session box (since 3.3).
+    static let doneWash = Color.pair("#e9f8ee", "#13301f")
+    /// How a set felt (since 3.3, his ask): Easy green, OK blue, Hard orange. Red stays for Pain and End.
+    static func effort(_ e: Effort) -> (fill: Color, ink: Color, tint: Color) {
+        switch e {
+        case .easy: (done, .white, doneTint)
+        case .ok: (fill, ink, tint)
+        case .hard: (Color.pair("#ea580c", "#f97316"), .white, busyTint)
+        }
+    }
     /// The rest buttons, lightly tinted (since 1.33 build 3, his ask): −15 s yellow, +15 s orange, Skip rest green.
     static let less = (fill: Color.pair("#fef6d8", "#352d0e"), ink: Color.pair("#a16207", "#fcd34d"))
     static let more = (fill: Color.pair("#ffeedd", "#3a2212"), ink: Color.pair("#c2410c", "#fdba74"))
@@ -251,22 +264,28 @@ struct GymScreen: View {
 
                 // A long list gets a search field (since 1.11): name or setting ("Seat 4").
                 if machines.count > GymScreen.searchFrom {
-                    HStack(spacing: 6) {
-                        AppMarkView(.search, size: 21, colour: Theme.muted)
+                    // Bigger since 3.3 (his ask: often used during a session): 50 points tall (was 36),
+                    // larger words, a blue edge.
+                    HStack(spacing: 8) {
+                        AppMarkView(.search, size: 24, colour: Theme.muted)
                         TextField("Find a machine", text: $search)
+                            .font(.title3)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .accessibilityIdentifier("gym-search")
                         if !search.isEmpty {
-                            Button { search = "" } label: { ControlMarkView(.close, size: 12, colour: Theme.muted) }
+                            Button { search = "" } label: {
+                                ControlMarkView(.close, size: 14, colour: Theme.muted).frame(width: 32, height: 32)
+                            }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("Clear")
                                 .accessibilityIdentifier("gym-search-clear")
                         }
                     }
-                    .padding(.horizontal, 10)
-                    .frame(height: 36)
+                    .padding(.horizontal, 14)
+                    .frame(height: 50)
                     .background(Theme.card, in: Capsule())
+                    .overlay(Capsule().stroke(Gym.fill.opacity(0.35), lineWidth: 1.5))
                 }
                 let found = Set(library.gym.machines(in: gymID, matching: search).map(\.id))
                 LazyVGrid(columns: columns, spacing: 8) {
@@ -805,9 +824,10 @@ struct GymScreen: View {
     /// "Done this session": one row per machine with sets, in the order done (since 1.22).
     private func doneList(_ visit: GymVisit) -> some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Green since 3.3 (his ask): done today; before, a blue heading in a white box.
             Text("Done this session")
                 .font(.headline)
-                .foregroundStyle(Gym.tint)
+                .foregroundStyle(Gym.doneTint)
                 .padding(.bottom, 4)
             ForEach(Array(visit.performed.enumerated()), id: \.element.id) { i, entry in
                 let name = library.gym.machine(entry.machineID)?.name ?? "Machine"
@@ -815,7 +835,7 @@ struct GymScreen: View {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text("\(i + 1)")
                             .font(.subheadline.weight(.bold).monospacedDigit())
-                            .foregroundStyle(Gym.tint)
+                            .foregroundStyle(Gym.doneTint)
                             .frame(width: 18, alignment: .trailing)
                         Text(name)
                             .font(.subheadline.weight(.semibold))
@@ -835,13 +855,13 @@ struct GymScreen: View {
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("gym-done-\(name)")
-                if i < visit.performed.count - 1 { Divider() }
+                if i < visit.performed.count - 1 { Divider().overlay(Gym.done.opacity(0.25)) }
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.line, lineWidth: 1))
+        .background(Gym.doneWash, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Gym.done, lineWidth: 1.5))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("gym-done-list")
     }
@@ -1156,9 +1176,10 @@ private struct MachineTile: View {
             MachinePhoto(name: machine.photo, height: Self.height, icon: machine.icon, corner: 14)
                 .overlay(alignment: .topTrailing) {
                     if done {
-                        ControlMarkView(.check, size: 14, colour: Gym.ink)
+                        // Green since 3.3: done today (was blue).
+                        ControlMarkView(.check, size: 14, colour: .white)
                             .frame(width: 26, height: 26)
-                            .background(Gym.fill, in: Circle())
+                            .background(Gym.done, in: Circle())
                             .padding(6)
                     }
                 }
@@ -1170,7 +1191,8 @@ private struct MachineTile: View {
                     .lineLimit(1)
                 Text(busy ? "Busy — come back later" : status)
                     .font(.caption)
-                    .foregroundStyle(busy ? Gym.busyTint : Gym.tint)
+                    .fontWeight(done && !busy ? .semibold : .regular)
+                    .foregroundStyle(busy ? Gym.busyTint : done ? Gym.doneTint : Gym.tint)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1183,7 +1205,7 @@ private struct MachineTile: View {
         // The muscle group stripe down the left edge (1.11) is gone since 1.27 (his ask: "disturbing").
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .stroke(busy ? Gym.busy.fillColor : done ? Gym.fill : .clear, lineWidth: 2))
+            .stroke(busy ? Gym.busy.fillColor : done ? Gym.done : .clear, lineWidth: 2))
         .accessibilityElement(children: .combine)
     }
 

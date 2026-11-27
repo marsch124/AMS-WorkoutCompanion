@@ -106,7 +106,8 @@ struct MachineScreen: View {
                         .accessibilityIdentifier("gym-superset")
                     }
                 }
-                lastTime
+                compareBox
+                lastNotes
                 if today.isEmpty, let reason = next.reason {
                     HStack(spacing: 8) {
                         IconMark(.hand("trophy"), size: 20, colour: Gym.tint)
@@ -118,8 +119,6 @@ struct MachineScreen: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("gym-suggestion")
                 }
-
-                if !today.isEmpty { setsDone }
 
                 if !today.isEmpty, !isTime { effortRow }
 
@@ -207,8 +206,14 @@ struct MachineScreen: View {
                     .accessibilityIdentifier("gym-edit-machine")
             }
             ToolbarItemGroup(placement: .keyboard) {
+                // Weight → Next → Reps (since 3.3), then Done closes the keyboard.
+                if typing == .restKg || typing == .kg {
+                    Button("Next") { typing = typing == .restKg ? .restReps : .reps }
+                        .accessibilityIdentifier("keyboard-next")
+                }
                 Spacer()
                 Button("Done") { typing = nil }
+                    .accessibilityIdentifier("keyboard-done")
             }
         }
         .onAppear(perform: prefill)
@@ -303,13 +308,165 @@ struct MachineScreen: View {
 
     // MARK: Parts
 
-    @ViewBuilder private var lastTime: some View {
-        if let last = library.gym.last(machineID, excluding: visit.id) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Last time, \(last.visit.date.formatted(.dateTime.day().month(.abbreviated))): \(library.gym.text(last.entry))")
+    /// Last time beside today (since 3.3, his pick 3 of a numbered picture): one row per set — last time's
+    /// set in grey on the left, today's in green on the right, each with its own kg; a warm-up in the
+    /// warm-up yellow. Before: a grey line "Last time, 24 Nov: BW × 20, 2,5 × 20, 5 × 14, 7,5 × 7 kg"
+    /// (the one "kg" at the end looked as if it belonged to the last set only) and today's sets in a
+    /// separate blue-grey box.
+    @ViewBuilder private var compareBox: some View {
+        let last = library.gym.last(machineID, excluding: visit.id)
+        let before = last?.entry.sets ?? []
+        let rows = max(before.count, today.count)
+        if rows == 0 {
+            Text("First time on this machine.")
+                .font(.subheadline)
+                .foregroundStyle(Theme.muted)
+                .accessibilityIdentifier("gym-last")
+        } else {
+            let hasLast = !before.isEmpty
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    Color.clear.frame(width: Self.labelWidth, height: 1)
+                    if hasLast, let last {
+                        Text("Last time · \(last.visit.date.formatted(.dateTime.day().month(.abbreviated)))")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Theme.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .padding(.horizontal, 6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityIdentifier("gym-last")
+                    }
+                    Text(hasLast ? "Today" : "Today · first time on this machine")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Gym.doneTint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.horizontal, 8)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .background(Gym.doneWash)
+                        .accessibilityIdentifier(hasLast ? "gym-today-head" : "gym-last")
+                }
+                .padding(.top, 7)
+                .padding(.bottom, 3)
+                .background(alignment: .trailing) { headWash(hasLast: hasLast) }
+                .fixedSize(horizontal: false, vertical: true)
+                ForEach(0..<rows, id: \.self) { i in
+                    Divider().padding(.leading, 10)
+                    compareRow(i, before: i < before.count ? before[i] : nil, hasLast: hasLast)
+                }
+            }
+            .background(Theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Gym.fill.opacity(0.35), lineWidth: 1))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("gym-compare")
+        }
+    }
+
+    /// The pale green of the Today column carried up behind its heading.
+    private func headWash(hasLast: Bool) -> some View {
+        GeometryReader { g in
+            let w = g.size.width - Self.labelWidth
+            Gym.doneWash.frame(width: hasLast ? w / 2 : w).frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+
+    private static let labelWidth: CGFloat = 84
+
+    /// One set: its name, last time's set and today's (or "next", or nothing yet).
+    private func compareRow(_ i: Int, before: GymSet?, hasLast: Bool) -> some View {
+        let done = i < today.count ? today[i] : nil
+        let warm = done?.isWarmup ?? before?.isWarmup ?? false
+        return HStack(spacing: 0) {
+            HStack(spacing: 3) {
+                if warm { AppMarkView(.warmup, size: 13, colour: Warmup.tint) }
+                Text(warm ? "Warm-up" : "Set \(i + 1)")
+                    .foregroundStyle(warm ? Warmup.tint : Theme.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .font(.subheadline)
+            .padding(.leading, 10)
+            .frame(width: Self.labelWidth, alignment: .leading)
+            if hasLast {
+                Text(before.map(short) ?? "—")
                     .font(.subheadline)
-                    .foregroundStyle(Theme.muted)
-                    .accessibilityIdentifier("gym-last")
+                    .foregroundStyle(before?.isWarmup == true ? Warmup.tint : Theme.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .padding(.horizontal, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("gym-last-\(i + 1)")
+            }
+            Group {
+                if let done {
+                    todayCell(done, i)
+                } else {
+                    Text(i == today.count ? "next" : "")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.muted)
+                        .padding(.horizontal, 8)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .background(Theme.line.opacity(0.35))
+                }
+            }
+        }
+        .frame(minHeight: 34)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Today's set, green — done and proud (since 3.3, his ask); a tap changes it.
+    private func todayCell(_ s: GymSet, _ i: Int) -> some View {
+        Button { changingSet = i } label: {
+            HStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 3) {
+                        Text(short(s))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Gym.doneTint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        if beats(s, i) {
+                            // More than the same set last time (since 1.16): the gold arrow.
+                            AppMarkView(.up, size: 13, colour: Gym.better)
+                        } else {
+                            ControlMarkView(.check, size: 11, colour: Gym.doneTint)
+                        }
+                    }
+                    if let effort = s.effort {
+                        Text(effort.title)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Gym.effort(effort).tint)
+                    }
+                }
+                Spacer(minLength: 2)
+                // The pencil says a tap changes the set (the tick means done, 2.0 mark check).
+                ControlMarkView(.edit, size: 11, colour: Gym.tint)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(Gym.doneWash)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(s.isWarmup ? "Warm-up" : "Set \(i + 1)"), \(said(s))\(s.effort.map { ", \($0.title.lowercased())" } ?? "")\(beats(s, i) ? ", more than last time" : "")")
+        .accessibilityIdentifier("gym-set-\(i + 1)")
+    }
+
+    /// One set short enough for a column, each with its own kg: "2,5 kg × 20", "BW × 20", "12 reps", "10 min · level 4".
+    private func short(_ s: GymSet) -> String {
+        if s.isTime { return s.text }
+        if isReps { return "\(s.reps) reps" }
+        return "\(s.kg <= 0 ? "BW" : GymSet.number(s.kg) + " kg") × \(s.reps)"
+    }
+
+    /// Last time's note and pain flag, under the box.
+    @ViewBuilder private var lastNotes: some View {
+        if let last = library.gym.last(machineID, excluding: visit.id), last.entry.note != nil || last.entry.pain == true {
+            VStack(alignment: .leading, spacing: 2) {
                 if let note = last.entry.note {
                     Text("“\(note)”")
                         .font(.subheadline)
@@ -324,55 +481,7 @@ struct MachineScreen: View {
                         .accessibilityIdentifier("gym-last-pain")
                 }
             }
-        } else {
-            Text("First time on this machine.")
-                .font(.subheadline)
-                .foregroundStyle(Theme.muted)
-                .accessibilityIdentifier("gym-last")
         }
-    }
-
-    private var setsDone: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(today.enumerated()), id: \.offset) { i, s in
-                Button { changingSet = i } label: {
-                    HStack {
-                        if s.isWarmup {
-                            AppMarkView(.warmup, size: 15, colour: Warmup.tint)
-                            Text("Warm-up").foregroundStyle(Warmup.tint)
-                        } else {
-                            Text("Set \(i + 1)").foregroundStyle(Theme.muted)
-                        }
-                        Spacer()
-                        if beats(s, i) {
-                            // More than the same set last time (since 1.16).
-                            AppMarkView(.up, size: 16, colour: Gym.better)
-                        }
-                        if let effort = s.effort {
-                            Text(effort.title).font(.caption.weight(.semibold)).foregroundStyle(Gym.tint)
-                        }
-                        Text(said(s)).fontWeight(s.isWarmup ? .regular : .semibold).foregroundStyle(s.isWarmup ? Theme.muted : Theme.ink)
-                        // A pencil and "Change": tapping the row changes the set. The tick means a finished machine (2.0).
-                        HStack(spacing: 3) {
-                            ControlMarkView(.edit, size: 12, colour: Gym.tint)
-                            Text("Change").font(.caption).foregroundStyle(Gym.tint)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(s.isWarmup ? "Warm-up" : "Set \(i + 1)"), \(said(s))\(s.effort.map { ", \($0.title.lowercased())" } ?? "")\(beats(s, i) ? ", more than last time" : "")")
-                .accessibilityIdentifier("gym-set-\(i + 1)")
-                if i < today.count - 1 { Divider().padding(.leading, 12) }
-            }
-        }
-        // Done sets on a light indigo wash (since 1.16; before, the plain card colour).
-        .background(Gym.fill.opacity(0.09), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Gym.fill.opacity(0.35), lineWidth: 1))
     }
 
     private func beats(_ s: GymSet, _ i: Int) -> Bool {
@@ -469,6 +578,11 @@ struct MachineScreen: View {
                 }
             }
             .frame(width: 180, height: 180)
+            // −15, Skip and +15 sit on the bottom of the ring, like a watch (since 3.3, his pick 6 of a
+            // numbered picture: "smaller and integrated with the countdown"). Before: three wide buttons
+            // in a row under Weight and Reps, 48 points tall.
+            .padding(.bottom, 30)
+            .overlay { ringButtons(end) }
             Text("Next: set \(today.count + 1) · \(said(GymSet(kg: isReps ? 0 : kg, reps: reps)))")
                 .font(.subheadline)
                 .foregroundStyle(Theme.muted)
@@ -508,36 +622,61 @@ struct MachineScreen: View {
                 .buttonStyle(BigButtonStyle(fill: Gym.fill, ink: Gym.ink, height: 48))
                 .accessibilityIdentifier("gym-next-machine")
             }
-            // −15 s and +15 s, small, on one line with Skip rest (since 1.25, his ask).
-            HStack(spacing: 8) {
-                Button("−15 s") {
-                    // Never below five seconds left: the countdown still ticks.
-                    let cut = min(15, max(0, end.timeIntervalSince(Date()) - 5))
-                    restEnd = end.addingTimeInterval(-cut)
-                    restLength = max(5, restLength - cut)
-                }
-                .buttonStyle(SoftButtonStyle(height: 48, tint: Gym.less))
-                .frame(width: 84)
-                .accessibilityLabel("15 seconds less")
-                .accessibilityIdentifier("gym-rest-less")
-                Button("+15 s") {
-                    restEnd = end.addingTimeInterval(15)
-                    restLength += 15
-                }
-                .buttonStyle(SoftButtonStyle(height: 48, tint: Gym.more))
-                .frame(width: 84)
-                .accessibilityLabel("15 seconds more")
-                .accessibilityIdentifier("gym-rest-more")
-                Button { restEnd = nil } label: {
-                    MarkLabel(title: "Skip rest", mark: .skip, colour: Gym.skip.ink)
-                }
-                .buttonStyle(SoftButtonStyle(height: 48, tint: Gym.skip))
-                .accessibilityIdentifier("gym-rest-skip")
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(12)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// The three rest buttons on the ring (since 3.3): −15 at about eight o'clock, Skip at six, +15 at four.
+    /// The ring is 180 points across, its line 14 wide; the buttons sit on that line.
+    private func ringButtons(_ end: Date) -> some View {
+        let r: CGFloat = 83
+        let side = CGFloat(cos(Double.pi / 4)) * r
+        return ZStack {
+            ringButton(size: 44, tint: Gym.less, id: "gym-rest-less", label: "15 seconds less") {
+                // Never below five seconds left: the countdown still ticks.
+                let cut = min(15, max(0, end.timeIntervalSince(Date()) - 5))
+                restEnd = end.addingTimeInterval(-cut)
+                restLength = max(5, restLength - cut)
+            } content: {
+                Text("−15").font(.subheadline.weight(.bold)).monospacedDigit()
+            }
+            .offset(x: -side - 6, y: side - 15)
+            ringButton(size: 58, tint: Gym.skip, id: "gym-rest-skip", label: "Skip rest") {
+                restEnd = nil
+                typing = nil
+            } content: {
+                VStack(spacing: 0) {
+                    ControlMarkView(.skip, size: 17, colour: Gym.skip.ink)
+                    Text("Skip").font(.caption2.weight(.bold))
+                }
+            }
+            .offset(y: r - 15 + 4)
+            ringButton(size: 44, tint: Gym.more, id: "gym-rest-more", label: "15 seconds more") {
+                restEnd = end.addingTimeInterval(15)
+                restLength += 15
+            } content: {
+                Text("+15").font(.subheadline.weight(.bold)).monospacedDigit()
+            }
+            .offset(x: side + 6, y: side - 15)
+        }
+    }
+
+    private func ringButton<Content: View>(size: CGFloat, tint: (fill: Color, ink: Color), id: String, label: String,
+                                           action: @escaping () -> Void, @ViewBuilder content: () -> Content) -> some View {
+        Button(action: action) {
+            content()
+                .foregroundStyle(tint.ink)
+                .frame(width: size, height: size)
+                .background(tint.fill, in: Circle())
+                .overlay(Circle().stroke(tint.ink.opacity(0.25), lineWidth: 1))
+                .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(id)
     }
 
     /// "Weight  −  34,5 kg  +" — under the rest ring (since 1.31, his ask: adjust the weight during the rest).
@@ -683,8 +822,10 @@ struct MachineScreen: View {
                 .font(.subheadline)
                 .foregroundStyle(Theme.muted)
                 .fixedSize()
+            // Easy green, OK blue, Hard orange (since 3.3, his ask "colour code"); before: all three blue.
             ChoicePills(options: Effort.allCases.map { ($0, $0.title, $0.rawValue) }, chosen: today.last?.effort,
-                        id: "gym-effort", fill: Gym.fill, ink: Gym.ink, tint: Gym.tint) { e in
+                        id: "gym-effort", fill: Gym.fill, ink: Gym.ink, tint: Gym.tint,
+                        colours: { Gym.effort($0) }) { e in
                 library.changeGym { $0.effort(visit: visit.id, machine: machineID, set: today.count - 1, e) }
             }
         }
@@ -850,6 +991,20 @@ struct MachineScreen: View {
         restEnd = restLength > 0 ? Date().addingTimeInterval(restLength) : nil
         now = Date()
         Cues.shared.rest("Rest")
+        // The keyboard opens on Weight with the number picked, to type the next set's weight
+        // (since 3.3, his pick: he almost always changes it during the rest); reps-only: on Reps.
+        // Screen tests keep the old way unless they ask for it with -restkeyboard.
+        if restEnd != nil, MachineScreen.restKeyboard {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                if restEnd != nil { typing = isReps ? .restReps : .restKg }
+            }
+        }
+    }
+
+    /// Off in screen tests (they tap the ring buttons right after a set), unless -restkeyboard.
+    static var restKeyboard: Bool {
+        let args = ProcessInfo.processInfo.arguments
+        return !args.contains("-uitest") || args.contains("-restkeyboard")
     }
 }
 
